@@ -1,13 +1,13 @@
 /**
  * 全局 Loading 加载管理模块
  *
- * 提供统一的全屏加载动画管理
+ * 提供统一的全屏加载动画管理（石斑鱼 + 泡泡动画）
  *
  * ## 主要功能
  *
  * - 全屏 Loading 显示和隐藏
  * - 自动适配明暗主题背景色
- * - 自定义 SVG 加载动画
+ * - 石斑鱼吐泡泡自定义动画
  * - 单例模式防止重复创建
  * - 锁定页面交互
  *
@@ -18,36 +18,11 @@
  * - 路由切换过渡
  * - 异步操作等待
  *
- * ## 特性
- *
- * - 自动检测当前主题并应用对应背景色
- * - 使用自定义 SVG 动画（四点旋转）
- * - 单例模式确保同时只有一个 Loading
- * - 提供便捷的显示/隐藏方法
- *
  * @module utils/ui/loading
  * @author GDOUHaiYuanYuYe
  */
-import { fourDotsSpinnerSvg } from '@/assets/svg/loading'
-
-/**
- * 获取当前主题对应的loading背景色
- * @returns 背景色字符串
- */
-const getLoadingBackground = (): string => {
-  const isDark = document.documentElement.classList.contains('dark')
-  return isDark ? 'rgba(7, 7, 7, 0.85)' : '#fff'
-}
-
-const DEFAULT_LOADING_CONFIG = {
-  lock: true,
-  get background() {
-    return getLoadingBackground()
-  },
-  svg: fourDotsSpinnerSvg,
-  svgViewBox: '0 0 40 40',
-  customClass: 'art-loading-fix'
-} as const
+import { createApp, type App as VueApp } from 'vue'
+import ArtFishLoading from '@/components/core/base/art-fish-loading/index.vue'
 
 interface LoadingInstance {
   close: () => void
@@ -62,12 +37,21 @@ export const loadingService = {
    */
   showLoading(): () => void {
     if (!loadingInstance) {
-      // 每次显示时获取最新的配置，确保背景色与当前主题同步
-      const config = {
-        ...DEFAULT_LOADING_CONFIG,
-        background: getLoadingBackground()
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      // 锁定页面滚动
+      document.body.style.overflow = 'hidden'
+
+      const app: VueApp = createApp(ArtFishLoading)
+      app.mount(container)
+
+      loadingInstance = {
+        close: () => {
+          app.unmount()
+          container.remove()
+          document.body.style.overflow = ''
+        }
       }
-      loadingInstance = ElLoading.service(config)
     }
     return () => this.hideLoading()
   },
