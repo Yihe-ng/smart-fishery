@@ -43,9 +43,25 @@
 
 <style scoped lang="scss">
   .sensor-card {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     cursor: pointer;
     border-left: 4px solid transparent;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+    transition:
+      border-color 0.25s ease,
+      box-shadow 0.25s ease,
+      transform 0.25s ease;
+
+    :deep(.el-card__body) {
+      padding: 16px;
+    }
+
+    &:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+      border-left-color: var(--el-color-primary);
+    }
 
     &.online {
       border-left-color: var(--el-color-success);
@@ -75,11 +91,28 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      box-shadow: 0 0 0 3px rgb(255 255 255 / 60%);
     }
 
     .name {
       font-size: 14px;
       font-weight: 500;
+      line-height: 1.4;
+    }
+
+    :deep(.el-tag) {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+  }
+
+  :global(.dark) .sensor-card {
+    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+
+    &:hover {
+      box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
     }
   }
 </style>

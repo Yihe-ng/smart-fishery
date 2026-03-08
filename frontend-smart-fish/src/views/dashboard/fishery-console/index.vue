@@ -276,6 +276,11 @@
 
     .production-card {
       border: 1px solid var(--art-border-color);
+      border-radius: 12px;
+
+      :deep(.el-card__header) {
+        border-bottom: 1px solid var(--art-border-color);
+      }
 
       .kpi-item {
         padding: 10px 0;

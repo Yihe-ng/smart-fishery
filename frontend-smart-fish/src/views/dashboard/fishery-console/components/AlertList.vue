@@ -62,13 +62,19 @@
 <style scoped lang="scss">
   .alert-list-card {
     border: 1px solid var(--art-border-color);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
 
     :deep(.el-card__header) {
-      padding: 12px 16px;
+      padding: 16px;
     }
 
     :deep(.el-card__body) {
       padding: 0;
+    }
+
+    :deep(.el-card__header) {
+      border-bottom: 1px solid var(--art-border-color);
     }
 
     .alert-items {
@@ -86,7 +92,7 @@
       }
 
       &:hover {
-        background-color: var(--art-gray-50);
+        background-color: var(--el-fill-color-light);
       }
 
       .message {
@@ -127,6 +133,21 @@
       .time {
         font-size: 12px;
         color: var(--art-gray-500);
+      }
+    }
+  }
+
+  :global(.dark) .alert-list-card {
+    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+
+    .alert-item {
+      &.high,
+      &.critical {
+        background-color: color-mix(in oklch, var(--el-color-danger) 12%, transparent);
+      }
+
+      &.warning {
+        background-color: color-mix(in oklch, var(--el-color-warning) 12%, transparent);
       }
     }
   }

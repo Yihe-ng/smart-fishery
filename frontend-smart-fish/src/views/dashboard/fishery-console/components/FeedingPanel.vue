@@ -94,9 +94,20 @@
 <style scoped lang="scss">
   .feeding-panel {
     border: 1px solid var(--art-border-color);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
 
     :deep(.el-card__body) {
       padding: 0;
     }
+
+    :deep(.el-card__header) {
+      padding: 16px;
+      border-bottom: 1px solid var(--art-border-color);
+    }
+  }
+
+  :global(.dark) .feeding-panel {
+    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
   }
 </style>

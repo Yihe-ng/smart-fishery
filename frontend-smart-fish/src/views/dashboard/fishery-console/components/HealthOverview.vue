@@ -99,9 +99,24 @@
 <style scoped lang="scss">
   .health-overview {
     border: 1px solid var(--art-border-color);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+
+    :deep(.el-card__header) {
+      padding: 16px;
+      border-bottom: 1px solid var(--art-border-color);
+    }
+
+    :deep(.el-card__body) {
+      padding: 16px;
+    }
 
     .score-container {
       flex-shrink: 0;
     }
+  }
+
+  :global(.dark) .health-overview {
+    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
   }
 </style>

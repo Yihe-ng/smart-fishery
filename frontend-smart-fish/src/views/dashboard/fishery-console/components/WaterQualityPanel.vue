@@ -11,21 +11,23 @@
         class="mb-3"
       >
         <el-card shadow="hover" class="metric-card" @click="handleCardClick(item)">
-          <div class="flex-cb">
+          <div class="flex-cb metric-head">
             <div class="flex-c gap-2">
-              <div
-                class="icon-box"
-                :style="{ backgroundColor: item.color + '20', color: item.color }"
-              >
+              <div class="icon-box" :style="iconBoxStyle(item.color)">
                 <ArtSvgIcon :icon="item.icon" />
               </div>
               <span class="label">{{ item.label }}</span>
             </div>
-            <el-tag :type="getStatusType(item.status)" size="small" effect="dark">
+            <el-tag
+              :type="getStatusType(item.status)"
+              size="small"
+              effect="light"
+              class="status-tag"
+            >
               {{ getStatusText(item.status) }}
             </el-tag>
           </div>
-          <div class="mt-3 flex-baseline gap-1">
+          <div class="mt-3 flex-baseline gap-1 metric-main">
             <span class="value">{{ item.value }}</span>
             <span class="unit">{{ item.unit }}</span>
           </div>
@@ -99,7 +101,7 @@
         value: props.data.temperature,
         unit: '℃',
         icon: 'ri:temp-hot-line',
-        color: '#409EFF', // var(--art-info) hex approximation
+        color: 'var(--el-color-primary)',
         status: getStatus(props.data.temperature, 'temperature')
       },
       {
@@ -108,7 +110,7 @@
         value: props.data.ph,
         unit: '',
         icon: 'ri:test-tube-line',
-        color: '#E6A23C', // var(--art-secondary) hex approximation
+        color: 'var(--el-color-warning)',
         status: getStatus(props.data.ph, 'ph')
       },
       {
@@ -117,7 +119,7 @@
         value: props.data.dissolvedOxygen,
         unit: 'mg/L',
         icon: 'ri:windy-line',
-        color: '#67C23A', // var(--art-success) hex approximation
+        color: 'var(--el-color-success)',
         status: getStatus(props.data.dissolvedOxygen, 'dissolvedOxygen')
       },
       {
@@ -126,7 +128,7 @@
         value: props.data.ammoniaNitrogen,
         unit: 'mg/L',
         icon: 'ri:flask-line',
-        color: '#E6A23C', // var(--art-warning) hex approximation
+        color: 'var(--el-color-warning)',
         status: getStatus(props.data.ammoniaNitrogen, 'ammoniaNitrogen')
       },
       {
@@ -135,11 +137,19 @@
         value: props.data.nitrite,
         unit: 'mg/L',
         icon: 'ri:drop-line',
-        color: '#F56C6C', // var(--art-danger) hex approximation
+        color: 'var(--el-color-danger)',
         status: getStatus(props.data.nitrite, 'nitrite')
       }
     ]
   })
+
+  const iconBoxStyle = (color: string) => {
+    return {
+      '--metric-accent': color,
+      color,
+      backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`
+    }
+  }
 
   const dialogVisible = ref(false)
   const currentItem = ref<MetricItem | null>(null)
@@ -287,11 +297,26 @@
     .metric-card {
       cursor: pointer;
       border: 1px solid var(--art-border-color);
-      transition: all 0.3s;
+      border-radius: 12px;
+      background: var(--art-main-bg-color);
+      box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+      transition:
+        border-color 0.25s ease,
+        box-shadow 0.25s ease,
+        transform 0.25s ease;
+
+      :deep(.el-card__body) {
+        padding: 16px;
+      }
 
       &:hover {
         border-color: var(--el-color-primary);
-        transform: translateY(-2px);
+        box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+        transform: translateY(-3px) scale(1.02);
+      }
+
+      .metric-head {
+        min-height: 26px;
       }
 
       .icon-box {
@@ -306,18 +331,54 @@
 
       .label {
         font-size: 14px;
+        font-weight: 500;
+        line-height: 1.4;
         color: var(--el-text-color-regular);
       }
 
+      .status-tag {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .metric-main {
+        align-items: baseline;
+        margin-top: 14px;
+        line-height: 1;
+      }
+
       .value {
-        font-size: 24px;
+        font-size: 28px;
         font-weight: 700;
+        line-height: 1;
         color: var(--el-text-color-primary);
       }
 
       .unit {
         font-size: 12px;
+        line-height: 1;
         color: var(--el-text-color-secondary);
+      }
+
+      :deep(.el-tag.status-tag) {
+        padding: 0 7px;
+      }
+    }
+  }
+
+  :global(.dark) .water-quality-panel {
+    .metric-card {
+      box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+
+      &:hover {
+        box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+      }
+
+      .icon-box {
+        color: color-mix(in oklch, var(--metric-accent) 72%, var(--el-text-color-primary));
+        background-color: color-mix(in oklch, var(--metric-accent) 12%, transparent);
       }
     }
   }
