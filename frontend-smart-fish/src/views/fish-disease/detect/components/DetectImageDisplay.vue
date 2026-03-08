@@ -7,7 +7,7 @@
         <el-text type="info">请上传本地图像或接入实时摄像头流</el-text>
       </div>
       <template v-else>
-        <img v-if="!isStream" :src="src" class="display-content" />
+        <img v-if="!isStream" :src="src" alt="病害检测图像" class="display-content" />
         <video v-else ref="videoRef" class="display-content" autoplay muted playsinline />
 
         <!-- 删除按钮 -->

@@ -11,7 +11,11 @@
     </template>
 
     <div v-if="detection" class="detection-container relative rounded overflow-hidden">
-      <img :src="detection.imageUrl" class="w-full h-auto block" />
+      <img
+        :src="detection.imageUrl"
+        :alt="diseaseLabel ? `AI识别结果：${diseaseLabel}` : 'AI识别抓拍图'"
+        class="w-full h-auto block"
+      />
 
       <!-- 模拟检测框 -->
       <div class="detection-box absolute border-2 border-error bg-error/10" :style="boxStyle">

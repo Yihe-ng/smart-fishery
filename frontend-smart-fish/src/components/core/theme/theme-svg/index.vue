@@ -57,6 +57,13 @@
     )
   }
 
+  const sanitizeSvgContent = (content: string): string => {
+    return content
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+      .replace(/\son\w+=("[^"]*"|'[^']*')/gi, '')
+      .replace(/\s(xlink:)?href=("|')\s*javascript:[\s\S]*?\2/gi, '')
+  }
+
   // 加载 SVG 文件内容
   const loadSvgContent = async () => {
     if (!props.src) {
@@ -71,7 +78,7 @@
       }
 
       const content = await response.text()
-      svgContent.value = applyThemeToSvg(content)
+      svgContent.value = applyThemeToSvg(sanitizeSvgContent(content))
     } catch (error) {
       console.error('Failed to load SVG:', error)
       svgContent.value = ''

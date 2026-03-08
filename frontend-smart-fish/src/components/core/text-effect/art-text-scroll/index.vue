@@ -20,13 +20,13 @@
       <!-- 原始内容 -->
       <span ref="textRef" class="inline-block">
         <slot>
-          <span v-html="text"></span>
+          <span v-html="sanitizedText"></span>
         </slot>
       </span>
       <!-- 克隆内容用于无缝循环 -->
       <span v-if="shouldClone" class="inline-block" :style="cloneSpacing">
         <slot>
-          <span v-html="text"></span>
+          <span v-html="sanitizedText"></span>
         </slot>
       </span>
     </div>
@@ -96,6 +96,13 @@
     type: 'theme',
     showClose: false,
     alwaysScroll: true
+  })
+
+  const sanitizedText = computed(() => {
+    return (props.text || '')
+      .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+      .replace(/\son\w+=("[^"]*"|'[^']*')/gi, '')
+      .replace(/javascript:/gi, '')
   })
 
   const emit = defineEmits<{

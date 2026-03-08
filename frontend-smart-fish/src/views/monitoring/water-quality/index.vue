@@ -48,9 +48,10 @@
 
       <div class="mb-4">
         <ArtSearchBar
-          v-model="searchQuery"
+          :model-value="searchQuery"
           :items="searchItems"
           :show-expand="false"
+          @update:model-value="handleSearchQueryUpdate"
           @search="loadData"
           @reset="handleReset"
         />
@@ -262,6 +263,10 @@
     } catch (err) {
       console.error('Failed to load water quality history:', err)
     }
+  }
+
+  const handleSearchQueryUpdate = (value: { dateRange: string[] }) => {
+    searchQuery.dateRange = value?.dateRange || []
   }
 
   const handleReset = () => {

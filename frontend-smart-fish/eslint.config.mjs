@@ -74,6 +74,7 @@ export default [
       'dist',
       'public',
       '.vscode/**',
+      'vite.config.ts.timestamp-*.mjs',
       'src/assets/**',
       'src/utils/console.ts'
     ]
