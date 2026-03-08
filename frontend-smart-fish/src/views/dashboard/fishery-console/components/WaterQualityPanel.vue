@@ -169,6 +169,15 @@
     dialogVisible.value = true
   }
 
+  // 将 CSS 变量转换为实际颜色值（ECharts canvas 无法解析 CSS 变量）
+  const resolveCssColor = (cssVar: string): string => {
+    if (!cssVar.startsWith('var(')) return cssVar
+    const varName = cssVar.match(/var\((--[^)]+)\)/)?.[1]
+    if (!varName) return cssVar
+    const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
+    return value || cssVar
+  }
+
   // 图表配置计算属性
   const chartOption = computed(() => {
     if (!currentItem.value) return {}
@@ -180,8 +189,11 @@
       .reverse() // 假设数据是按时间倒序的，图表需要正序
 
     const dates = historyData.map((d) => d.collectTime.split(' ')[1] || d.collectTime)
-    // @ts-expect-error 动态字段用于图表值映射
-    const values = historyData.map((d) => d[currentItem.value!.key])
+    const key = currentItem.value!.key as keyof WaterQualityData
+    const values = historyData.map((d) => {
+      const val = d[key]
+      return typeof val === 'number' ? val : null
+    })
 
     return {
       tooltip: {
@@ -239,7 +251,7 @@
           showSymbol: false,
           data: values,
           itemStyle: {
-            color: currentItem.value.color
+            color: resolveCssColor(currentItem.value.color)
           },
           areaStyle: {
             color: {
@@ -249,7 +261,7 @@
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: currentItem.value.color },
+                { offset: 0, color: resolveCssColor(currentItem.value.color) },
                 { offset: 1, color: 'rgba(255, 255, 255, 0)' }
               ]
             },
@@ -370,9 +382,13 @@
 
   :global(.dark) .water-quality-panel {
     .metric-card {
+      background: color-mix(in oklch, var(--art-main-bg-color) 80%, #ffffff 8%);
+      border-color: var(--art-gray-400);
       box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 
       &:hover {
+        border-color: var(--el-color-primary);
+        background: color-mix(in oklch, var(--art-main-bg-color) 75%, #ffffff 12%);
         box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
       }
 

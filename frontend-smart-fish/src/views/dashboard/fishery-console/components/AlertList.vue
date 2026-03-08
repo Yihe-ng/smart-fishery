@@ -1,49 +1,157 @@
 <template>
   <el-card shadow="never" class="alert-list-card">
     <template #header>
-      <div class="flex-cb">
+      <div class="flex-cb alert-header">
         <div class="flex-c gap-2">
           <el-badge :value="alerts.length" :hidden="alerts.length === 0" class="alert-badge">
             <ArtSvgIcon icon="ri:notification-3-line" class="text-lg text-red-500" />
           </el-badge>
-          <span class="font-bold">实时告警</span>
+          <span class="panel-title">实时告警</span>
+          <el-tag v-if="criticalCount > 0" type="danger" size="small" effect="light"
+            >严重 {{ criticalCount }}</el-tag
+          >
         </div>
-        <el-button link @click="isExpanded = !isExpanded">
+        <el-button
+          link
+          class="header-toggle-btn"
+          :aria-label="isExpanded ? '收起告警列表' : '展开告警列表'"
+          @click="isExpanded = !isExpanded"
+        >
           {{ isExpanded ? '收起' : '展开' }}
           <ArtSvgIcon :icon="isExpanded ? 'ri:arrow-up-s-line' : 'ri:arrow-down-s-line'" />
         </el-button>
       </div>
     </template>
 
-    <el-collapse-transition>
-      <div v-show="isExpanded">
-        <div v-if="alerts.length === 0" class="py-4 text-center text-g-500 text-sm">
-          暂无告警信息
+    <Transition name="panel-fade-slide" mode="out-in">
+      <div v-show="isExpanded" class="alert-content-wrap">
+        <div class="alert-toolbar">
+          <el-radio-group
+            v-model="activeLevel"
+            size="small"
+            class="level-filter"
+            aria-label="按级别筛选实时告警"
+          >
+            <el-radio-button v-for="item in levelOptions" :key="item.value" :label="item.value">
+              {{ item.label }}
+            </el-radio-button>
+          </el-radio-group>
         </div>
-        <div v-else class="alert-items">
-          <div v-for="alert in alerts" :key="alert.id" class="alert-item" :class="alert.level">
-            <div class="flex-cb mb-1">
-              <span class="title">{{ alert.title }}</span>
-              <span class="time">{{ formatTime(alert.createTime) }}</span>
-            </div>
-            <p class="message text-sm text-g-600">{{ alert.message }}</p>
-          </div>
+
+        <div v-if="filteredAlerts.length === 0" class="py-6 text-center text-g-500 text-sm"
+          >暂无告警信息</div
+        >
+
+        <div
+          v-else
+          class="alert-items"
+          role="list"
+          aria-label="实时告警列表"
+          aria-live="polite"
+          aria-atomic="false"
+        >
+          <TransitionGroup name="alert-fade" tag="div" move-class="alert-fade-move" appear>
+            <article
+              v-for="alert in filteredAlerts"
+              :key="alert.id"
+              class="alert-item"
+              :class="[`level-${alert.level}`, `type-${alert.type}`]"
+              role="listitem"
+              tabindex="0"
+              @keydown.enter="emit('view', alert)"
+              @keydown.space.prevent="emit('view', alert)"
+              :aria-label="`${levelTextMap[alert.level]}告警：${alert.title}`"
+            >
+              <div class="alert-accent" :class="`accent-${alert.level}`"></div>
+
+              <div class="alert-main">
+                <div class="alert-top-row">
+                  <div class="title-wrap">
+                    <el-tag size="small" effect="light" :type="levelTagTypeMap[alert.level]">
+                      {{ levelTextMap[alert.level] }}
+                    </el-tag>
+                    <el-tag size="small" effect="plain" class="type-tag">
+                      {{ typeTextMap[alert.type] }}
+                    </el-tag>
+                    <h4 class="title">{{ alert.title }}</h4>
+                  </div>
+                  <time class="time">{{ formatTime(alert.createTime) }}</time>
+                </div>
+
+                <p class="message">{{ alert.message }}</p>
+
+                <div class="alert-actions">
+                  <el-button link type="primary" size="small" @click.stop="emit('view', alert)">
+                    查看详情
+                  </el-button>
+                  <el-button
+                    link
+                    :type="alert.level === 'critical' ? 'danger' : 'info'"
+                    size="small"
+                    @click.stop="emit('resolve', alert)"
+                  >
+                    忽略告警
+                  </el-button>
+                </div>
+              </div>
+            </article>
+          </TransitionGroup>
         </div>
       </div>
-    </el-collapse-transition>
+    </Transition>
   </el-card>
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue'
+  import { computed, ref } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import type { Alert } from '@/types/alert'
 
-  defineProps<{
+  const props = defineProps<{
     alerts: Alert[]
   }>()
 
+  const emit = defineEmits<{
+    view: [alert: Alert]
+    resolve: [alert: Alert]
+  }>()
+
   const isExpanded = ref(true)
+  const activeLevel = ref<'all' | Alert['level']>('all')
+
+  const levelOptions = [
+    { label: '全部', value: 'all' },
+    { label: '严重', value: 'critical' },
+    { label: '警告', value: 'warning' },
+    { label: '提示', value: 'info' }
+  ] as const
+
+  const levelTextMap: Record<Alert['level'], string> = {
+    critical: '严重',
+    warning: '警告',
+    info: '提示'
+  }
+
+  const levelTagTypeMap: Record<Alert['level'], 'danger' | 'warning' | 'info'> = {
+    critical: 'danger',
+    warning: 'warning',
+    info: 'info'
+  }
+
+  const typeTextMap: Record<Alert['type'], string> = {
+    water_quality: '水质异常',
+    device_offline: '设备状态',
+    disease_detected: '病害识别'
+  }
+
+  const criticalCount = computed(
+    () => props.alerts.filter((item) => item.level === 'critical').length
+  )
+
+  const filteredAlerts = computed(() => {
+    if (activeLevel.value === 'all') return props.alerts
+    return props.alerts.filter((item) => item.level === activeLevel.value)
+  })
 
   const formatTime = (time: string) => {
     // 如果时间已经是 HH:mm 格式，直接返回
@@ -77,62 +185,149 @@
       border-bottom: 1px solid var(--art-border-color);
     }
 
+    .alert-header {
+      gap: 12px;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: var(--el-text-color-primary);
+    }
+
+    .header-toggle-btn {
+      min-height: 32px;
+    }
+
+    .alert-content-wrap {
+      padding-bottom: 6px;
+    }
+
+    .alert-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 10px 16px;
+      background: var(--art-main-bg-color);
+      border-bottom: 1px solid var(--art-border-color);
+
+      .level-filter {
+        :deep(.el-radio-button__inner) {
+          font-weight: 500;
+          transition: all 0.2s ease;
+        }
+
+        :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+          transform: translateY(-1px);
+        }
+      }
+    }
+
     .alert-items {
+      position: relative;
       max-height: 300px;
       overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .alert-item {
+      position: relative;
+      display: flex;
+      gap: 12px;
       padding: 12px 16px;
       border-bottom: 1px solid var(--art-border-color);
-      transition: background 0.3s;
+      transition: background-color 0.2s ease;
+      outline: none;
 
       &:last-child {
         border-bottom: none;
       }
 
-      &:hover {
+      &:hover,
+      &:focus-visible {
         background-color: var(--el-fill-color-light);
+        box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--el-color-primary) 35%, transparent);
+      }
+
+      .alert-accent {
+        width: 4px;
+        border-radius: 999px;
+        flex-shrink: 0;
+
+        &.accent-critical {
+          background: var(--el-color-danger);
+        }
+
+        &.accent-warning {
+          background: var(--el-color-warning);
+        }
+
+        &.accent-info {
+          background: var(--el-color-primary);
+        }
+      }
+
+      .alert-main {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .alert-top-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .type-tag {
+        color: var(--el-text-color-secondary);
+      }
+
+      .title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.35;
+        color: var(--el-text-color-primary);
       }
 
       .message {
-        margin: 0;
+        margin: 8px 0;
         color: var(--art-gray-600);
+        font-size: 14px;
+        line-height: 1.6;
       }
 
-      &.high {
+      .alert-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      &.level-critical {
         background-color: var(--el-color-danger-light-9);
-        border-color: var(--el-color-danger-light-5);
-
-        .title {
-          font-weight: bold;
-          color: var(--el-color-danger);
-        }
       }
 
-      &.critical {
-        background-color: var(--el-color-danger-light-9);
-        border-color: var(--el-color-danger-light-5);
-
-        .title {
-          font-weight: bold;
-          color: var(--el-color-danger);
-        }
-      }
-
-      &.warning {
+      &.level-warning {
         background-color: var(--el-color-warning-light-9);
-        border-color: var(--el-color-warning-light-5);
-
-        .title {
-          font-weight: bold;
-          color: var(--el-color-warning);
-        }
       }
 
       .time {
-        font-size: 12px;
+        font-size: 13px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
         color: var(--art-gray-500);
+        white-space: nowrap;
       }
     }
   }
@@ -141,14 +336,95 @@
     box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 
     .alert-item {
-      &.high,
-      &.critical {
+      &.level-critical {
         background-color: color-mix(in oklch, var(--el-color-danger) 12%, transparent);
       }
 
-      &.warning {
+      &.level-warning {
         background-color: color-mix(in oklch, var(--el-color-warning) 12%, transparent);
       }
+
+      &.level-info {
+        background-color: color-mix(in oklch, var(--el-color-primary) 12%, transparent);
+      }
+    }
+  }
+
+  .alert-fade-enter-active,
+  .alert-fade-leave-active {
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .alert-fade-move {
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .alert-fade-leave-active {
+    position: absolute;
+    z-index: 0;
+    width: calc(100% - 32px);
+  }
+
+  .alert-fade-enter-from,
+  .alert-fade-leave-to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+
+  .alert-fade-leave-to {
+    transform: translateX(16px) scale(0.96);
+  }
+
+  .panel-fade-slide-enter-active,
+  .panel-fade-slide-leave-active {
+    transition: all 0.2s ease;
+  }
+
+  .panel-fade-slide-enter-from,
+  .panel-fade-slide-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  @media (width <= 768px) {
+    .alert-list-card {
+      .alert-toolbar {
+        overflow-x: auto;
+
+        .level-filter {
+          min-width: max-content;
+        }
+      }
+
+      .alert-item {
+        padding: 10px 12px;
+
+        .alert-top-row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .time {
+          padding-left: 2px;
+        }
+
+        .alert-actions {
+          width: 100%;
+          justify-content: flex-end;
+        }
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .alert-fade-move,
+    .alert-fade-enter-active,
+    .alert-fade-leave-active,
+    .panel-fade-slide-enter-active,
+    .panel-fade-slide-leave-active,
+    .alert-item,
+    .level-filter :deep(.el-radio-button__inner) {
+      transition: none;
     }
   }
 </style>

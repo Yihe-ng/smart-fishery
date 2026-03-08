@@ -53,7 +53,12 @@
           </el-row>
         </div>
 
-        <AlertList :alerts="allAlerts" class="mb-5" />
+        <AlertList
+          :alerts="allAlerts"
+          class="mb-5"
+          @view="handleViewAlert"
+          @resolve="handleResolveAlert"
+        />
         <FeedingPanel />
       </el-col>
 
@@ -63,7 +68,9 @@
 
         <el-row :gutter="20" class="mb-5">
           <el-col :span="14">
-            <VideoPlayer src="http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8" />
+            <VideoPlayer
+              src="http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8"
+            />
           </el-col>
           <el-col :span="10">
             <AIDetectionResult :detection="latestDetection" />
@@ -120,7 +127,7 @@
   import AIDetectionResult from './components/AIDetectionResult.vue'
 
   import { getSensorDevices } from '@/api/device'
-  import { getRecentAlerts } from '@/api/alert'
+  import { getRecentAlerts, resolveAlert } from '@/api/alert'
   import { getHealthOverview } from '@/api/fish-disease/detect'
   import type { SensorDevice } from '@/types/device'
   import type { Alert } from '@/types/alert'
@@ -128,6 +135,17 @@
   import type { WaterQualityData } from '@/types/water-quality'
   import waterQualityMockData from '@/mock/water-quality-data.json'
   import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
+  import { ElMessage } from 'element-plus'
+
+  interface WaterQualityMockRow {
+    collectTime: string
+    temperature: number
+    ph: number
+    dissolvedOxygen: number
+    ammoniaNitrogen: number
+    nitrite: number
+    status: string
+  }
 
   const lastUpdateTime = ref(new Date().toLocaleTimeString())
   const currentPond = ref('P001')
@@ -138,6 +156,27 @@
   const currentIndex = ref(0)
   const currentWaterQuality = ref<WaterQualityData | null>(null)
 
+  const parseMockWaterQuality = (row: WaterQualityMockRow, index: number): WaterQualityData => {
+    const normalizedStatus: WaterQualityData['status'] =
+      row.status === 'danger' || row.status === 'warning' ? row.status : 'normal'
+
+    return {
+      id: `mock-${index}`,
+      collectTime: row.collectTime,
+      temperature: row.temperature,
+      ph: row.ph,
+      dissolvedOxygen: row.dissolvedOxygen,
+      ammoniaNitrogen: row.ammoniaNitrogen,
+      nitrite: row.nitrite,
+      status: normalizedStatus
+    }
+  }
+
+  type WaterMetricKey = keyof Pick<
+    WaterQualityData,
+    'temperature' | 'ph' | 'dissolvedOxygen' | 'ammoniaNitrogen' | 'nitrite'
+  >
+
   // 基于当前水质数据生成的告警
   const waterQualityAlerts = computed<Alert[]>(() => {
     if (!currentWaterQuality.value) return []
@@ -147,17 +186,21 @@
     const time = data.collectTime.split(' ')[1] || '刚刚'
 
     // 遍历检查每个指标
-    Object.entries(WATER_QUALITY_THRESHOLDS).forEach(([key, rule]) => {
-      // @ts-expect-error WATER_QUALITY_THRESHOLDS 为动态 key
+    Object.entries(WATER_QUALITY_THRESHOLDS).forEach(([rawKey, rule]) => {
+      const key = rawKey as WaterMetricKey
       const val = data[key]
       if (typeof val === 'number') {
+        const isDangerHigh = rule.max !== undefined && val > rule.max * 1.2
+        const isDangerLow = rule.min !== undefined && val < rule.min * 0.8
+        const level: Alert['level'] = isDangerHigh || isDangerLow ? 'critical' : 'warning'
+
         if (rule.max !== undefined && val > rule.max) {
           alerts.push({
             id: `wq-${key}-high-${Date.now()}`,
             title: `${rule.label}过高`,
             message: `当前${rule.label} ${val}，超过阈值 ${rule.max}`,
             createTime: time,
-            level: 'warning',
+            level,
             type: 'water_quality',
             status: 'pending'
           })
@@ -167,7 +210,7 @@
             title: `${rule.label}过低`,
             message: `当前${rule.label} ${val}，低于阈值 ${rule.min}`,
             createTime: time,
-            level: 'warning',
+            level,
             type: 'water_quality',
             status: 'pending'
           })
@@ -182,6 +225,21 @@
   const allAlerts = computed(() => {
     return [...waterQualityAlerts.value, ...deviceAlerts.value]
   })
+
+  const handleViewAlert = (alert: Alert) => {
+    ElMessage.info(`查看告警：${alert.title}`)
+  }
+
+  const handleResolveAlert = async (alert: Alert) => {
+    try {
+      await resolveAlert(alert.id)
+      deviceAlerts.value = deviceAlerts.value.filter((item) => item.id !== alert.id)
+      ElMessage.success('告警已忽略')
+    } catch (error) {
+      console.error('resolve alert failed:', error)
+      ElMessage.error('告警处理失败，请稍后重试')
+    }
+  }
 
   const healthData = ref<{
     score: number
@@ -211,8 +269,8 @@
     // 更新水质数据（循环切换下一条）
     if (waterQualityMockData && waterQualityMockData.length > 0) {
       currentIndex.value = (currentIndex.value + 1) % waterQualityMockData.length
-      // @ts-expect-error mock 数据为动态索引访问
-      currentWaterQuality.value = waterQualityMockData[currentIndex.value]
+      const current = waterQualityMockData[currentIndex.value] as WaterQualityMockRow
+      currentWaterQuality.value = parseMockWaterQuality(current, currentIndex.value)
     }
 
     try {
@@ -238,8 +296,8 @@
   onMounted(() => {
     // 初始化第一条数据
     if (waterQualityMockData && waterQualityMockData.length > 0) {
-      // @ts-expect-error mock 数据为动态索引访问
-      currentWaterQuality.value = waterQualityMockData[0]
+      const first = waterQualityMockData[0] as WaterQualityMockRow
+      currentWaterQuality.value = parseMockWaterQuality(first, 0)
     }
     refreshData()
   })
