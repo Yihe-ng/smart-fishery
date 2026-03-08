@@ -85,12 +85,13 @@
     height: 220px;
   }
 
-  /* 鱼层：居中偏右，z-index 低 */
+  /* 鱼层：居中，水平翻转使鱼头朝右 */
   .fish-layer {
     position: absolute;
     top: 10px;
-    left: 50px;  /* 向右偏移，左边留出空间给泡泡 */
+    left: 40px;  /* 居中，右侧留空间给泡泡 */
     z-index: 1;
+    transform: scaleX(-1);  /* 水平翻转 */
     animation: fish-swing 2.5s ease-in-out infinite;
   }
 
@@ -99,18 +100,15 @@
     height: 200px;
   }
 
-  /* 鱼轻微摆动动画 */
   @keyframes fish-swing {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    50% { transform: translateY(-6px) rotate(1deg); }
+    0%, 100% { transform: scaleX(-1) translateY(0) rotate(0deg); }
+    50% { transform: scaleX(-1) translateY(-6px) rotate(-1deg); }
   }
 
-  /* 泡泡层：定位在鱼嘴左侧（鱼嘴朝左，泡泡向左上漂） */
+  /* 泡泡层：定位在鱼嘴右侧（鱼头朝右，泡泡向右上漂） */
   .bubble-layer {
     position: absolute;
-    /* 鱼嘴在鱼层的坐标约 (20, 97)，鱼层 left=50，所以绝对 left=70 */
-    /* 泡泡起点在鱼嘴左侧一点 */
-    left: 45px;
+    left: 225px;  /* 鱼嘴右侧 */
     top: 107px;
     z-index: 2;
     width: 0;
@@ -134,9 +132,8 @@
 
   /*
    * 泡泡漂浮动画
-   * 鱼头朝左，嘴在左边
-   * 泡泡从嘴左侧生成，向左上方漂移（远离鱼身）
-   * 加X轴轻微摆动，模拟真实气泡曲线
+   * 鱼头朝右，嘴在右边
+   * 泡泡从嘴右侧生成，向右上方漂移（远离鱼身）
    */
   @keyframes bubble-float {
     0% {
@@ -149,21 +146,20 @@
     }
 
     25% {
-      /* 向左上漂移，X轴轻微右摆 */
-      transform: translate(-20px, -25px) scale(0.7) translateX(5px);
+      transform: translate(20px, -25px) scale(0.7);
     }
 
     50% {
-      transform: translate(-45px, -50px) scale(1.0) translateX(-3px);
+      transform: translate(45px, -50px) scale(1.0);
     }
 
     75% {
-      transform: translate(-65px, -70px) scale(1.15) translateX(4px);
+      transform: translate(65px, -70px) scale(1.15);
       opacity: 0.7;
     }
 
     100% {
-      transform: translate(-85px, -90px) scale(1.25);
+      transform: translate(85px, -90px) scale(1.25);
       opacity: 0;
     }
   }
