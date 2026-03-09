@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
   defineOptions({ name: 'ArtFishLoading' })
 
@@ -20,7 +19,6 @@
 <template>
   <div class="fish-loading-mask">
     <div class="fish-scene">
-
       <!-- 层1: 泡泡层（z-index 高，视觉在上）-->
       <div class="bubble-layer">
         <span
@@ -57,13 +55,16 @@
           />
         </svg>
       </div>
-
     </div>
   </div>
 </template>
 
 <style scoped>
-  /* 全屏遮罩 */
+  /*
+   * 全屏遮罩 - Glassmorphism 高斯模糊风格
+   * 设计理念：毛玻璃效果 + 双主题支持 + 无障碍适配
+   */
+
   .fish-loading-mask {
     position: fixed;
     inset: 0;
@@ -71,11 +72,34 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgb(250 251 252 / 95%);
+
+    /* 高斯模糊背景 - 直接应用，现代浏览器都支持 */
+    background: rgba(250, 251, 252, 0.55);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
   }
 
+  /* 暗色模式适配 */
   :global(html.dark) .fish-loading-mask {
-    background: rgb(7 7 7 / 88%);
+    background: rgba(15, 23, 42, 0.6);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
+  }
+
+  /*
+   * 无障碍支持：尊重用户减少透明度偏好
+   * WCAG 2.1 - prefers-reduced-transparency
+   */
+  @media (prefers-reduced-transparency: reduce) {
+    .fish-loading-mask {
+      background: rgba(250, 251, 252, 0.98);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    :global(html.dark) .fish-loading-mask {
+      background: rgba(15, 23, 42, 0.98);
+    }
   }
 
   /* 场景容器：280px 宽，给泡泡左侧留出漂移空间 */
@@ -89,9 +113,9 @@
   .fish-layer {
     position: absolute;
     top: 10px;
-    left: 40px;  /* 居中，右侧留空间给泡泡 */
+    left: 40px; /* 居中，右侧留空间给泡泡 */
     z-index: 1;
-    transform: scaleX(-1);  /* 水平翻转 */
+    transform: scaleX(-1); /* 水平翻转 */
     animation: fish-swing 2.5s ease-in-out infinite;
   }
 
@@ -101,15 +125,21 @@
   }
 
   @keyframes fish-swing {
-    0%, 100% { transform: scaleX(-1) translateY(0) rotate(0deg); }
-    50% { transform: scaleX(-1) translateY(-6px) rotate(-1deg); }
+    0%,
+    100% {
+      transform: scaleX(-1) translateY(0) rotate(0deg);
+    }
+
+    50% {
+      transform: scaleX(-1) translateY(-6px) rotate(-1deg);
+    }
   }
 
   /* 泡泡层：定位在鱼嘴右侧（鱼头朝右，泡泡向右上漂） */
   .bubble-layer {
     position: absolute;
     top: 107px;
-    left: 225px;  /* 鱼嘴右侧 */
+    left: 225px; /* 鱼嘴右侧 */
     z-index: 2;
     width: 0;
     height: 0;
@@ -150,7 +180,7 @@
     }
 
     50% {
-      transform: translate(45px, -50px) scale(1.0);
+      transform: translate(45px, -50px) scale(1);
     }
 
     75% {
