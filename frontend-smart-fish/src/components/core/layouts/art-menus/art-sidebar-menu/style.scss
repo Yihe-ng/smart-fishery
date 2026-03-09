@@ -154,16 +154,17 @@
 
     p {
       position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 58px;
+      inset: 0 8px 0 58px;
       box-sizing: border-box;
-      margin-left: 10px;
+      margin-left: 0;
+      overflow: visible;
       font-size: 18px;
+      white-space: nowrap;
 
       &.is-dual-menu-name {
-        left: 25px;
-        margin: auto;
+        inset: 0 25px;
+        margin: 0;
+        text-align: center;
       }
     }
   }

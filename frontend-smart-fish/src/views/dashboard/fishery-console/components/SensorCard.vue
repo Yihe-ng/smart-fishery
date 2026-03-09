@@ -58,9 +58,9 @@
     }
 
     &:hover {
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
       border-left-color: var(--el-color-primary);
+      box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+      transform: translateY(-3px) scale(1.02);
     }
 
     &.online {

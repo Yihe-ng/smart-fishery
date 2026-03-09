@@ -102,6 +102,7 @@
   .art-chart-container {
     overflow: hidden;
   }
+
   .chart-instance {
     width: 100%;
     height: 100%;

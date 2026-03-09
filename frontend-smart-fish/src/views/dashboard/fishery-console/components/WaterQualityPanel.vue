@@ -308,9 +308,9 @@
   .water-quality-panel {
     .metric-card {
       cursor: pointer;
+      background: var(--art-main-bg-color);
       border: 1px solid var(--art-border-color);
       border-radius: 12px;
-      background: var(--art-main-bg-color);
       box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
       transition:
         border-color 0.25s ease,
@@ -382,13 +382,13 @@
 
   :global(.dark) .water-quality-panel {
     .metric-card {
-      background: color-mix(in oklch, var(--art-main-bg-color) 80%, #ffffff 8%);
+      background: color-mix(in oklch, var(--art-main-bg-color) 80%, #fff 8%);
       border-color: var(--art-gray-400);
       box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 
       &:hover {
+        background: color-mix(in oklch, var(--art-main-bg-color) 75%, #fff 12%);
         border-color: var(--el-color-primary);
-        background: color-mix(in oklch, var(--art-main-bg-color) 75%, #ffffff 12%);
         box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
       }
 

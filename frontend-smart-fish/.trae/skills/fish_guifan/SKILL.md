@@ -1,6 +1,6 @@
 ---
 name: fish_guifan
-description: "Smart Fishery frontend dev guide based on Art Design Pro. Invoke when developing Vue3/Element Plus/Vite/Tailwind CSS features, creating pages/components, configuring routes, using useTable/ArtTable/ArtForm/ArtSearchBar, or working on fish-disease/water-quality/growth-monitoring modules. Keywords: 智慧渔业, Art Design Pro, frontend-smart-fish, useTable, ArtTable"
+description: "Smart Fishery frontend development guide. Invoke when working on Vue3/Element Plus/Vite/Tailwind CSS code, creating pages/components, adding routes, or developing fish-disease/water-quality/growth-monitoring features."
 ---
 
 # 智慧渔业前端开发规范 (基于 Art Design Pro)

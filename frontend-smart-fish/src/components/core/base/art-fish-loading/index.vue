@@ -71,11 +71,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(250, 251, 252, 0.95);
+    background: rgb(250 251 252 / 95%);
   }
 
   :global(html.dark) .fish-loading-mask {
-    background: rgba(7, 7, 7, 0.88);
+    background: rgb(7 7 7 / 88%);
   }
 
   /* 场景容器：280px 宽，给泡泡左侧留出漂移空间 */
@@ -108,8 +108,8 @@
   /* 泡泡层：定位在鱼嘴右侧（鱼头朝右，泡泡向右上漂） */
   .bubble-layer {
     position: absolute;
-    left: 225px;  /* 鱼嘴右侧 */
     top: 107px;
+    left: 225px;  /* 鱼嘴右侧 */
     z-index: 2;
     width: 0;
     height: 0;
@@ -118,16 +118,16 @@
   /* 泡泡：纯半透明实心圆 */
   .bubble {
     position: absolute;
+    background: rgb(17 150 219 / 60%);
     border-radius: 50%;
-    background: rgba(17, 150, 219, 0.6);
-    box-shadow: 0 0 8px rgba(17, 150, 219, 0.3);
-    animation: bubble-float linear infinite;
+    box-shadow: 0 0 8px rgb(17 150 219 / 30%);
     opacity: 0;
+    animation: bubble-float linear infinite;
   }
 
   :global(html.dark) .bubble {
-    background: rgba(17, 150, 219, 0.5);
-    box-shadow: 0 0 10px rgba(17, 150, 219, 0.4);
+    background: rgb(17 150 219 / 50%);
+    box-shadow: 0 0 10px rgb(17 150 219 / 40%);
   }
 
   /*
@@ -137,8 +137,8 @@
    */
   @keyframes bubble-float {
     0% {
-      transform: translate(0, 0) scale(0.3);
       opacity: 0;
+      transform: translate(0, 0) scale(0.3);
     }
 
     8% {
@@ -154,13 +154,13 @@
     }
 
     75% {
-      transform: translate(65px, -70px) scale(1.15);
       opacity: 0.7;
+      transform: translate(65px, -70px) scale(1.15);
     }
 
     100% {
-      transform: translate(85px, -90px) scale(1.25);
       opacity: 0;
+      transform: translate(85px, -90px) scale(1.25);
     }
   }
 </style>
