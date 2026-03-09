@@ -14,7 +14,7 @@
               >
             </div>
           </div>
-          <div class="mt-3 pt-3 border-t border-[var(--art-border-color)] flex-cb text-xs">
+          <div class="mt-3 pt-3 border-t border-[var(--default-border)] flex-cb text-xs">
             <span class="text-[var(--el-text-color-secondary)]">环比昨日</span>
             <span :class="kpi.trend > 0 ? 'text-green-500' : 'text-red-500'">
               {{ kpi.trend > 0 ? '+' : '' }}{{ kpi.trend }}%
@@ -34,7 +34,7 @@
             <span class="font-bold">生长趋势分析</span>
           </template>
           <div
-            class="h-80 flex-center bg-[var(--default-box-color)] border border-[var(--art-border-color)] rounded"
+            class="h-80 flex-center bg-[var(--default-box-color)] border border-[var(--default-border)] rounded"
           >
             <el-empty description="生长曲线图表加载中..." />
           </div>
@@ -65,7 +65,7 @@
             <span class="font-bold">规格分布预估</span>
           </template>
           <div
-            class="h-64 flex-center bg-[var(--default-box-color)] border border-[var(--art-border-color)] rounded"
+            class="h-64 flex-center bg-[var(--default-box-color)] border border-[var(--default-border)] rounded"
           >
             <el-empty description="规格分布饼图加载中..." />
           </div>
@@ -143,7 +143,7 @@
     background-color: var(--default-bg-color);
 
     .kpi-card {
-      border: 1px solid var(--art-border-color);
+      border: 1px solid var(--default-border);
 
       .icon-box {
         display: flex;

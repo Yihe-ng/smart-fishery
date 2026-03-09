@@ -3,7 +3,7 @@
   <div class="flex w-full h-screen">
     <LoginLeftView />
 
-    <div class="relative flex-1">
+    <div class="relative flex-1 bg-[var(--default-bg-color)]">
       <AuthTopBar />
 
       <div class="auth-right-wrap">

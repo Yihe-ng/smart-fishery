@@ -59,7 +59,7 @@
       <div
         v-if="shouldShowThemeToggle"
         class="btn theme-btn h-8 w-8 c-p flex-cc tad-300"
-        @click="themeAnimation"
+        @click="handleThemeToggle"
       >
         <ArtSvgIcon
           :icon="isDark ? 'ri:sun-fill' : 'ri:moon-line'"
@@ -75,9 +75,9 @@
   import { useSettingStore } from '@/store/modules/setting'
   import { useUserStore } from '@/store/modules/user'
   import { useHeaderBar } from '@/hooks/core/useHeaderBar'
-  import { themeAnimation } from '@/utils/ui/animation'
+  import { useTheme } from '@/hooks/core/useTheme'
   import { languageOptions } from '@/locales'
-  import { LanguageEnum } from '@/enums/appEnum'
+  import { LanguageEnum, SystemThemeEnum } from '@/enums/appEnum'
   import AppConfig from '@/config'
 
   defineOptions({ name: 'AuthTopBar' })
@@ -86,6 +86,12 @@
   const userStore = useUserStore()
   const { isDark, systemThemeColor } = storeToRefs(settingStore)
   const { shouldShowThemeToggle, shouldShowLanguage } = useHeaderBar()
+
+  // 安全切换主题
+  const { switchThemeStyles } = useTheme()
+  const handleThemeToggle = () => {
+    switchThemeStyles(isDark.value ? SystemThemeEnum.LIGHT : SystemThemeEnum.DARK)
+  }
   const { locale } = useI18n()
 
   const mainColors = AppConfig.systemMainColor

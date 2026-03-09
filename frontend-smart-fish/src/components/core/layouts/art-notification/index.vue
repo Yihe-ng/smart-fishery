@@ -380,8 +380,8 @@
     width: 320px;
     height: 420px;
     overflow: hidden;
-    background: var(--art-bg-color);
-    border: 1px solid var(--art-border-dashed-color);
+    background: var(--default-box-color);
+    border: 1px solid var(--default-border-dashed);
     border-radius: 12px;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     transform-origin: top right;

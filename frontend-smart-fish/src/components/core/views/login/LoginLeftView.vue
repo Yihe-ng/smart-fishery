@@ -37,7 +37,7 @@
       <div
         class="geo-element circle-top-right animate-fade-in-down"
         style="animation-delay: 0.5"
-        @click="themeAnimation"
+        @click="handleThemeToggle"
       ></div>
 
       <!-- 装饰点 -->
@@ -73,12 +73,22 @@
 <script setup lang="ts">
   import AppConfig from '@/config'
   import loginIcon from '@imgs/svg/login_icon.svg'
-  import { themeAnimation } from '@/utils/ui/animation'
+  import { useTheme } from '@/hooks/core/useTheme'
+  import { SystemThemeEnum } from '@/enums/appEnum'
+  import { useSettingStore } from '@/store/modules/setting'
 
   // 定义 props
   defineProps<{
     hideContent?: boolean // 是否隐藏内容，只显示 logo
   }>()
+
+  const settingStore = useSettingStore()
+  const { isDark } = storeToRefs(settingStore)
+  const { switchThemeStyles } = useTheme()
+
+  const handleThemeToggle = () => {
+    switchThemeStyles(isDark.value ? SystemThemeEnum.LIGHT : SystemThemeEnum.DARK)
+  }
 </script>
 
 <style lang="scss" scoped>

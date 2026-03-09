@@ -27,7 +27,7 @@
         </div>
       </template>
       <div
-        class="chart-container h-80 w-full bg-[var(--default-box-color)] border border-[var(--art-border-color)] rounded p-4"
+        class="chart-container h-80 w-full bg-[var(--default-box-color)] border border-[var(--default-border)] rounded p-4"
       >
         <ArtChart :option="chartOption" />
       </div>
