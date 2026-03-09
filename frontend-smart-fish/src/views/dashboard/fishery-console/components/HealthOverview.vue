@@ -98,25 +98,47 @@
 
 <style scoped lang="scss">
   .health-overview {
-    border: 1px solid var(--art-border-color);
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+    height: 100%;
+
+    :deep(.el-card) {
+      height: 100%;
+    }
 
     :deep(.el-card__header) {
       padding: 16px;
-      border-bottom: 1px solid var(--art-border-color);
     }
 
     :deep(.el-card__body) {
+      display: flex;
+      align-items: center;
+      height: calc(100% - 57px);
       padding: 16px;
+    }
+
+    :deep(.el-progress-dashboard) {
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .score-container {
       flex-shrink: 0;
     }
+
+    .risks-container {
+      min-width: 0;
+    }
   }
 
-  :global(.dark) .health-overview {
-    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+  @media (width <= 1200px) {
+    .health-overview {
+      :deep(.el-card__body) {
+        height: auto;
+      }
+
+      .risks-container {
+        margin-left: 16px;
+      }
+    }
   }
 </style>

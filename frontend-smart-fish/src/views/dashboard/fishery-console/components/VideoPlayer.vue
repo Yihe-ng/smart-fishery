@@ -86,15 +86,19 @@
 
 <style scoped lang="scss">
   .video-player-card {
-    border: 1px solid var(--art-border-color);
-    border-radius: 12px;
+    height: 100%;
+
+    :deep(.el-card) {
+      height: 100%;
+    }
 
     :deep(.el-card__body) {
+      height: calc(100% - 57px);
       padding: 12px;
     }
 
-    :deep(.el-card__header) {
-      border-bottom: 1px solid var(--art-border-color);
+    .video-container {
+      height: 100%;
     }
   }
 </style>

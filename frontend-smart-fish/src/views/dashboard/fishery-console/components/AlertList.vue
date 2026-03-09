@@ -169,20 +169,21 @@
 
 <style scoped lang="scss">
   .alert-list-card {
-    border: 1px solid var(--art-border-color);
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
 
     :deep(.el-card__header) {
       padding: 16px;
     }
 
     :deep(.el-card__body) {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
       padding: 0;
-    }
-
-    :deep(.el-card__header) {
-      border-bottom: 1px solid var(--art-border-color);
     }
 
     .alert-header {
@@ -201,6 +202,10 @@
     }
 
     .alert-content-wrap {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
       padding-bottom: 6px;
     }
 
@@ -212,8 +217,8 @@
       align-items: center;
       justify-content: flex-start;
       padding: 10px 16px;
-      background: var(--art-main-bg-color);
-      border-bottom: 1px solid var(--art-border-color);
+      background: var(--default-box-color);
+      border-bottom: 1px solid var(--art-card-border);
 
       .level-filter {
         :deep(.el-radio-button__inner) {
@@ -229,7 +234,8 @@
 
     .alert-items {
       position: relative;
-      max-height: 300px;
+      flex: 1;
+      min-height: 0;
       overflow: hidden auto;
     }
 
@@ -248,8 +254,7 @@
 
       &:hover,
       &:focus-visible {
-        background-color: var(--el-fill-color-light);
-        box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--el-color-primary) 35%, transparent);
+        background-color: var(--art-hover-color);
       }
 
       .alert-accent {
@@ -332,19 +337,25 @@
   }
 
   :global(.dark) .alert-list-card {
-    box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+    .alert-toolbar {
+      background: var(--default-box-color);
+      border-bottom: 1px solid rgba(255 255 255 / 0.06);
+    }
 
     .alert-item {
       &.level-critical {
         background-color: color-mix(in oklch, var(--el-color-danger) 12%, transparent);
       }
-
       &.level-warning {
         background-color: color-mix(in oklch, var(--el-color-warning) 12%, transparent);
       }
-
       &.level-info {
         background-color: color-mix(in oklch, var(--el-color-primary) 12%, transparent);
+      }
+
+      &:hover,
+      &:focus-visible {
+        background-color: var(--art-hover-color);
       }
     }
   }

@@ -30,88 +30,90 @@
       </div>
     </div>
 
-    <el-row :gutter="20">
-      <!-- 左侧区域 -->
-      <el-col :xs="24" :sm="24" :md="10" :lg="9">
-        <div class="panel-section mb-5">
-          <div class="section-title flex-c gap-2">
-            <ArtSvgIcon icon="ri:temp-hot-line" />
-            <span>水质监测指标 (模拟)</span>
-          </div>
+    <div class="dashboard-grid">
+      <section class="panel-section dashboard-panel area-water">
+        <div class="section-title flex-c gap-2">
+          <ArtSvgIcon icon="ri:temp-hot-line" />
+          <span>水质监测指标 (模拟)</span>
+        </div>
+        <div class="panel-content">
           <WaterQualityPanel :data="currentWaterQuality" />
         </div>
+      </section>
 
-        <div class="panel-section mb-5">
-          <div class="section-title flex-c gap-2">
-            <ArtSvgIcon icon="ri:cpu-line" />
-            <span>传感器设备状态 (模拟)</span>
-          </div>
+      <AlertList
+        :alerts="allAlerts"
+        class="area-alert dashboard-card-base dashboard-fill"
+        @view="handleViewAlert"
+        @resolve="handleResolveAlert"
+      />
+
+      <HealthOverview
+        :score="healthData.score"
+        :risks="healthData.risks"
+        class="area-health dashboard-card-base dashboard-fill"
+      />
+
+      <section class="panel-section dashboard-panel area-sensor">
+        <div class="section-title flex-c gap-2">
+          <ArtSvgIcon icon="ri:cpu-line" />
+          <span>传感器设备状态 (模拟)</span>
+        </div>
+        <div class="panel-content sensor-scroll">
           <el-row :gutter="10">
             <el-col v-for="device in sensorDevices" :key="device.id" :span="12">
               <SensorCard :device="device" />
             </el-col>
           </el-row>
         </div>
+      </section>
 
-        <AlertList
-          :alerts="allAlerts"
-          class="mb-5"
-          @view="handleViewAlert"
-          @resolve="handleResolveAlert"
-        />
-        <FeedingPanel />
-      </el-col>
+      <VideoPlayer
+        class="area-video dashboard-card-base dashboard-fill"
+        src="http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8"
+      />
 
-      <!-- 右侧区域 -->
-      <el-col :xs="24" :sm="24" :md="14" :lg="15">
-        <HealthOverview :score="healthData.score" :risks="healthData.risks" class="mb-5" />
+      <AIDetectionResult
+        :detection="latestDetection"
+        class="area-detect dashboard-card-base dashboard-fill"
+      />
 
-        <el-row :gutter="20" class="mb-5">
-          <el-col :span="14">
-            <VideoPlayer
-              src="http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8"
-            />
+      <FeedingPanel class="area-feed dashboard-card-base dashboard-fill" />
+
+      <!-- 生产数据预留 -->
+      <el-card shadow="never" class="production-card area-kpi dashboard-card-base dashboard-fill">
+        <template #header>
+          <div class="flex-cb">
+            <div class="flex-c gap-2">
+              <ArtSvgIcon icon="ri:bar-chart-box-line" class="text-blue-500" />
+              <span class="font-bold">生产关键指标 (KPI) (模拟)</span>
+            </div>
+            <el-button link type="primary" icon="ri:file-list-3-line">查看报表</el-button>
+          </div>
+        </template>
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <div class="kpi-item">
+              <div class="kpi-label">当前估重 (Avg)</div>
+              <div class="kpi-value">450<span class="kpi-unit">g</span></div>
+              <div class="kpi-trend up"><ArtSvgIcon icon="ri:arrow-right-up-line" /> 5.2%</div>
+            </div>
           </el-col>
-          <el-col :span="10">
-            <AIDetectionResult :detection="latestDetection" />
+          <el-col :span="8">
+            <div class="kpi-item">
+              <div class="kpi-label">存栏预估</div>
+              <div class="kpi-value">12,500<span class="kpi-unit">尾</span></div>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="kpi-item">
+              <div class="kpi-label">投喂量 (今日)</div>
+              <div class="kpi-value">1,600<span class="kpi-unit">g</span></div>
+            </div>
           </el-col>
         </el-row>
-
-        <!-- 生产数据预留 -->
-        <el-card shadow="never" class="production-card">
-          <template #header>
-            <div class="flex-cb">
-              <div class="flex-c gap-2">
-                <ArtSvgIcon icon="ri:bar-chart-box-line" class="text-blue-500" />
-                <span class="font-bold">生产关键指标 (KPI) (模拟)</span>
-              </div>
-              <el-button link type="primary" icon="ri:file-list-3-line">查看报表</el-button>
-            </div>
-          </template>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <div class="kpi-item">
-                <div class="kpi-label">当前估重 (Avg)</div>
-                <div class="kpi-value">450<span class="kpi-unit">g</span></div>
-                <div class="kpi-trend up"><ArtSvgIcon icon="ri:arrow-right-up-line" /> 5.2%</div>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="kpi-item">
-                <div class="kpi-label">存栏预估</div>
-                <div class="kpi-value">12,500<span class="kpi-unit">尾</span></div>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="kpi-item">
-                <div class="kpi-label">投喂量 (今日)</div>
-                <div class="kpi-value">1,600<span class="kpi-unit">g</span></div>
-              </div>
-            </el-col>
-          </el-row>
-        </el-card>
-      </el-col>
-    </el-row>
+      </el-card>
+    </div>
   </div>
 </template>
 
@@ -307,6 +309,7 @@
   .fishery-dashboard {
     padding: 20px;
     background-color: var(--art-bg-color);
+    background-color: var(--art-bg-color);
 
     .dashboard-header {
       .title-icon {
@@ -323,6 +326,81 @@
       }
     }
 
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1.25fr 1fr;
+      grid-template-rows: 340px 360px auto;
+      gap: 20px;
+      grid-template-areas:
+        'water alert health'
+        'sensor video detect'
+        'feed kpi kpi';
+      align-items: stretch;
+    }
+
+    .area-water {
+      grid-area: water;
+    }
+
+    .area-alert {
+      grid-area: alert;
+    }
+
+    .area-health {
+      grid-area: health;
+    }
+
+    .area-sensor {
+      grid-area: sensor;
+    }
+
+    .area-video {
+      grid-area: video;
+    }
+
+    .area-detect {
+      grid-area: detect;
+    }
+
+    .area-feed {
+      grid-area: feed;
+    }
+
+    .area-kpi {
+      grid-area: kpi;
+    }
+
+    .dashboard-fill {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .dashboard-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 12px 12px 0;
+      background: var(--default-box-color);
+      border: 1px solid var(--art-card-border);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
+      transition: box-shadow 0.2s ease;
+
+      &:hover {
+        box-shadow: 0 4px 16px rgb(0 0 0 / 10%);
+      }
+    }
+
+    .panel-content {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .sensor-scroll {
+      overflow: auto;
+      padding-right: 4px;
+    }
+
     .section-title {
       padding-left: 10px;
       margin-bottom: 12px;
@@ -333,11 +411,12 @@
     }
 
     .production-card {
-      border: 1px solid var(--art-border-color);
-      border-radius: 12px;
-
       :deep(.el-card__header) {
-        border-bottom: 1px solid var(--art-border-color);
+        border-bottom: 1px solid var(--art-card-border);
+      }
+
+      :deep(.el-card__body) {
+        height: calc(100% - 57px);
       }
 
       .kpi-item {
@@ -374,6 +453,78 @@
             color: var(--el-color-danger);
           }
         }
+      }
+    }
+
+    @media (width <= 1200px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+        grid-template-areas:
+          'water alert'
+          'health health'
+          'sensor video'
+          'detect feed'
+          'kpi kpi';
+      }
+    }
+
+    @media (width <= 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          'video'
+          'alert'
+          'health'
+          'water'
+          'detect'
+          'sensor'
+          'feed'
+          'kpi';
+      }
+    }
+  }
+
+  :global(.dark) .fishery-dashboard {
+    .dashboard-panel {
+      border-color: rgba(255 255 255 / 0.06);
+      box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+
+      &:hover {
+        box-shadow: 0 4px 16px rgb(0 0 0 / 50%);
+      }
+    }
+
+    .production-card {
+      :deep(.el-card__header) {
+        border-bottom: 1px solid rgba(255 255 255 / 0.06);
+      }
+    }
+  }
+</style>
+
+<style lang="scss">
+  .fishery-dashboard {
+    .dashboard-card-base {
+      background: var(--default-box-color);
+      border: 1px solid var(--art-card-border);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
+      transition: box-shadow 0.2s ease;
+
+      &:hover {
+        box-shadow: 0 4px 16px rgb(0 0 0 / 10%);
+      }
+    }
+  }
+
+  :global(.dark) .fishery-dashboard {
+    .dashboard-card-base {
+      border-color: rgba(255 255 255 / 0.06);
+      box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+
+      &:hover {
+        box-shadow: 0 4px 16px rgb(0 0 0 / 50%);
       }
     }
   }
