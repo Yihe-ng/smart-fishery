@@ -4,15 +4,15 @@
       <span class="font-bold">健康总览</span>
     </template>
 
-    <div class="flex items-center justify-around py-4">
+    <div class="content-wrapper">
       <!-- 分数圆环 -->
       <div class="score-container">
         <el-progress
           type="dashboard"
           :percentage="score"
           :color="scoreColor"
-          :width="120"
-          :stroke-width="10"
+          :width="140"
+          :stroke-width="12"
         >
           <template #default="{ percentage }">
             <div class="flex flex-col items-center">
@@ -26,8 +26,8 @@
       </div>
 
       <!-- 风险等级 -->
-      <div class="risks-container flex-1 ml-8">
-        <div v-for="(level, type) in riskItems" :key="type" class="risk-item mb-4 last:mb-0">
+      <div class="risks-container">
+        <div v-for="(level, type) in riskItems" :key="type" class="risk-item">
           <div class="flex-cb mb-1">
             <span class="text-sm text-g-600">{{ riskLabels[type] }}</span>
             <el-tag :type="getRiskTagType(level)" size="small" effect="plain">{{
@@ -38,6 +38,7 @@
             :percentage="getRiskPercentage(level)"
             :color="getRiskColor(level)"
             :show-text="false"
+            :stroke-width="10"
           />
         </div>
       </div>
@@ -98,35 +99,64 @@
 
 <style scoped lang="scss">
   .health-overview {
+    display: flex;
+    flex-direction: column;
     height: 100%;
 
     :deep(.el-card) {
+      display: flex;
+      flex-direction: column;
       height: 100%;
     }
 
     :deep(.el-card__header) {
+      flex-shrink: 0;
       padding: 16px;
     }
 
     :deep(.el-card__body) {
       display: flex;
-      align-items: center;
-      height: calc(100% - 57px);
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
       padding: 16px;
     }
 
-    :deep(.el-progress-dashboard) {
+    .content-wrapper {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+      flex: 1;
+      gap: 16px;
     }
 
     .score-container {
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
     }
 
     .risks-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
       min-width: 0;
+
+      .risk-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+
+        &:not(:last-child) {
+          margin-bottom: 12px;
+        }
+      }
+    }
+
+    :deep(.el-progress__bar) {
+      height: 10px !important;
     }
   }
 
@@ -136,8 +166,13 @@
         height: auto;
       }
 
+      .content-wrapper {
+        flex-direction: column;
+        gap: 16px;
+      }
+
       .risks-container {
-        margin-left: 16px;
+        width: 100%;
       }
     }
   }

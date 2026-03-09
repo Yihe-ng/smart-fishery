@@ -10,7 +10,7 @@
         :lg="4.8"
         class="mb-3"
       >
-        <el-card shadow="hover" class="metric-card" @click="handleCardClick(item)">
+        <el-card shadow="never" class="metric-card" :style="{ '--metric-accent': item.color }" @click="handleCardClick(item)">
           <div class="flex-cb metric-head">
             <div class="flex-c gap-2">
               <div class="icon-box" :style="iconBoxStyle(item.color)">
@@ -145,7 +145,6 @@
 
   const iconBoxStyle = (color: string) => {
     return {
-      '--metric-accent': color,
       color,
       backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`
     }
@@ -308,8 +307,9 @@
   .water-quality-panel {
     .metric-card {
       cursor: pointer;
-      background: var(--art-main-bg-color);
-      border: 1px solid var(--art-border-color);
+      --el-card-bg-color: var(--art-gray-100);
+      border: 1px solid var(--art-card-border);
+      border-left: 4px solid var(--metric-accent, var(--el-color-primary));
       border-radius: 12px;
       box-shadow: 0 2px 8px rgb(15 23 42 / 6%);
       transition:
@@ -322,7 +322,7 @@
       }
 
       &:hover {
-        border-color: var(--el-color-primary);
+        border-left-color: var(--metric-accent, var(--el-color-primary));
         box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
         transform: translateY(-3px) scale(1.02);
       }
@@ -382,13 +382,14 @@
 
   :global(.dark) .water-quality-panel {
     .metric-card {
-      background: color-mix(in oklch, var(--art-main-bg-color) 80%, #fff 8%);
+      --el-card-bg-color: var(--art-gray-300) !important;
       border-color: var(--art-gray-400);
+      border-left: 4px solid var(--metric-accent, var(--el-color-primary));
       box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
 
       &:hover {
-        background: color-mix(in oklch, var(--art-main-bg-color) 75%, #fff 12%);
-        border-color: var(--el-color-primary);
+        --el-card-bg-color: var(--art-gray-400) !important;
+        border-left-color: var(--metric-accent, var(--el-color-primary));
         box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
       }
 
