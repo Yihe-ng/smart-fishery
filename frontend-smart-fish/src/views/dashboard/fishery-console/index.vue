@@ -44,7 +44,6 @@
       <AlertList
         :alerts="allAlerts"
         class="area-alert dashboard-card-base dashboard-fill"
-        @view="handleViewAlert"
         @resolve="handleResolveAlert"
       />
 
@@ -198,7 +197,7 @@
 
         if (rule.max !== undefined && val > rule.max) {
           alerts.push({
-            id: `wq-${key}-high-${Date.now()}`,
+            id: `wq-${key}-high`,
             title: `${rule.label}过高`,
             message: `当前${rule.label} ${val}，超过阈值 ${rule.max}`,
             createTime: time,
@@ -208,7 +207,7 @@
           })
         } else if (rule.min !== undefined && val < rule.min) {
           alerts.push({
-            id: `wq-${key}-low-${Date.now()}`,
+            id: `wq-${key}-low`,
             title: `${rule.label}过低`,
             message: `当前${rule.label} ${val}，低于阈值 ${rule.min}`,
             createTime: time,
@@ -228,9 +227,7 @@
     return [...waterQualityAlerts.value, ...deviceAlerts.value]
   })
 
-  const handleViewAlert = (alert: Alert) => {
-    ElMessage.info(`查看告警：${alert.title}`)
-  }
+
 
   const handleResolveAlert = async (alert: Alert) => {
     try {
