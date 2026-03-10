@@ -227,8 +227,6 @@
     return [...waterQualityAlerts.value, ...deviceAlerts.value]
   })
 
-
-
   const handleResolveAlert = async (alert: Alert) => {
     try {
       await resolveAlert(alert.id)
@@ -421,26 +419,40 @@
         text-align: center;
 
         .kpi-label {
-          margin-bottom: 8px;
-          font-size: 14px;
-          color: var(--el-text-color-regular);
+          margin-bottom: 10px;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--art-gray-600);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
         }
 
         .kpi-value {
-          font-size: 24px;
+          font-size: 32px;
           font-weight: 800;
+          line-height: 1.1;
           color: var(--el-text-color-primary);
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -0.02em;
 
           .kpi-unit {
-            margin-left: 2px;
-            font-size: 12px;
-            font-weight: normal;
+            margin-left: 3px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--art-gray-500);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
           }
         }
 
         .kpi-trend {
-          margin-top: 4px;
+          margin-top: 6px;
           font-size: 12px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 2px;
 
           &.up {
             color: var(--el-color-success);
@@ -484,17 +496,18 @@
 
   :global(.dark) .fishery-dashboard {
     .dashboard-panel {
-      border-color: rgba(255 255 255 / 0.06);
-      box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+      border-color: rgba(99, 179, 237, 0.1);
+      box-shadow: 0 2px 12px rgb(0 0 0 / 50%);
 
       &:hover {
-        box-shadow: 0 4px 16px rgb(0 0 0 / 50%);
+        border-color: rgba(99, 179, 237, 0.2);
+        box-shadow: 0 4px 20px rgb(14 165 233 / 12%);
       }
     }
 
     .production-card {
       :deep(.el-card__header) {
-        border-bottom: 1px solid rgba(255 255 255 / 0.06);
+        border-bottom: 1px solid rgba(99, 179, 237, 0.1);
       }
     }
   }
@@ -517,11 +530,12 @@
 
   :global(.dark) .fishery-dashboard {
     .dashboard-card-base {
-      border-color: rgba(255 255 255 / 0.06);
-      box-shadow: 0 2px 8px rgb(0 0 0 / 40%);
+      border-color: rgba(99, 179, 237, 0.1);
+      box-shadow: 0 2px 12px rgb(0 0 0 / 50%);
 
       &:hover {
-        box-shadow: 0 4px 16px rgb(0 0 0 / 50%);
+        border-color: rgba(99, 179, 237, 0.2);
+        box-shadow: 0 4px 20px rgb(14 165 233 / 12%);
       }
     }
   }

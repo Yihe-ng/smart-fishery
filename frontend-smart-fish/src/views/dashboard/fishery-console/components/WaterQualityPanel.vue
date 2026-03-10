@@ -101,7 +101,7 @@
         value: props.data.temperature,
         unit: '℃',
         icon: 'ri:temp-hot-line',
-        color: 'var(--el-color-primary)',
+        color: 'var(--metric-temperature)',
         status: getStatus(props.data.temperature, 'temperature')
       },
       {
@@ -110,7 +110,7 @@
         value: props.data.ph,
         unit: '',
         icon: 'ri:test-tube-line',
-        color: 'var(--el-color-warning)',
+        color: 'var(--metric-ph)',
         status: getStatus(props.data.ph, 'ph')
       },
       {
@@ -119,7 +119,7 @@
         value: props.data.dissolvedOxygen,
         unit: 'mg/L',
         icon: 'ri:windy-line',
-        color: 'var(--el-color-success)',
+        color: 'var(--metric-oxygen)',
         status: getStatus(props.data.dissolvedOxygen, 'dissolvedOxygen')
       },
       {
@@ -128,7 +128,7 @@
         value: props.data.ammoniaNitrogen,
         unit: 'mg/L',
         icon: 'ri:flask-line',
-        color: 'var(--el-color-warning)',
+        color: 'var(--metric-ammonia)',
         status: getStatus(props.data.ammoniaNitrogen, 'ammoniaNitrogen')
       },
       {
@@ -137,7 +137,7 @@
         value: props.data.nitrite,
         unit: 'mg/L',
         icon: 'ri:drop-line',
-        color: 'var(--el-color-danger)',
+        color: 'var(--metric-nitrite)',
         status: getStatus(props.data.nitrite, 'nitrite')
       }
     ]
@@ -357,11 +357,21 @@
 
       .metric-main {
         align-items: baseline;
+        margin-top: 16px;
+        gap: 3px;
+        line-height: 1;
+        align-items: baseline;
         margin-top: 14px;
         line-height: 1;
       }
 
       .value {
+        font-size: 32px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--el-text-color-primary);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
         font-size: 28px;
         font-weight: 700;
         line-height: 1;
@@ -369,6 +379,12 @@
       }
 
       .unit {
+        font-size: 11px;
+        line-height: 1;
+        color: var(--art-gray-500);
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
         font-size: 12px;
         line-height: 1;
         color: var(--el-text-color-secondary);

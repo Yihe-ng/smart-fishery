@@ -47,6 +47,15 @@
   --art-el-active-color: #f2f4f5;
 }
 
+/* ==================== Fishery Dashboard - Water Quality Metric Colors ==================== */
+:root {
+  --metric-temperature: oklch(0.72 0.18 35);    /* 橙红 - 水温 */
+  --metric-ph:          oklch(0.65 0.18 290);   /* 紫色 - pH */
+  --metric-oxygen:      oklch(0.72 0.17 200);   /* 青蓝 - 溶解氧 */
+  --metric-ammonia:     oklch(0.75 0.15 75);    /* 琥珀 - 氨氮 */
+  --metric-nitrite:     oklch(0.65 0.22 25);    /* 红色 - 亚硝酸盐 */
+}
+
 /* ==================== Dark Mode Variables ==================== */
 .dark {
   /* Base Colors */
@@ -64,23 +73,23 @@
   --art-gray-900: #e3e3e8;
 
   /* Border Colors */
-  --art-card-border: rgba(255, 255, 255, 0.08);
+  --art-card-border: rgba(99, 179, 237, 0.08);  /* 带蓝调边框 */
 
   --default-border: rgba(255, 255, 255, 0.1);
   --default-border-dashed: #363843;
 
   /* Background Colors */
-  --default-bg-color: #070707;
-  --default-box-color: #161618;
+  --default-bg-color:  #0c1220;   /* 深海蓝底 */
+  --default-box-color: #162032;   /* 卡片层 */
 
   /* Hover Color */
-  --art-hover-color: #252530;
+  --art-hover-color: #1a2d45;
 
   /* Active Color */
-  --art-active-color: #202226;
+  --art-active-color: #1e3350;
 
   /* Element Component Active Color */
-  --art-el-active-color: #2e2e38;
+  --art-el-active-color: #1e3350;
 }
 
 /* ==================== Tailwind Theme Configuration ==================== */

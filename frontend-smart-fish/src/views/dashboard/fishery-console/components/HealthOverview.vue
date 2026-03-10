@@ -15,11 +15,15 @@
           :stroke-width="12"
         >
           <template #default="{ percentage }">
-            <div class="flex flex-col items-center">
-              <span class="text-3xl font-bold" :style="{ color: scoreColor }">{{
-                percentage
-              }}</span>
-              <span class="text-xs text-g-500">综合健康度</span>
+            <div class="flex flex-col items-center gap-0.5">
+              <span
+                class="text-4xl font-bold tracking-tight"
+                :style="{ color: scoreColor, fontVariantNumeric: 'tabular-nums' }"
+              >{{ percentage }}</span>
+              <span
+                class="text-xs font-medium tracking-wide"
+                style="color: var(--art-gray-500); text-transform: uppercase; letter-spacing: 0.08em;"
+              >综合健康度</span>
             </div>
           </template>
         </el-progress>
