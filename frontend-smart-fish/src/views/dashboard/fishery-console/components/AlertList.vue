@@ -20,11 +20,7 @@
           class="level-filter"
           aria-label="按级别筛选实时告警"
         >
-          <el-radio-button 
-            v-for="item in levelOptions" 
-            :key="item.value" 
-            :label="item.value"
-          >
+          <el-radio-button v-for="item in levelOptions" :key="item.value" :label="item.value">
             {{ item.label }}
           </el-radio-button>
         </el-radio-group>
@@ -127,7 +123,8 @@
     () => props.alerts,
     (val) => {
       if (isAnimating.value) return
-        displayedAlerts.value = activeLevel.value === 'all' ? val : val.filter(a => a.level === activeLevel.value)
+      displayedAlerts.value =
+        activeLevel.value === 'all' ? val : val.filter((a) => a.level === activeLevel.value)
     },
     { immediate: true, deep: true }
   )
@@ -137,43 +134,40 @@
     isAnimating.value = true
     isListVisible.value = false
     setTimeout(() => {
-      displayedAlerts.value = level === 'all'
-        ? props.alerts
-        : props.alerts.filter(a => a.level === level)
+      displayedAlerts.value =
+        level === 'all' ? props.alerts : props.alerts.filter((a) => a.level === level)
       animKey.value++
       isListVisible.value = true
       isAnimating.value = false
     }, 150)
   })
 
-
-  const criticalCount = computed(() => props.alerts.filter(a => a.level === 'critical').length)
+  const criticalCount = computed(() => props.alerts.filter((a) => a.level === 'critical').length)
 
   const levelOptions = [
     { label: '全部', value: 'all' },
     { label: '严重', value: 'critical' },
     { label: '警告', value: 'warning' },
-    { label: '提示', value: 'info' },
+    { label: '提示', value: 'info' }
   ] as const
 
   const levelTextMap: Record<string, string> = {
     critical: '严重',
     warning: '警告',
-    info: '提示',
+    info: '提示'
   }
 
   const levelIconMap: Record<string, string> = {
     critical: 'ri:error-warning-fill',
     warning: 'ri:alert-fill',
-    info: 'ri:information-fill',
+    info: 'ri:information-fill'
   }
 
   const levelTagTypeMap: Record<string, 'danger' | 'warning' | 'info' | 'primary' | 'success'> = {
     critical: 'danger',
     warning: 'warning',
-    info: 'info',
+    info: 'info'
   }
-
 
   const formatTime = (time: string) => {
     if (/^\d{2}:\d{2}$/.test(time)) return time
@@ -238,12 +232,9 @@
       .level-filter {
         :deep(.el-radio-button__inner) {
           font-weight: 500;
-          transition: background-color 0.2s ease, border-color 0.2s ease;
-        }
-
-        // 取消选中上浮效果，仅保留颜色变化
-        :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-          // 不再有 transform 和 box-shadow
+          transition:
+            background-color 0.2s ease,
+            border-color 0.2s ease;
         }
       }
     }
@@ -309,7 +300,9 @@
       outline: none;
       box-shadow: 0 2px 8px rgb(0 0 0 / 6%);
       // 只对box-shadow做transition，不干扰move动画的transform
-      transition: box-shadow 0.25s ease, background-color 0.25s ease;
+      transition:
+        box-shadow 0.25s ease,
+        background-color 0.25s ease;
 
       &:hover,
       &:focus-visible {
@@ -337,7 +330,12 @@
         .alert-glow-bar {
           background: var(--el-color-danger);
           .glow-inner {
-            background: linear-gradient(180deg, var(--el-color-danger) 0%, transparent 50%, var(--el-color-danger) 100%);
+            background: linear-gradient(
+              180deg,
+              var(--el-color-danger) 0%,
+              transparent 50%,
+              var(--el-color-danger) 100%
+            );
             animation: pulse-glow 2s ease-in-out infinite;
           }
         }
@@ -444,29 +442,50 @@
     }
 
     .alert-card {
-      border-color: rgba(255 255 255 / 0.06);
-      background: var(--default-box-color);
+      border-color: rgba(99, 179, 237, 0.18);
+      box-shadow:
+        0 2px 8px rgb(0 0 0 / 30%),
+        inset 0 1px 0 rgba(99, 179, 237, 0.06);
 
       &:hover,
       &:focus-visible {
-        box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+        box-shadow:
+          0 8px 24px rgb(0 0 0 / 40%),
+          0 0 0 1px rgba(99, 179, 237, 0.25);
       }
 
       .alert-actions {
         border-top-color: rgba(255 255 255 / 0.06);
       }
 
-      // 严重告警暗黑模式脉动
+      // 每个级别各自控制背景，基色统一为 #1e3a52
       &.level-critical {
-        background: linear-gradient(135deg, color-mix(in oklch, var(--el-color-danger) 8%, transparent) 0%, transparent 100%);
+        background: linear-gradient(
+          135deg,
+          color-mix(in oklch, var(--el-color-danger) 12%, #1e3a52) 0%,
+          #1e3a52 100%
+        );
       }
 
       &.level-warning {
-        background: linear-gradient(135deg, color-mix(in oklch, var(--el-color-warning) 6%, transparent) 0%, transparent 100%);
+        background: linear-gradient(
+          135deg,
+          color-mix(in oklch, var(--el-color-warning) 10%, #1e3a52) 0%,
+          #1e3a52 100%
+        );
       }
 
       &.level-info {
-        background: linear-gradient(135deg, color-mix(in oklch, var(--el-color-primary) 6%, transparent) 0%, transparent 100%);
+        background: linear-gradient(
+          135deg,
+          color-mix(in oklch, var(--el-color-primary) 10%, #1e3a52) 0%,
+          #1e3a52 100%
+        );
+      }
+
+      // 无级别时的默认背景（放在最后作为 fallback）
+      &:not(.level-critical):not(.level-warning):not(.level-info) {
+        background: #1e3a52;
       }
     }
 
@@ -477,7 +496,8 @@
 
   // 脉动动画
   @keyframes pulse-glow {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 0.4;
       transform: scaleY(1);
     }
@@ -531,61 +551,5 @@
   // 空状态淡入动画
   .empty-state {
     animation: empty-fade-in 0.4s ease-out;
-  }
-
-  @keyframes empty-fade-in {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @media (width <= 768px) {
-    .alert-list-card {
-      .alert-toolbar {
-        overflow-x: auto;
-
-        .level-filter {
-          min-width: max-content;
-        }
-      }
-
-      .alert-card {
-        .alert-top-row {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-
-        .alert-time {
-          padding-left: 2px;
-        }
-
-        .alert-actions {
-          justify-content: flex-end;
-          width: 100%;
-        }
-      }
-
-      .alert-list-inner {
-        gap: 10px;
-        padding: 10px 12px;
-      }
-    }
-  }
-
-  // 减少动画偏好
-  @media (prefers-reduced-motion: reduce) {
-    .alert-items,
-    .empty-state,
-    .alert-card,
-    .level-filter :deep(.el-radio-button__inner),
-    .alert-glow-bar .glow-inner {
-      animation: none !important;
-      transition: none !important;
-    }
   }
 </style>

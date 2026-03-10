@@ -10,7 +10,12 @@
         :lg="4.8"
         class="mb-3"
       >
-        <el-card shadow="never" class="metric-card" :style="{ '--metric-accent': item.color }" @click="handleCardClick(item)">
+        <el-card
+          shadow="never"
+          class="metric-card"
+          :style="{ '--metric-accent': item.color }"
+          @click="handleCardClick(item)"
+        >
           <div class="flex-cb metric-head">
             <div class="flex-c gap-2">
               <div class="icon-box" :style="iconBoxStyle(item.color)">
@@ -41,35 +46,36 @@
       :title="currentItem?.label + ' 24小时趋势'"
       width="700px"
       append-to-body
-      @opened="initChart"
+      @opened="handleDialogOpened"
+      @closed="handleDialogClosed"
     >
-      <div class="h-80 w-full" v-if="dialogVisible && currentItem">
-        <div ref="chartRef" class="w-full h-full"></div>
+      <div class="h-80 w-full">
+        <!-- 图表加载中占位 -->
+        <div v-if="!chartReady" class="flex items-center justify-center h-full">
+          <el-icon class="is-loading" :size="32">
+            <Loading />
+          </el-icon>
+        </div>
+        <!-- 实际图表 -->
+        <ArtChart v-if="chartReady && currentItem" :option="chartOption" />
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
+  import { ref, computed, nextTick } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
+  import { Loading } from '@element-plus/icons-vue'
   import type { WaterQualityData } from '@/types/water-quality'
   import waterQualityMockData from '@/mock/water-quality-data.json'
   import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
-  import * as echarts from 'echarts/core'
-  import { CanvasRenderer } from 'echarts/renderers'
-  import { LineChart } from 'echarts/charts'
-  import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
-
-  // 注册 ECharts 组件
-  echarts.use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent])
+  import ArtChart from '@/components/core/charts/art-chart/index.vue'
+  import type { EChartsOption } from '@/plugins/echarts'
 
   const props = defineProps<{
     data: WaterQualityData | null
   }>()
-
-  const chartRef = ref<HTMLElement | null>(null)
-  let chartInstance: echarts.ECharts | null = null
 
   interface MetricItem {
     key: string
@@ -81,14 +87,21 @@
     status: 'normal' | 'warning' | 'danger'
   }
 
+  // 指标颜色配置（硬编码 hex，ECharts canvas 无法解析 CSS 变量）
+  const metricColors: Record<string, string> = {
+    temperature: '#409EFF',
+    ph: '#E6A23C',
+    dissolvedOxygen: '#67C23A',
+    ammoniaNitrogen: '#F56C6C',
+    nitrite: '#9B59B6'
+  }
+
   const items = computed<MetricItem[]>(() => {
     if (!props.data) return []
 
-    // 状态判断逻辑
     const getStatus = (val: number, key: string) => {
       const rule = WATER_QUALITY_THRESHOLDS[key]
       if (!rule) return 'normal'
-
       if (rule.max !== undefined && val > rule.max) return 'warning'
       if (rule.min !== undefined && val < rule.min) return 'warning'
       return 'normal'
@@ -96,12 +109,12 @@
 
     return [
       {
-        key: 'temperature', // 对应 JSON 字段名
+        key: 'temperature',
         label: '水温',
         value: props.data.temperature,
         unit: '℃',
         icon: 'ri:temp-hot-line',
-        color: 'var(--metric-temperature)',
+        color: metricColors.temperature,
         status: getStatus(props.data.temperature, 'temperature')
       },
       {
@@ -110,7 +123,7 @@
         value: props.data.ph,
         unit: '',
         icon: 'ri:test-tube-line',
-        color: 'var(--metric-ph)',
+        color: metricColors.ph,
         status: getStatus(props.data.ph, 'ph')
       },
       {
@@ -119,7 +132,7 @@
         value: props.data.dissolvedOxygen,
         unit: 'mg/L',
         icon: 'ri:windy-line',
-        color: 'var(--metric-oxygen)',
+        color: metricColors.dissolvedOxygen,
         status: getStatus(props.data.dissolvedOxygen, 'dissolvedOxygen')
       },
       {
@@ -128,7 +141,7 @@
         value: props.data.ammoniaNitrogen,
         unit: 'mg/L',
         icon: 'ri:flask-line',
-        color: 'var(--metric-ammonia)',
+        color: metricColors.ammoniaNitrogen,
         status: getStatus(props.data.ammoniaNitrogen, 'ammoniaNitrogen')
       },
       {
@@ -137,29 +150,32 @@
         value: props.data.nitrite,
         unit: 'mg/L',
         icon: 'ri:drop-line',
-        color: 'var(--metric-nitrite)',
+        color: metricColors.nitrite,
         status: getStatus(props.data.nitrite, 'nitrite')
       }
     ]
   })
 
-  const iconBoxStyle = (color: string) => {
-    return {
-      color,
-      backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`
-    }
-  }
+  const iconBoxStyle = (color: string) => ({
+    color,
+    backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`
+  })
 
   const dialogVisible = ref(false)
   const currentItem = ref<MetricItem | null>(null)
+  const chartReady = ref(false)
 
-  const getStatusType = (status: string) => {
-    const map: any = { normal: 'success', warning: 'warning', danger: 'danger' }
+  const getStatusType = (status: string): 'success' | 'warning' | 'danger' | 'info' => {
+    const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
+      normal: 'success',
+      warning: 'warning',
+      danger: 'danger'
+    }
     return map[status] || 'info'
   }
 
   const getStatusText = (status: string) => {
-    const map: any = { normal: '正常', warning: '预警', danger: '告警' }
+    const map: Record<string, string> = { normal: '正常', warning: '预警', danger: '告警' }
     return map[status] || '未知'
   }
 
@@ -168,72 +184,69 @@
     dialogVisible.value = true
   }
 
-  // 将 CSS 变量转换为实际颜色值（ECharts canvas 无法解析 CSS 变量）
-  const resolveCssColor = (cssVar: string): string => {
-    if (!cssVar.startsWith('var(')) return cssVar
-    const varName = cssVar.match(/var\((--[^)]+)\)/)?.[1]
-    if (!varName) return cssVar
-    const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
-    return value || cssVar
+  // 关键：dialog 动画结束后，延迟挂载图表
+  const handleDialogOpened = async () => {
+    await nextTick() // 等待 Vue 完成 DOM 更新
+    chartReady.value = true // 此时才挂载 ArtChart
   }
 
-  // 图表配置计算属性
-  const chartOption = computed(() => {
+  // dialog 关闭时重置状态
+  const handleDialogClosed = () => {
+    chartReady.value = false
+  }
+
+  // 图表配置，完全对齐 water-quality/index.vue
+  const chartOption = computed<EChartsOption>(() => {
     if (!currentItem.value) return {}
 
-    // 获取历史数据
-    // 注意：这里简单取最近24条数据作为示例，实际应根据时间筛选
+    const config = currentItem.value
+    const color = metricColors[config.key]
+
     const historyData = (waterQualityMockData as unknown as WaterQualityData[])
       .slice(0, 24)
-      .reverse() // 假设数据是按时间倒序的，图表需要正序
+      .reverse()
 
     const dates = historyData.map((d) => d.collectTime.split(' ')[1] || d.collectTime)
-    const key = currentItem.value!.key as keyof WaterQualityData
-    const values = historyData.map((d) => {
-      const val = d[key]
-      return typeof val === 'number' ? val : null
-    })
+    const key = config.key as keyof WaterQualityData
+    const values = historyData.map((d) => d[key] as number)
 
     return {
       tooltip: {
         trigger: 'axis',
-        formatter: '{b} <br/> {a}: {c}' + currentItem.value.unit,
+        formatter: '{b} <br/> {a}: {c}' + config.unit,
         backgroundColor: 'rgba(50, 50, 50, 0.7)',
         borderColor: '#333',
-        textStyle: {
-          color: '#fff'
-        }
+        textStyle: { color: '#fff' }
       },
       grid: {
         top: '10%',
         left: '3%',
         right: '4%',
-        bottom: '3%',
+        bottom: '15%',
         containLabel: true
       },
+      dataZoom: [
+        {
+          type: 'inside',
+          start: 0,
+          end: 100
+        },
+        {
+          start: 0,
+          end: 100
+        }
+      ],
       xAxis: {
         type: 'category',
         boundaryGap: false,
         data: dates,
-        axisLine: {
-          lineStyle: {
-            color: '#909399'
-          }
-        },
-        axisLabel: {
-          color: '#909399'
-        }
+        axisLine: { lineStyle: { color: '#909399' } },
+        axisLabel: { color: '#909399' }
       },
       yAxis: {
         type: 'value',
-        axisLine: {
-          lineStyle: {
-            color: '#909399'
-          }
-        },
-        axisLabel: {
-          color: '#909399'
-        },
+        axisLine: { lineStyle: { color: '#909399' } },
+        axisLabel: { color: '#909399' },
         splitLine: {
           lineStyle: {
             color: '#E4E7ED',
@@ -244,14 +257,12 @@
       },
       series: [
         {
-          name: currentItem.value.label,
+          name: config.label,
           type: 'line',
           smooth: true,
           showSymbol: false,
           data: values,
-          itemStyle: {
-            color: resolveCssColor(currentItem.value.color)
-          },
+          itemStyle: { color },
           areaStyle: {
             color: {
               type: 'linear',
@@ -260,7 +271,7 @@
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: resolveCssColor(currentItem.value.color) },
+                { offset: 0, color },
                 { offset: 1, color: 'rgba(255, 255, 255, 0)' }
               ]
             },
@@ -269,37 +280,6 @@
         }
       ]
     }
-  })
-
-  // 初始化图表
-  const initChart = async () => {
-    await nextTick()
-    if (chartRef.value) {
-      if (chartInstance) {
-        chartInstance.dispose()
-      }
-      chartInstance = echarts.init(chartRef.value)
-      chartInstance.setOption(chartOption.value)
-    }
-  }
-
-  // 监听选项变化更新图表
-  watch(chartOption, (newVal) => {
-    if (chartInstance) {
-      chartInstance.setOption(newVal)
-    }
-  })
-
-  // 监听窗口大小变化
-  const handleResize = () => {
-    chartInstance?.resize()
-  }
-
-  window.addEventListener('resize', handleResize)
-
-  onBeforeUnmount(() => {
-    window.removeEventListener('resize', handleResize)
-    chartInstance?.dispose()
   })
 </script>
 
@@ -357,37 +337,27 @@
 
       .metric-main {
         align-items: baseline;
-        margin-top: 16px;
-        gap: 3px;
-        line-height: 1;
-        align-items: baseline;
         margin-top: 14px;
+        gap: 3px;
         line-height: 1;
       }
 
       .value {
-        font-size: 32px;
+        font-size: 28px;
         font-weight: 700;
         line-height: 1;
         color: var(--el-text-color-primary);
         font-variant-numeric: tabular-nums;
         letter-spacing: -0.02em;
-        font-size: 28px;
-        font-weight: 700;
-        line-height: 1;
-        color: var(--el-text-color-primary);
       }
 
       .unit {
-        font-size: 11px;
-        line-height: 1;
-        color: var(--art-gray-500);
-        font-weight: 500;
-        letter-spacing: 0.02em;
-        text-transform: uppercase;
         font-size: 12px;
         line-height: 1;
         color: var(--el-text-color-secondary);
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
       }
 
       :deep(.el-tag.status-tag) {
@@ -398,15 +368,25 @@
 
   :global(.dark) .water-quality-panel {
     .metric-card {
-      --el-card-bg-color: var(--art-gray-300) !important;
-      border-color: var(--art-gray-400);
+      border-color: rgba(99, 179, 237, 0.18);
       border-left: 4px solid var(--metric-accent, var(--el-color-primary));
-      box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+      box-shadow:
+        0 2px 8px rgb(0 0 0 / 30%),
+        inset 0 1px 0 rgba(99, 179, 237, 0.06);
+
+      :deep(.el-card) {
+        background-color: #1a3248;
+      }
 
       &:hover {
-        --el-card-bg-color: var(--art-gray-400) !important;
         border-left-color: var(--metric-accent, var(--el-color-primary));
-        box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+        box-shadow:
+          0 12px 28px rgb(0 0 0 / 40%),
+          0 0 0 1px rgba(99, 179, 237, 0.25);
+
+        :deep(.el-card) {
+          background-color: #1e3a52;
+        }
       }
 
       .icon-box {

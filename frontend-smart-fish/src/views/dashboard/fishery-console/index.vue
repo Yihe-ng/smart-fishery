@@ -510,6 +510,11 @@
         border-bottom: 1px solid rgba(99, 179, 237, 0.1);
       }
     }
+
+    // water 区域外层容器加深，形成容器深、内卡片浅的层次
+    .area-water.dashboard-panel {
+      background: #0f1e30;
+    }
   }
 </style>
 
