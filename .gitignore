@@ -13,3 +13,8 @@
 
 # 忽略根目录下的压缩包
 frontend-smart-fish.zip
+
+# 忽略 frontend 目录下的特定文件
+frontend/.env
+frontend/.vscode/
+frontend/nul
