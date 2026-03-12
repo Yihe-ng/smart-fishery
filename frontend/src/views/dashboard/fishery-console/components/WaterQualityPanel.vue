@@ -287,7 +287,7 @@
   .water-quality-panel {
     .metric-card {
       cursor: pointer;
-      --el-card-bg-color: var(--art-gray-100);
+      // 移除强制背景色覆盖，使用全局深色规则 var(--default-box-color)
       border: 1px solid var(--art-card-border);
       border-left: 4px solid var(--metric-accent, var(--el-color-primary));
       border-radius: 12px;
@@ -366,33 +366,25 @@
     }
   }
 
-  :global(.dark) .water-quality-panel {
-    .metric-card {
-      border-color: rgba(99, 179, 237, 0.18);
-      border-left: 4px solid var(--metric-accent, var(--el-color-primary));
+  :global(.dark) .water-quality-panel .metric-card {
+    border-color: rgba(99, 179, 237, 0.25);
+    border-left: 4px solid var(--metric-accent, var(--el-color-primary));
+    box-shadow:
+      0 2px 8px rgb(0 0 0 / 30%),
+      inset 0 1px 0 rgba(99, 179, 237, 0.06);
+    --el-card-bg-color: #224466 !important;
+
+    &:hover {
+      border-left-color: var(--metric-accent, var(--el-color-primary));
       box-shadow:
-        0 2px 8px rgb(0 0 0 / 30%),
-        inset 0 1px 0 rgba(99, 179, 237, 0.06);
+        0 12px 28px rgb(0 0 0 / 40%),
+        0 0 0 1px rgba(99, 179, 237, 0.25);
+      --el-card-bg-color: #2a5577 !important;
+    }
 
-      :deep(.el-card) {
-        background-color: #1a3248;
-      }
-
-      &:hover {
-        border-left-color: var(--metric-accent, var(--el-color-primary));
-        box-shadow:
-          0 12px 28px rgb(0 0 0 / 40%),
-          0 0 0 1px rgba(99, 179, 237, 0.25);
-
-        :deep(.el-card) {
-          background-color: #1e3a52;
-        }
-      }
-
-      .icon-box {
-        color: color-mix(in oklch, var(--metric-accent) 72%, var(--el-text-color-primary));
-        background-color: color-mix(in oklch, var(--metric-accent) 12%, transparent);
-      }
+    .icon-box {
+      color: color-mix(in oklch, var(--metric-accent) 72%, var(--el-text-color-primary));
+      background-color: color-mix(in oklch, var(--metric-accent) 12%, transparent);
     }
   }
 </style>
