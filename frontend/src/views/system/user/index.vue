@@ -32,6 +32,7 @@
 
       <!-- 用户弹窗 -->
       <UserDialog
+        ref="userDialogRef"
         v-model:visible="dialogVisible"
         :type="dialogType"
         :user-data="currentUserData"
@@ -45,11 +46,12 @@
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { ACCOUNT_TABLE_DATA } from '@/mock/temp/formData'
   import { useTable } from '@/hooks/core/useTable'
-  import { fetchGetUserList } from '@/api/system-manage'
+  import { fetchGetUserList, fetchCreateUser, fetchUpdateUser, fetchDeleteUser } from '@/api/system-manage'
   import UserSearch from './modules/user-search.vue'
   import UserDialog from './modules/user-dialog.vue'
-  import { ElTag, ElMessageBox, ElImage } from 'element-plus'
+  import { ElTag, ElMessageBox, ElImage, ElMessage } from 'element-plus'
   import { DialogType } from '@/types'
+  import { ref, computed, watch, nextTick } from 'vue'
 
   defineOptions({ name: 'User' })
 
@@ -59,25 +61,21 @@
   const dialogType = ref<DialogType>('add')
   const dialogVisible = ref(false)
   const currentUserData = ref<Partial<UserListItem>>({})
+  const userDialogRef = ref<any>(null)
 
   // 选中行
   const selectedRows = ref<UserListItem[]>([])
 
   // 搜索表单
   const searchForm = ref({
-    userName: undefined,
-    userGender: undefined,
-    userPhone: undefined,
-    userEmail: undefined,
-    status: '1'
+    keyword: undefined,
+    status: 1
   })
 
   // 用户状态配置
   const USER_STATUS_CONFIG = {
-    '1': { type: 'success' as const, text: '在线' },
-    '2': { type: 'info' as const, text: '离线' },
-    '3': { type: 'warning' as const, text: '异常' },
-    '4': { type: 'danger' as const, text: '注销' }
+    '1': { type: 'success' as const, text: '启用' },
+    '0': { type: 'danger' as const, text: '禁用' }
   } as const
 
   /**
@@ -122,33 +120,24 @@
         { type: 'selection' }, // 勾选列
         { type: 'index', width: 60, label: '序号' }, // 序号
         {
-          prop: 'userInfo',
+          prop: 'userName',
           label: '用户名',
           width: 280,
           // visible: false, // 默认是否显示列
           formatter: (row) => {
             return h('div', { class: 'user flex-c' }, [
-              h(ElImage, {
-                class: 'size-9.5 rounded-md',
-                src: row.avatar,
-                previewSrcList: [row.avatar],
-                // 图片预览是否插入至 body 元素上，用于解决表格内部图片预览样式异常
-                previewTeleported: true
-              }),
+              h('div', { class: 'size-9.5 rounded-md bg-blue-100 flex items-center justify-center text-blue-500' }, row.userName.charAt(0)),
               h('div', { class: 'ml-2' }, [
                 h('p', { class: 'user-name' }, row.userName),
-                h('p', { class: 'email' }, row.userEmail)
+                h('p', { class: 'email' }, row.email)
               ])
             ])
           }
         },
         {
-          prop: 'userGender',
-          label: '性别',
-          sortable: true,
-          formatter: (row) => row.userGender
+          prop: 'phone',
+          label: '手机号',
         },
-        { prop: 'userPhone', label: '手机号' },
         {
           prop: 'status',
           label: '状态',
@@ -183,7 +172,7 @@
     },
     // 数据处理
     transform: {
-      // 数据转换器 - 替换头像
+      // 数据转换器 - 处理数据
       dataTransformer: (records) => {
         // 类型守卫检查
         if (!Array.isArray(records)) {
@@ -191,11 +180,10 @@
           return []
         }
 
-        // 使用本地头像替换接口返回的头像
-        return records.map((item, index: number) => {
+        // 处理数据
+        return records.map((item) => {
           return {
             ...item,
-            avatar: ACCOUNT_TABLE_DATA[index % ACCOUNT_TABLE_DATA.length].avatar
           }
         })
       }
@@ -228,15 +216,23 @@
   /**
    * 删除用户
    */
-  const deleteUser = (row: UserListItem): void => {
+  const deleteUser = async (row: UserListItem): void => {
     console.log('删除用户:', row)
-    ElMessageBox.confirm(`确定要注销该用户吗？`, '注销用户', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'error'
-    }).then(() => {
-      ElMessage.success('注销成功')
-    })
+    try {
+      await ElMessageBox.confirm(`确定要注销该用户吗？`, '注销用户', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'error'
+      })
+      
+      if (row.id) {
+        await fetchDeleteUser(row.id)
+        ElMessage.success('注销成功')
+        refreshData()
+      }
+    } catch (error) {
+      console.error('删除失败:', error)
+    }
   }
 
   /**
@@ -244,10 +240,36 @@
    */
   const handleDialogSubmit = async () => {
     try {
+      if (!userDialogRef.value) return
+      
+      const formData = userDialogRef.value.formData
+      
+      if (dialogType.value === 'add') {
+        await fetchCreateUser({
+          userName: formData.username,
+          email: formData.username + '@example.com',
+          phone: formData.phone,
+          password: '123456',
+          roleIds: [],
+          status: 1
+        })
+        ElMessage.success('添加成功')
+      } else if (dialogType.value === 'edit' && currentUserData.value.id) {
+        await fetchUpdateUser(currentUserData.value.id, {
+          userName: formData.username,
+          email: formData.username + '@example.com',
+          phone: formData.phone,
+          roleIds: [],
+          status: 1
+        })
+        ElMessage.success('更新成功')
+      }
       dialogVisible.value = false
       currentUserData.value = {}
+      refreshData()
     } catch (error) {
       console.error('提交失败:', error)
+      ElMessage.error('操作失败，请重试')
     }
   }
 
