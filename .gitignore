@@ -1,45 +1,15 @@
 # Git Ignore File
 
-# 系统文件
-.DS_Store
-Thumbs.db
+# 忽略所有文件和目录
+/*
 
-# IDE 配置
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
+# 但保留 frontend 和 backend 目录
+!frontend/
+!backend/
 
-# 环境文件
-.env
-.env.local
-.env.*.local
+# 保留这两个目录下的所有内容
+!frontend/**/*
+!backend/**/*
 
-# 依赖目录
-node_modules/
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-
-# 构建输出
-dist/
-build/
-*.log
-
-# AI 工具文件（可选，根据需要保留）
-# .cobridge/
-# .traerules
-# .cursorrules
-# .github/copilot-instructions.md
-
-# 压缩包
-*.zip
-*.rar
-*.7z
-
-# 临时文件
-nul
-skills-lock.json
+# 忽略根目录下的压缩包
+frontend-smart-fish.zip
