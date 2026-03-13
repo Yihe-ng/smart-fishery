@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from app.schemas.water import WaterQualityCreate
-from crud.crud_water import create_water_quality_data, get_latest_water_quality, get_water_quality_history
+from app.crud.crud_water import create_water_quality_data, get_latest_water_quality, get_water_quality_history
 from algorithms.prediction import analyze_water_quality
 
 

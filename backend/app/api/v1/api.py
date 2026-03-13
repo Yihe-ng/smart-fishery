@@ -4,7 +4,7 @@ from app.api.v1.endpoints import auth, water_quality, user, role, menu
 api_router = APIRouter()
 
 # 包含认证路由
-api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
+api_router.include_router(auth.router, tags=["认证"])
 
 # 包含水质检测路由
 api_router.include_router(water_quality.router, prefix="/water-quality", tags=["水质检测"])

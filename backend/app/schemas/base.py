@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Generic, TypeVar,Optional,List
+from typing import Generic, TypeVar, Optional, List
 
 T = TypeVar('T')
 
@@ -9,14 +9,13 @@ class BaseResponse(BaseModel, Generic[T]):
     msg: str
     data: T
 
-#分页功能实现
 class PageQuery(BaseModel):
     """分页查询参数"""
     pageNum: int = 1
-    pageSize: int = 10   #每页规定数据数目
-    keyword: Optional[str] = None    #默认为NONE
-    
-class PageResult(BaseModel,Generic[T]):
+    pageSize: int = 10
+    keyword: Optional[str] = None
+
+class PageResult(BaseModel, Generic[T]):
     """分页结果"""
-    total: int 
+    total: int
     list: List[T] = []

@@ -7,12 +7,14 @@ from app.schemas.user import (
     ForgotPasswordRequest, 
     ResetPasswordRequest
 )
-from models.base import BaseResponse
+from app.schemas.base import BaseResponse
 import random
 
-router = APIRouter()
+router = APIRouter(
+    tags=["认证"]
+)
 
-@router.post("/login", response_model=BaseResponse[LoginResponse])
+@router.post("/auth/login", response_model=BaseResponse[LoginResponse])
 def login(request: LoginRequest):
     """用户登录接口"""
     valid_users = {
@@ -35,7 +37,7 @@ def login(request: LoginRequest):
         )
     )
 
-@router.post("/register", response_model=BaseResponse[dict])
+@router.post("/auth/register", response_model=BaseResponse[dict])
 def register(request: RegisterRequest):
     """用户注册接口"""
     if request.password != request.confirmPassword:
@@ -122,7 +124,7 @@ user_info_data = {
 verification_codes = {}
 
 # 获取用户信息
-@router.get("/user/info", response_model=BaseResponse[UserInfoResponse])
+@router.get("/auth/user/info", response_model=BaseResponse[UserInfoResponse])
 def get_user_info():
     """获取用户信息接口"""
     user_info = user_info_data.get("Super")
@@ -138,7 +140,7 @@ def get_user_info():
     )
 
 # 忘记密码接口
-@router.post("/forgot-password", response_model=BaseResponse[dict])
+@router.post("/auth/forgot-password", response_model=BaseResponse[dict])
 def forgot_password(request: ForgotPasswordRequest):
     """忘记密码接口"""
     user_found = False
@@ -165,7 +167,7 @@ def forgot_password(request: ForgotPasswordRequest):
     )
 
 # 重置密码接口
-@router.post("/reset-password", response_model=BaseResponse[dict])
+@router.post("/auth/reset-password", response_model=BaseResponse[dict])
 def reset_password(request: ResetPasswordRequest):
     """重置密码接口"""
     if request.email not in verification_codes or verification_codes[request.email] != request.code:
