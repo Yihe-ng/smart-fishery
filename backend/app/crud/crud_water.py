@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models.water import WaterQualityData, SensorDevice, AlertRecord
+from app.models.water import WaterQualityData, SensorDevice, AlertRecord
 from app.schemas.water import WaterQualityCreate
 from datetime import datetime
 

@@ -3,8 +3,8 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 from sqlalchemy.orm import Session
-from db.session import get_db
-from models.user import User
+from app.db.session import get_db
+from app.models.user import User
 from passlib.context import CryptContext
 
 router = APIRouter()

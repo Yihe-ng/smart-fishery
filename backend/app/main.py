@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from app.api.v1.api import api_router
 from fastapi.middleware.cors import CORSMiddleware
-from db.session import engine
-from db.base import Base
+from app.db.session import engine
+from app.db.base import Base
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)

@@ -4,13 +4,13 @@ from app.schemas.water import (
     WaterQualityCreate, WaterQualityResponse, 
     WaterQualityHistoryRequest, WaterQualityHistoryResponse
 )
-from services.water_analysis import (
+from app.services.water_analysis import (
     process_water_quality_data,
     get_latest_water_quality_service,
     get_water_quality_history_service
 )
-from db.session import get_db
-from models.base import BaseResponse
+from app.db.session import get_db
+from app.schemas.base import BaseResponse
 from datetime import datetime
 
 router = APIRouter()
