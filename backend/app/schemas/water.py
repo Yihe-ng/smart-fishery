@@ -5,10 +5,11 @@ from datetime import datetime
 
 class WaterQualityBase(BaseModel):
     """水质数据基础模型"""
-    dissolved_oxygen: float
-    ph_value: float
-    temperature: float
-    ammonia_nitrogen: float
+    dissolved_oxygen: float  # 溶解氧 mg/L
+    ph_value: float          # pH值
+    temperature: float       # 温度 ℃
+    ammonia_nitrogen: float  # 氨氮 mg/L
+    nitrite: float           # 亚硝酸盐 mg/L
     sensor_id: str
     pond_id: str
 
@@ -24,6 +25,7 @@ class WaterQualityUpdate(BaseModel):
     ph_value: Optional[float] = None
     temperature: Optional[float] = None
     ammonia_nitrogen: Optional[float] = None
+    nitrite: Optional[float] = None
 
 
 class WaterQualityResponse(WaterQualityBase):

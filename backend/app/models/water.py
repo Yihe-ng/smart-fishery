@@ -22,10 +22,11 @@ class WaterQualityData(Base):
     id = Column(Integer, primary_key=True, index=True)
     sensor_id = Column(String, nullable=False, index=True)
     pond_id = Column(String, nullable=False, index=True)
-    dissolved_oxygen = Column(Float, nullable=False)
-    ph_value = Column(Float, nullable=False)
-    temperature = Column(Float, nullable=False)
-    ammonia_nitrogen = Column(Float, nullable=False)
+    dissolved_oxygen = Column(Float, nullable=False)  # 溶解氧 mg/L
+    ph_value = Column(Float, nullable=False)          # pH值
+    temperature = Column(Float, nullable=False)       # 温度 ℃
+    ammonia_nitrogen = Column(Float, nullable=False)  # 氨氮 mg/L
+    nitrite = Column(Float, nullable=False)           # 亚硝酸盐 mg/L
     analysis_result = Column(String, nullable=True)
     alert_level = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -13,6 +13,7 @@ def create_water_quality_data(db: Session, data: WaterQualityCreate, analysis_re
         ph_value=data.ph_value,
         temperature=data.temperature,
         ammonia_nitrogen=data.ammonia_nitrogen,
+        nitrite=data.nitrite,
         analysis_result=analysis_result,
         alert_level=alert_level
     )

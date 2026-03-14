@@ -15,7 +15,6 @@
     <el-row :gutter="20">
       <!-- 左侧控制面板 -->
       <el-col :xs="24" :sm="24" :md="8" :lg="6">
-        <GrowthControlPanel v-model="confidence" class="mb-4" />
         <GrowthStatsSummary :stats="growthStats" />
         <GrowthResultCard :result="latestDetection" />
       </el-col>
@@ -45,7 +44,6 @@
   import { ElMessage } from 'element-plus'
   import type { GrowthDetectionItem, GrowthStats } from '@/types/growth-monitoring'
   import { detectGrowth, getCameraStream } from '@/api/growth-monitoring/detect'
-  import GrowthControlPanel from './components/GrowthControlPanel.vue'
   import GrowthStatsSummary from './components/GrowthStatsSummary.vue'
   import GrowthImageDisplay from './components/GrowthImageDisplay.vue'
   import GrowthActionButtons from './components/GrowthActionButtons.vue'
@@ -54,11 +52,9 @@
   defineOptions({ name: 'GrowthMonitoringDetect' })
 
   // 状态定义
-  const confidence = ref(50)
   const currentImage = ref<string | null>(null)
   const isCameraActive = ref(false)
   const isStream = ref(false)
-  
   // 生长状态统计
   const growthStats = reactive<GrowthStats>({
     small: 0,
@@ -113,7 +109,6 @@
       isCameraActive.value = true
       resetStats()
       ElMessage.success('摄像头已开启')
-      
       // 模拟实时检测 (每3秒更新一次数据)
       startRealTimeSimulation()
     } catch (err) {
@@ -129,7 +124,6 @@
       window.clearInterval(simulationTimer)
       simulationTimer = null
     }
-    
     simulationTimer = window.setInterval(async () => {
       if (!isCameraActive.value) {
         if (simulationTimer) window.clearInterval(simulationTimer)
