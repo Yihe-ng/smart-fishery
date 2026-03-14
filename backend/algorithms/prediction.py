@@ -11,6 +11,7 @@ def analyze_water_quality(data):
     ph_value = data.get('ph_value', 0)
     temperature = data.get('temperature', 0)
     ammonia_nitrogen = data.get('ammonia_nitrogen', 0)
+    nitrite = data.get('nitrite', 0)  # 亚硝酸盐
     
     # 分析结果
     analysis_result = ""
@@ -33,15 +34,15 @@ def analyze_water_quality(data):
     
     # pH值分析
     if ph_value < 6.5:
-        analysis_result += "pH值偏低，"
+        analysis_result += "pH值偏低,"
         if alert_level != "critical":
             alert_level = "high"
     elif ph_value > 8.5:
-        analysis_result += "pH值偏高，"
+        analysis_result += "pH值偏高,"
         if alert_level != "critical":
             alert_level = "high"
     else:
-        analysis_result += "pH值正常，"
+        analysis_result += "pH值正常,"
     
     # 温度分析
     if temperature < 18:
@@ -63,8 +64,19 @@ def analyze_water_quality(data):
     else:
         analysis_result += "氨氮含量正常，"
     
+    # 亚硝酸盐分析
+    if nitrite > 0.1:
+        analysis_result += "亚硝酸盐超标，"
+        alert_level = "critical"
+    elif nitrite > 0.05:
+        analysis_result += "亚硝酸盐偏高，"
+        if alert_level != "critical":
+            alert_level = "high"
+    else:
+        analysis_result += "亚硝酸盐含量正常，"
+    
     # 去除末尾的逗号
-    if analysis_result.endswith("，"):
+    if analysis_result.endswith(","):
         analysis_result = analysis_result[:-1]
     
     return {

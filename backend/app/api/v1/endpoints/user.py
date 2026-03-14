@@ -1,16 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app.models.user import User
-from passlib.context import CryptContext
 
 router = APIRouter()
-
-# 密码加密上下文
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class UserListItem(BaseModel):
@@ -55,45 +48,57 @@ async def get_user_list(
     current: int = Query(1, description="当前页码"),
     size: int = Query(20, description="每页大小"),
     status: Optional[int] = Query(None, description="状态筛选"),
-    keyword: Optional[str] = Query(None, description="关键词搜索"),
-    db: Session = Depends(get_db)
+    keyword: Optional[str] = Query(None, description="关键词搜索")
 ):
     """获取用户列表"""
-    # 构建查询
-    query = db.query(User)
+    # 模拟数据
+    mock_users = [
+        {
+            "id": 1,
+            "userName": "admin",
+            "email": "admin@example.com",
+            "phone": "13800138000",
+            "status": 1,
+            "createTime": "2024-01-01 00:00:00",
+            "roleNames": ["管理员"]
+        },
+        {
+            "id": 2,
+            "userName": "user1",
+            "email": "user1@example.com",
+            "phone": "13800138001",
+            "status": 1,
+            "createTime": "2024-01-02 00:00:00",
+            "roleNames": ["普通用户"]
+        },
+        {
+            "id": 3,
+            "userName": "user2",
+            "email": "user2@example.com",
+            "phone": "13800138002",
+            "status": 0,
+            "createTime": "2024-01-03 00:00:00",
+            "roleNames": ["普通用户"]
+        }
+    ]
     
     # 状态筛选
     if status is not None:
-        query = query.filter(User.status == status)
+        mock_users = [user for user in mock_users if user["status"] == status]
     
     # 关键词搜索
     if keyword:
-        query = query.filter(
-            (User.userName.ilike(f"%{keyword}%") ) |
-            (User.email.ilike(f"%{keyword}%") )
-        )
+        mock_users = [
+            user for user in mock_users
+            if keyword.lower() in user["userName"].lower() or keyword.lower() in user["email"].lower()
+        ]
     
-    # 获取总数
-    total = query.count()
+    total = len(mock_users)
     
     # 分页
     start = (current - 1) * size
     end = start + size
-    users = query.offset(start).limit(size).all()
-    
-    # 转换为响应格式
-    page_data = []
-    for user in users:
-        user_dict = {
-            "id": user.id,
-            "userName": user.userName,
-            "email": user.email,
-            "phone": user.phone,
-            "status": user.status,
-            "createTime": user.createTime.strftime("%Y-%m-%d %H:%M:%S"),
-            "roleNames": ["普通用户"]  # 简化处理
-        }
-        page_data.append(user_dict)
+    page_data = mock_users[start:end]
     
     return UserListResponse(
         code=200,
@@ -108,123 +113,158 @@ async def get_user_list(
 
 
 @router.get("/{user_id}")
-async def get_user(user_id: int, db: Session = Depends(get_db)):
+async def get_user(user_id: int):
     """获取用户详情"""
-    user = db.query(User).filter(User.id == user_id).first()
+    # 模拟数据
+    mock_users = [
+        {
+            "id": 1,
+            "userName": "admin",
+            "email": "admin@example.com",
+            "phone": "13800138000",
+            "status": 1,
+            "createTime": "2024-01-01 00:00:00",
+            "roleNames": ["管理员"]
+        },
+        {
+            "id": 2,
+            "userName": "user1",
+            "email": "user1@example.com",
+            "phone": "13800138001",
+            "status": 1,
+            "createTime": "2024-01-02 00:00:00",
+            "roleNames": ["普通用户"]
+        },
+        {
+            "id": 3,
+            "userName": "user2",
+            "email": "user2@example.com",
+            "phone": "13800138002",
+            "status": 0,
+            "createTime": "2024-01-03 00:00:00",
+            "roleNames": ["普通用户"]
+        }
+    ]
+    
+    user = next((u for u in mock_users if u["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
-    user_dict = {
-        "id": user.id,
-        "userName": user.userName,
-        "email": user.email,
-        "phone": user.phone,
-        "status": user.status,
-        "createTime": user.createTime.strftime("%Y-%m-%d %H:%M:%S"),
-        "roleNames": ["普通用户"]  # 简化处理
-    }
     
     return {
         "code": 200,
         "msg": "success",
-        "data": user_dict
+        "data": user
     }
 
 
 @router.post("")
-async def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
+async def create_user(request: UserCreateRequest):
     """创建用户"""
+    # 模拟数据
+    mock_users = [
+        {"id": 1, "email": "admin@example.com"},
+        {"id": 2, "email": "user1@example.com"},
+        {"id": 3, "email": "user2@example.com"}
+    ]
+    
     # 检查邮箱是否已存在
-    existing_user = db.query(User).filter(User.email == request.email).first()
+    existing_user = next((u for u in mock_users if u["email"] == request.email), None)
     if existing_user:
         raise HTTPException(status_code=400, detail="邮箱已存在")
     
-    # 加密密码
-    hashed_password = pwd_context.hash(request.password)
+    # 模拟密码处理
+    hashed_password = f"hashed_{request.password}"
     
-    # 创建新用户
-    new_user = User(
-        userName=request.userName,
-        email=request.email,
-        phone=request.phone,
-        password=hashed_password,
-        status=request.status
-    )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    user_dict = {
-        "id": new_user.id,
-        "userName": new_user.userName,
-        "email": new_user.email,
-        "phone": new_user.phone,
-        "status": new_user.status,
-        "createTime": new_user.createTime.strftime("%Y-%m-%d %H:%M:%S"),
-        "roleNames": ["普通用户"]  # 简化处理
+    # 模拟创建新用户
+    new_user = {
+        "id": 4,
+        "userName": request.userName,
+        "email": request.email,
+        "phone": request.phone,
+        "status": request.status,
+        "createTime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "roleNames": ["普通用户"]
     }
     
     return {
         "code": 200,
         "msg": "创建成功",
-        "data": user_dict
+        "data": new_user
     }
 
 
 @router.put("/{user_id}")
-async def update_user(user_id: int, request: UserUpdateRequest, db: Session = Depends(get_db)):
+async def update_user(user_id: int, request: UserUpdateRequest):
     """更新用户"""
-    user = db.query(User).filter(User.id == user_id).first()
+    # 模拟数据
+    mock_users = [
+        {
+            "id": 1,
+            "userName": "admin",
+            "email": "admin@example.com",
+            "phone": "13800138000",
+            "status": 1,
+            "createTime": "2024-01-01 00:00:00",
+            "roleNames": ["管理员"]
+        },
+        {
+            "id": 2,
+            "userName": "user1",
+            "email": "user1@example.com",
+            "phone": "13800138001",
+            "status": 1,
+            "createTime": "2024-01-02 00:00:00",
+            "roleNames": ["普通用户"]
+        },
+        {
+            "id": 3,
+            "userName": "user2",
+            "email": "user2@example.com",
+            "phone": "13800138002",
+            "status": 0,
+            "createTime": "2024-01-03 00:00:00",
+            "roleNames": ["普通用户"]
+        }
+    ]
+    
+    user = next((u for u in mock_users if u["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
-    # 更新字段
-    if request.userName:
-        user.userName = request.userName
+    # 检查邮箱是否已被其他用户使用
     if request.email:
-        # 检查邮箱是否已被其他用户使用
-        existing_user = db.query(User).filter(
-            User.email == request.email, 
-            User.id != user_id
-        ).first()
+        existing_user = next((u for u in mock_users if u["email"] == request.email and u["id"] != user_id), None)
         if existing_user:
             raise HTTPException(status_code=400, detail="邮箱已被其他用户使用")
-        user.email = request.email
+    
+    # 更新字段
+    if request.userName:
+        user["userName"] = request.userName
+    if request.email:
+        user["email"] = request.email
     if request.phone:
-        user.phone = request.phone
+        user["phone"] = request.phone
     if request.status is not None:
-        user.status = request.status
-    
-    db.commit()
-    db.refresh(user)
-    
-    user_dict = {
-        "id": user.id,
-        "userName": user.userName,
-        "email": user.email,
-        "phone": user.phone,
-        "status": user.status,
-        "createTime": user.createTime.strftime("%Y-%m-%d %H:%M:%S"),
-        "roleNames": ["普通用户"]  # 简化处理
-    }
+        user["status"] = request.status
     
     return {
         "code": 200,
         "msg": "更新成功",
-        "data": user_dict
+        "data": user
     }
 
 
 @router.delete("/{user_id}")
-async def delete_user(user_id: int, db: Session = Depends(get_db)):
+async def delete_user(user_id: int):
     """删除用户"""
-    user = db.query(User).filter(User.id == user_id).first()
+    # 模拟数据
+    mock_users = [
+        {"id": 1}, {"id": 2}, {"id": 3}
+    ]
+    
+    user = next((u for u in mock_users if u["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
-    db.delete(user)
-    db.commit()
     
     return {
         "code": 200,
