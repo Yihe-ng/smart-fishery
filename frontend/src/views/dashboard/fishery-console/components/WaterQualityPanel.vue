@@ -357,29 +357,29 @@
   }
 
   :global(.dark) .water-quality-panel .metric-card {
-    /* 修复 1：移除写死的蓝色，改用主题色动态混合生成边框颜色 */
-    border-color: color-mix(in oklch, var(--metric-accent) 25%, transparent);
+    /* 使用主题色动态混合生成边框颜色，降低透明度使边框更柔和 */
+    border-color: color-mix(in oklch, var(--metric-accent) 20%, transparent);
     border-left: 4px solid var(--metric-accent, var(--el-color-primary));
     box-shadow:
       0 2px 8px rgb(0 0 0 / 30%),
-      /* 修复 2：同步修改内阴影的颜色 */ inset 0 1px 0
-        color-mix(in oklch, var(--metric-accent) 10%, transparent);
+      /* 内阴影颜色与边框保持一致 */ inset 0 1px 0
+        color-mix(in oklch, var(--metric-accent) 8%, transparent);
 
-    --el-card-bg-color: var(--art-nested-card-bg, #345a7a);
+    /* 背景色由 el-ui.scss 统一控制，使用 --art-nested-card-bg 变量 */
 
     &:hover {
       border-left-color: var(--metric-accent, var(--el-color-primary));
       box-shadow:
         0 12px 28px rgb(0 0 0 / 40%),
-        /* 修复 3：同步修改 hover 时外发光边框的颜色 */ 0 0 0 1px
-          color-mix(in oklch, var(--metric-accent) 40%, transparent);
+        /* hover 时外发光边框 */ 0 0 0 1px
+          color-mix(in oklch, var(--metric-accent) 35%, transparent);
 
-      --el-card-bg-color: var(--art-nested-card-hover, #406a8a);
+      /* 悬停背景色由 el-ui.scss 统一控制，使用 --art-nested-card-hover 变量 */
     }
 
     .icon-box {
       color: color-mix(in oklch, var(--metric-accent) 72%, var(--el-text-color-primary));
-      /* 修复 4：将 12% 提高到 20%，避免暗色下图标背景融为一体看不出色差 */
+      /* 图标背景保持 20% 透明度，确保在深色背景下可见 */
       background-color: color-mix(in oklch, var(--metric-accent) 20%, transparent);
     }
   }
