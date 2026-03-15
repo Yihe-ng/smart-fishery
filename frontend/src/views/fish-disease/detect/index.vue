@@ -3,7 +3,7 @@
     <!-- 页面标题 -->
     <div class="page-header">
       <div class="title-section">
-        <ArtSvgIcon icon="ri:fish-line" style="font-size: 32px; color: #409eff" />
+        <ArtSvgIcon icon="ri:fish-line" style="font-size: 32px; color: var(--el-color-primary)" />
         <h2>智能鱼类病害识别系统</h2>
       </div>
       <el-tag :type="isCameraActive ? 'success' : 'info'" size="large" effect="dark">

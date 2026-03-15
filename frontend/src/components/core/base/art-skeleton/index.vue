@@ -512,7 +512,7 @@
   }
 
   :global(html.dark) .skeleton-donut-center {
-    background: #0f172a;
+    background: var(--default-bg-color);
   }
 
   /* 响应式适配 */

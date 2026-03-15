@@ -1,13 +1,12 @@
-// 定义基础变量
-$bg-animation-color-light: #fff;
-$bg-animation-color-dark: #070707;
+// 定义基础变量 - 使用 CSS 变量以支持主题切换
 $bg-animation-duration: 0.5s;
 
 html {
-  --bg-animation-color: $bg-animation-color-light;
+  // 使用 CSS 变量，自动适配深浅色模式
+  --bg-animation-color: var(--default-box-color);
 
   &.dark {
-    --bg-animation-color: $bg-animation-color-dark;
+    --bg-animation-color: var(--default-bg-color);
   }
 
   // View transition styles

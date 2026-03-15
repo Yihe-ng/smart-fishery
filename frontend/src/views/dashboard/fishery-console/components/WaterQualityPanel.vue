@@ -72,6 +72,11 @@
   import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
   import ArtChart from '@/components/core/charts/art-chart/index.vue'
   import type { EChartsOption } from '@/plugins/echarts'
+  import { useChartStyles } from '@/hooks/core/useChart'
+
+  // 主题感知的图表样式
+  const { getAxisLineStyle, getSplitLineStyle, getAxisLabelStyle, getTooltipStyle } =
+    useChartStyles()
 
   const props = defineProps<{
     data: WaterQualityData | null
@@ -195,7 +200,7 @@
     chartReady.value = false
   }
 
-  // 图表配置，完全对齐 water-quality/index.vue
+  // 图表配置，使用主题感知的图表样式
   const chartOption = computed<EChartsOption>(() => {
     if (!currentItem.value) return {}
 
@@ -211,13 +216,9 @@
     const values = historyData.map((d) => d[key] as number)
 
     return {
-      tooltip: {
-        trigger: 'axis',
-        formatter: '{b} <br/> {a}: {c}' + config.unit,
-        backgroundColor: 'rgba(50, 50, 50, 0.7)',
-        borderColor: '#333',
-        textStyle: { color: '#fff' }
-      },
+      tooltip: getTooltipStyle('axis', {
+        formatter: '{b} <br/> {a}: {c}' + config.unit
+      }),
       grid: {
         top: '10%',
         left: '3%',
@@ -240,20 +241,14 @@
         type: 'category',
         boundaryGap: false,
         data: dates,
-        axisLine: { lineStyle: { color: '#909399' } },
-        axisLabel: { color: '#909399' }
+        axisLine: getAxisLineStyle().lineStyle,
+        axisLabel: getAxisLabelStyle()
       },
       yAxis: {
         type: 'value',
-        axisLine: { lineStyle: { color: '#909399' } },
-        axisLabel: { color: '#909399' },
-        splitLine: {
-          lineStyle: {
-            color: '#E4E7ED',
-            type: 'dashed',
-            opacity: 0.3
-          }
-        }
+        axisLine: getAxisLineStyle().lineStyle,
+        axisLabel: getAxisLabelStyle(),
+        splitLine: getSplitLineStyle().lineStyle
       },
       series: [
         {
@@ -372,14 +367,15 @@
     box-shadow:
       0 2px 8px rgb(0 0 0 / 30%),
       inset 0 1px 0 rgba(99, 179, 237, 0.06);
-    --el-card-bg-color: #224466 !important;
+    // 使用 CSS 变量以支持主题切换
+    --el-card-bg-color: var(--art-hover-color) !important;
 
     &:hover {
       border-left-color: var(--metric-accent, var(--el-color-primary));
       box-shadow:
         0 12px 28px rgb(0 0 0 / 40%),
         0 0 0 1px rgba(99, 179, 237, 0.25);
-      --el-card-bg-color: #2a5577 !important;
+      --el-card-bg-color: var(--art-active-color) !important;
     }
 
     .icon-box {

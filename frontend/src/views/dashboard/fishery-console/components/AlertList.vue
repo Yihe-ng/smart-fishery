@@ -458,34 +458,34 @@
         border-top-color: rgba(255 255 255 / 0.06);
       }
 
-      // 每个级别各自控制背景，基色统一为 #1e3a52
+      // 每个级别各自控制背景，使用 CSS 变量以支持主题切换
       &.level-critical {
         background: linear-gradient(
           135deg,
-          color-mix(in oklch, var(--el-color-danger) 12%, #1e3a52) 0%,
-          #1e3a52 100%
+          color-mix(in oklch, var(--el-color-danger) 12%, var(--art-active-color)) 0%,
+          var(--art-active-color) 100%
         );
       }
 
       &.level-warning {
         background: linear-gradient(
           135deg,
-          color-mix(in oklch, var(--el-color-warning) 10%, #1e3a52) 0%,
-          #1e3a52 100%
+          color-mix(in oklch, var(--el-color-warning) 10%, var(--art-active-color)) 0%,
+          var(--art-active-color) 100%
         );
       }
 
       &.level-info {
         background: linear-gradient(
           135deg,
-          color-mix(in oklch, var(--el-color-primary) 10%, #1e3a52) 0%,
-          #1e3a52 100%
+          color-mix(in oklch, var(--el-color-primary) 10%, var(--art-active-color)) 0%,
+          var(--art-active-color) 100%
         );
       }
 
       // 无级别时的默认背景（放在最后作为 fallback）
       &:not(.level-critical):not(.level-warning):not(.level-info) {
-        background: #1e3a52;
+        background: var(--art-active-color);
       }
     }
 

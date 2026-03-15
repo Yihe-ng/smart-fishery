@@ -353,12 +353,12 @@
       i {
         padding-left: 0;
         font-size: 14px;
-        color: #999;
+        color: var(--art-gray-500);
       }
 
       .el-icon-circle-check {
         margin-top: 9px;
-        color: #6c6;
+        color: var(--el-color-success);
       }
     }
 
