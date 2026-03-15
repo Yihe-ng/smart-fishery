@@ -42,6 +42,25 @@ html.dark .el-card {
   --el-card-bg-color: var(--default-box-color) !important;
 }
 
+// 水质面板嵌套卡片例外：需要更高对比度
+html.dark .water-quality-panel .metric-card {
+  --el-card-bg-color: #1a2d45 !important;
+}
+
+html.dark .water-quality-panel .metric-card:hover {
+  --el-card-bg-color: #223a5a !important;
+}
+
+// 告警列表卡片背景与水质卡片统一
+// 注意：.alert-card 是普通 div，不是 el-card，所以使用 background-color 而非 --el-card-bg-color
+html.dark .alert-list-card .alert-card {
+  background-color: #1a2d45 !important;
+}
+
+html.dark .alert-list-card .alert-card:hover {
+  background-color: #223a5a !important;
+}
+
 // 修改 el-pagination 大小
 .el-pagination--default {
   & {

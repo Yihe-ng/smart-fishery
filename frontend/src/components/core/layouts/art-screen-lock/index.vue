@@ -463,7 +463,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background-color: #fff;
+    background-color: var(--default-box-color);
     background-image: url('@imgs/lock/bg_light.webp');
     background-size: cover;
     transition: transform 0.3s ease-in-out;

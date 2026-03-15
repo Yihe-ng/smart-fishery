@@ -90,6 +90,10 @@
 
   /* Element Component Active Color */
   --art-el-active-color: #1e3350;
+
+  /* 嵌套卡片层 - 深色容器内子卡片, WCAG AA 对比度 */
+  --art-nested-card-bg: #1e3a5f;
+  --art-nested-card-hover: #254770;
 }
 
 /* ==================== Tailwind Theme Configuration ==================== */

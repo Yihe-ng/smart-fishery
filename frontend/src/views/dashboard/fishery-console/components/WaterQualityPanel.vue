@@ -18,7 +18,7 @@
         >
           <div class="flex-cb metric-head">
             <div class="flex-c gap-2">
-              <div class="icon-box" :style="iconBoxStyle(item.color)">
+              <div class="icon-box">
                 <ArtSvgIcon :icon="item.icon" />
               </div>
               <span class="label">{{ item.label }}</span>
@@ -40,7 +40,6 @@
       </el-col>
     </el-row>
 
-    <!-- 趋势详情弹窗 -->
     <el-dialog
       v-model="dialogVisible"
       :title="currentItem?.label + ' 24小时趋势'"
@@ -50,13 +49,11 @@
       @closed="handleDialogClosed"
     >
       <div class="h-80 w-full">
-        <!-- 图表加载中占位 -->
         <div v-if="!chartReady" class="flex items-center justify-center h-full">
           <el-icon class="is-loading" :size="32">
             <Loading />
           </el-icon>
         </div>
-        <!-- 实际图表 -->
         <ArtChart v-if="chartReady && currentItem" :option="chartOption" />
       </div>
     </el-dialog>
@@ -72,6 +69,11 @@
   import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
   import ArtChart from '@/components/core/charts/art-chart/index.vue'
   import type { EChartsOption } from '@/plugins/echarts'
+  import { useChartStyles } from '@/hooks/core/useChart'
+
+  // 主题感知的图表样式
+  const { getAxisLineStyle, getSplitLineStyle, getAxisLabelStyle, getTooltipStyle } =
+    useChartStyles()
 
   const props = defineProps<{
     data: WaterQualityData | null
@@ -156,10 +158,7 @@
     ]
   })
 
-  const iconBoxStyle = (color: string) => ({
-    color,
-    backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`
-  })
+  // 修复 2：去除了多余的 iconBoxStyle 函数
 
   const dialogVisible = ref(false)
   const currentItem = ref<MetricItem | null>(null)
@@ -195,7 +194,7 @@
     chartReady.value = false
   }
 
-  // 图表配置，完全对齐 water-quality/index.vue
+  // 图表配置，使用主题感知的图表样式
   const chartOption = computed<EChartsOption>(() => {
     if (!currentItem.value) return {}
 
@@ -211,13 +210,9 @@
     const values = historyData.map((d) => d[key] as number)
 
     return {
-      tooltip: {
-        trigger: 'axis',
-        formatter: '{b} <br/> {a}: {c}' + config.unit,
-        backgroundColor: 'rgba(50, 50, 50, 0.7)',
-        borderColor: '#333',
-        textStyle: { color: '#fff' }
-      },
+      tooltip: getTooltipStyle('axis', {
+        formatter: '{b} <br/> {a}: {c}' + config.unit
+      }),
       grid: {
         top: '10%',
         left: '3%',
@@ -240,20 +235,14 @@
         type: 'category',
         boundaryGap: false,
         data: dates,
-        axisLine: { lineStyle: { color: '#909399' } },
-        axisLabel: { color: '#909399' }
+        axisLine: getAxisLineStyle().lineStyle,
+        axisLabel: getAxisLabelStyle()
       },
       yAxis: {
         type: 'value',
-        axisLine: { lineStyle: { color: '#909399' } },
-        axisLabel: { color: '#909399' },
-        splitLine: {
-          lineStyle: {
-            color: '#E4E7ED',
-            type: 'dashed',
-            opacity: 0.3
-          }
-        }
+        axisLine: getAxisLineStyle().lineStyle,
+        axisLabel: getAxisLabelStyle(),
+        splitLine: getSplitLineStyle().lineStyle
       },
       series: [
         {
@@ -287,7 +276,6 @@
   .water-quality-panel {
     .metric-card {
       cursor: pointer;
-      // 移除强制背景色覆盖，使用全局深色规则 var(--default-box-color)
       border: 1px solid var(--art-card-border);
       border-left: 4px solid var(--metric-accent, var(--el-color-primary));
       border-radius: 12px;
@@ -319,6 +307,8 @@
         height: 32px;
         font-size: 18px;
         border-radius: 8px;
+        color: var(--metric-accent);
+        background-color: color-mix(in oklch, var(--metric-accent) 16%, transparent);
       }
 
       .label {
@@ -367,24 +357,30 @@
   }
 
   :global(.dark) .water-quality-panel .metric-card {
-    border-color: rgba(99, 179, 237, 0.25);
+    /* 使用主题色动态混合生成边框颜色，降低透明度使边框更柔和 */
+    border-color: color-mix(in oklch, var(--metric-accent) 20%, transparent);
     border-left: 4px solid var(--metric-accent, var(--el-color-primary));
     box-shadow:
       0 2px 8px rgb(0 0 0 / 30%),
-      inset 0 1px 0 rgba(99, 179, 237, 0.06);
-    --el-card-bg-color: #224466 !important;
+      /* 内阴影颜色与边框保持一致 */ inset 0 1px 0
+        color-mix(in oklch, var(--metric-accent) 8%, transparent);
+
+    /* 背景色由 el-ui.scss 统一控制，使用 --art-nested-card-bg 变量 */
 
     &:hover {
       border-left-color: var(--metric-accent, var(--el-color-primary));
       box-shadow:
         0 12px 28px rgb(0 0 0 / 40%),
-        0 0 0 1px rgba(99, 179, 237, 0.25);
-      --el-card-bg-color: #2a5577 !important;
+        /* hover 时外发光边框 */ 0 0 0 1px
+          color-mix(in oklch, var(--metric-accent) 35%, transparent);
+
+      /* 悬停背景色由 el-ui.scss 统一控制，使用 --art-nested-card-hover 变量 */
     }
 
     .icon-box {
       color: color-mix(in oklch, var(--metric-accent) 72%, var(--el-text-color-primary));
-      background-color: color-mix(in oklch, var(--metric-accent) 12%, transparent);
+      /* 图标背景保持 20% 透明度，确保在深色背景下可见 */
+      background-color: color-mix(in oklch, var(--metric-accent) 20%, transparent);
     }
   }
 </style>

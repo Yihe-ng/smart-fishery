@@ -391,18 +391,18 @@
   .dark .layout-search {
     .el-input {
       :deep(.el-input__wrapper) {
-        background-color: #333;
-        border: 1px solid #4c4d50;
+        background-color: var(--art-gray-300);
+        border: 1px solid var(--art-gray-400);
       }
     }
 
     :deep(.search-modal) {
-      background-color: rgb(23 23 26 / 60%);
+      background-color: rgb(23 17 28 / 60%);
       backdrop-filter: none;
     }
 
     :deep(.el-dialog) {
-      background-color: #252526;
+      background-color: var(--default-box-color);
     }
   }
 </style>
