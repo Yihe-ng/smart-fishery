@@ -442,6 +442,7 @@
     }
 
     .alert-card {
+      background: #1a2d45;
       border-color: rgba(99, 179, 237, 0.18);
       box-shadow:
         0 2px 8px rgb(0 0 0 / 30%),
@@ -449,6 +450,7 @@
 
       &:hover,
       &:focus-visible {
+        background: #223a5a;
         box-shadow:
           0 8px 24px rgb(0 0 0 / 40%),
           0 0 0 1px rgba(99, 179, 237, 0.25);
@@ -456,36 +458,6 @@
 
       .alert-actions {
         border-top-color: rgba(255 255 255 / 0.06);
-      }
-
-      // 每个级别各自控制背景，使用 CSS 变量以支持主题切换
-      &.level-critical {
-        background: linear-gradient(
-          135deg,
-          color-mix(in oklch, var(--el-color-danger) 12%, var(--art-active-color)) 0%,
-          var(--art-active-color) 100%
-        );
-      }
-
-      &.level-warning {
-        background: linear-gradient(
-          135deg,
-          color-mix(in oklch, var(--el-color-warning) 10%, var(--art-active-color)) 0%,
-          var(--art-active-color) 100%
-        );
-      }
-
-      &.level-info {
-        background: linear-gradient(
-          135deg,
-          color-mix(in oklch, var(--el-color-primary) 10%, var(--art-active-color)) 0%,
-          var(--art-active-color) 100%
-        );
-      }
-
-      // 无级别时的默认背景（放在最后作为 fallback）
-      &:not(.level-critical):not(.level-warning):not(.level-info) {
-        background: var(--art-active-color);
       }
     }
 
