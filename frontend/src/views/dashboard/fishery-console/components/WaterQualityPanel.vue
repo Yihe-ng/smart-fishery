@@ -18,7 +18,7 @@
         >
           <div class="flex-cb metric-head">
             <div class="flex-c gap-2">
-              <div class="icon-box" :style="iconBoxStyle(item.color)">
+              <div class="icon-box">
                 <ArtSvgIcon :icon="item.icon" />
               </div>
               <span class="label">{{ item.label }}</span>
@@ -40,7 +40,6 @@
       </el-col>
     </el-row>
 
-    <!-- 趋势详情弹窗 -->
     <el-dialog
       v-model="dialogVisible"
       :title="currentItem?.label + ' 24小时趋势'"
@@ -50,13 +49,11 @@
       @closed="handleDialogClosed"
     >
       <div class="h-80 w-full">
-        <!-- 图表加载中占位 -->
         <div v-if="!chartReady" class="flex items-center justify-center h-full">
           <el-icon class="is-loading" :size="32">
             <Loading />
           </el-icon>
         </div>
-        <!-- 实际图表 -->
         <ArtChart v-if="chartReady && currentItem" :option="chartOption" />
       </div>
     </el-dialog>
@@ -161,10 +158,7 @@
     ]
   })
 
-  const iconBoxStyle = (color: string) => ({
-    color,
-    backgroundColor: `color-mix(in oklch, ${color} 16%, transparent)`
-  })
+  // 修复 2：去除了多余的 iconBoxStyle 函数
 
   const dialogVisible = ref(false)
   const currentItem = ref<MetricItem | null>(null)
@@ -282,7 +276,6 @@
   .water-quality-panel {
     .metric-card {
       cursor: pointer;
-      // 移除强制背景色覆盖，使用全局深色规则 var(--default-box-color)
       border: 1px solid var(--art-card-border);
       border-left: 4px solid var(--metric-accent, var(--el-color-primary));
       border-radius: 12px;
@@ -314,6 +307,8 @@
         height: 32px;
         font-size: 18px;
         border-radius: 8px;
+        color: var(--metric-accent);
+        background-color: color-mix(in oklch, var(--metric-accent) 16%, transparent);
       }
 
       .label {
@@ -362,25 +357,30 @@
   }
 
   :global(.dark) .water-quality-panel .metric-card {
-    border-color: rgba(99, 179, 237, 0.25);
+    /* 修复 1：移除写死的蓝色，改用主题色动态混合生成边框颜色 */
+    border-color: color-mix(in oklch, var(--metric-accent) 25%, transparent);
     border-left: 4px solid var(--metric-accent, var(--el-color-primary));
     box-shadow:
       0 2px 8px rgb(0 0 0 / 30%),
-      inset 0 1px 0 rgba(99, 179, 237, 0.06);
-    // 使用 CSS 变量以支持主题切换
-    --el-card-bg-color: var(--art-hover-color) !important;
+      /* 修复 2：同步修改内阴影的颜色 */ inset 0 1px 0
+        color-mix(in oklch, var(--metric-accent) 10%, transparent);
+
+    --el-card-bg-color: var(--art-nested-card-bg, #345a7a);
 
     &:hover {
       border-left-color: var(--metric-accent, var(--el-color-primary));
       box-shadow:
         0 12px 28px rgb(0 0 0 / 40%),
-        0 0 0 1px rgba(99, 179, 237, 0.25);
-      --el-card-bg-color: var(--art-active-color) !important;
+        /* 修复 3：同步修改 hover 时外发光边框的颜色 */ 0 0 0 1px
+          color-mix(in oklch, var(--metric-accent) 40%, transparent);
+
+      --el-card-bg-color: var(--art-nested-card-hover, #406a8a);
     }
 
     .icon-box {
       color: color-mix(in oklch, var(--metric-accent) 72%, var(--el-text-color-primary));
-      background-color: color-mix(in oklch, var(--metric-accent) 12%, transparent);
+      /* 修复 4：将 12% 提高到 20%，避免暗色下图标背景融为一体看不出色差 */
+      background-color: color-mix(in oklch, var(--metric-accent) 20%, transparent);
     }
   }
 </style>

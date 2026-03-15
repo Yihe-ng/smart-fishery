@@ -42,6 +42,15 @@ html.dark .el-card {
   --el-card-bg-color: var(--default-box-color) !important;
 }
 
+// 水质面板嵌套卡片例外：需要更高对比度
+html.dark .water-quality-panel .metric-card {
+  --el-card-bg-color: var(--art-nested-card-bg, #345a7a) !important;
+}
+
+html.dark .water-quality-panel .metric-card:hover {
+  --el-card-bg-color: var(--art-nested-card-hover, #406a8a) !important;
+}
+
 // 修改 el-pagination 大小
 .el-pagination--default {
   & {
