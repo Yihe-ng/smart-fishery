@@ -1,29 +1,50 @@
 import api from '@/utils/http'
 
-// 生长趋势数据接口
+export interface GrowthTrendRecord {
+  date: string
+  weight: number
+  feed: number
+}
+
+export interface SizeDistributionRecord {
+  size_range: string
+  percentage: number
+}
+
+export interface FcrRecord {
+  date: string
+  fishWeight: number
+  feedTotal: number
+  fcr: number
+}
+
+export interface InventoryRecord {
+  timestamp: string
+  type: string
+  stock: number
+  average_weight: number
+}
+
 export const getGrowthTrend = () => {
-  return api.get({
+  return api.get<GrowthTrendRecord[]>({
     url: '/api/growth/trend'
   })
 }
 
-// 规格分布数据接口
 export const getSizeDistribution = () => {
-  return api.get({
+  return api.get<SizeDistributionRecord[]>({
     url: '/api/growth/size-distribution'
   })
 }
 
-// FCR 记录接口
 export const getFCRRecords = () => {
-  return api.get({
+  return api.get<FcrRecord[]>({
     url: '/api/growth/fcr'
   })
 }
 
-// 盘点记录接口
 export const getInventoryRecords = () => {
-  return api.get({
+  return api.get<InventoryRecord[]>({
     url: '/api/growth/inventory'
   })
 }

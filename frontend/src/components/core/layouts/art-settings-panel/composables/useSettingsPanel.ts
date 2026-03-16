@@ -3,7 +3,7 @@ import { useSettingStore } from '@/store/modules/setting'
 import { storeToRefs } from 'pinia'
 import { useBreakpoints } from '@vueuse/core'
 import AppConfig from '@/config'
-import { SystemThemeEnum, MenuTypeEnum } from '@/enums/appEnum'
+import { MenuTypeEnum } from '@/enums/appEnum'
 import { mittBus } from '@/utils/sys'
 import { useTheme } from '@/hooks/core/useTheme'
 import { useSettingsState } from './useSettingsState'
@@ -14,10 +14,10 @@ import { useSettingsHandlers } from './useSettingsHandlers'
  */
 export function useSettingsPanel() {
   const settingStore = useSettingStore()
-  const { systemThemeType, systemThemeMode, menuType } = storeToRefs(settingStore)
+  const { systemThemeMode, menuType } = storeToRefs(settingStore)
 
   // Composables
-  const { setSystemTheme, setSystemAutoTheme } = useTheme()
+  const { switchThemeStyles } = useTheme()
   const { initColorWeak } = useSettingsState()
   const { domOperations } = useSettingsHandlers()
 
@@ -47,11 +47,7 @@ export function useSettingsPanel() {
 
     // 初始化系统主题
     const initSystemTheme = () => {
-      if (systemThemeMode.value === SystemThemeEnum.AUTO) {
-        setSystemAutoTheme()
-      } else {
-        setSystemTheme(systemThemeType.value)
-      }
+      switchThemeStyles(systemThemeMode.value)
     }
 
     // 监听系统主题变化

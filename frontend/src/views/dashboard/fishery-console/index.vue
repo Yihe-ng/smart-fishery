@@ -513,7 +513,7 @@
 
     // water 区域外层容器加深，形成容器深、内卡片浅的层次
     .area-water.dashboard-panel {
-      background: #0f1e30;
+      background: var(--art-deep-surface-bg);
     }
   }
 </style>

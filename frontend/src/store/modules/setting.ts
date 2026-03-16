@@ -163,10 +163,10 @@ export const useSettingStore = defineStore(
      * @param theme 主题类型
      * @param themeMode 主题模式
      */
-    const setGlopTheme = (theme: SystemThemeEnum, themeMode: SystemThemeEnum) => {
+    const setSystemThemeState = (theme: SystemThemeEnum, themeMode: SystemThemeEnum) => {
       systemThemeType.value = theme
       systemThemeMode.value = themeMode
-      localStorage.setItem(StorageConfig.THEME_KEY, theme)
+      localStorage.setItem(StorageConfig.THEME_KEY, themeMode)
     }
 
     /**
@@ -371,7 +371,7 @@ export const useSettingStore = defineStore(
       getCustomRadius,
       switchMenuLayouts,
       setMenuOpenWidth,
-      setGlopTheme,
+      setSystemThemeState,
       switchMenuStyles,
       setElementTheme,
       setBorderMode,

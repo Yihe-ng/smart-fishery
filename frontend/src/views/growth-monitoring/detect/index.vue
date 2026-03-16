@@ -55,6 +55,7 @@
   const currentImage = ref<string | null>(null)
   const isCameraActive = ref(false)
   const isStream = ref(false)
+  const confidence = ref(0)
   // 生长状态统计
   const growthStats = reactive<GrowthStats>({
     small: 0,
@@ -83,7 +84,7 @@
     try {
       const result = await detectGrowth(imgData)
       updateStats(result.detections)
-      
+
       // 更新最新结果显示 (显示置信度最高的或者第一个)
       if (result.detections.length > 0) {
         // 按置信度排序
