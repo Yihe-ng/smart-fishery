@@ -7,6 +7,9 @@
 !frontend/
 !backend/
 !技术介绍与开发文档.md
+!dev.py
+!tests/
+!tests/**/*
 
 # 保留这两个目录下的所有内容
 !frontend/**/*
