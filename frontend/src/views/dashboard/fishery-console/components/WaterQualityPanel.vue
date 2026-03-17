@@ -1,28 +1,22 @@
 <!-- cspell:ignore echarts tabularnums -->
 <template>
   <div class="water-quality-panel">
-    <el-row :gutter="12">
-      <el-col
-        v-for="item in items"
-        :key="item.key"
-        :xs="12"
-        :sm="12"
-        :md="8"
-        :lg="4.8"
-        class="mb-3"
-      >
-        <el-card
-          shadow="never"
+    <div class="metric-grid">
+      <div class="metric-row metric-row-top">
+        <article
+          v-for="item in topRowItems"
+          :key="item.key"
           class="metric-card"
+          :class="item.status"
           :style="{ '--metric-accent': item.color }"
           @click="handleCardClick(item)"
         >
-          <div class="metric-head flex-cb">
-            <div class="flex-c gap-2">
+          <div class="metric-head">
+            <div class="metric-title">
               <div class="icon-box">
                 <ArtSvgIcon :icon="item.icon" />
               </div>
-              <span class="label">{{ item.label }}</span>
+              <span class="label label-top">{{ item.label }}</span>
             </div>
             <el-tag
               :type="getStatusType(item.status)"
@@ -30,21 +24,64 @@
               effect="light"
               class="status-tag"
             >
-              {{ getStatusText(item.status) }}
+              {{ item.statusText }}
             </el-tag>
           </div>
 
-          <div class="metric-main mt-3 flex-baseline gap-1">
-            <span class="value">{{ item.value }}</span>
-            <span class="unit">{{ item.unit }}</span>
+          <div class="metric-main">
+            <span class="value">{{ formatMetricNumber(item.value) }}</span>
+            <span v-if="item.unit" class="unit">{{ item.unit }}</span>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
+
+          <div class="metric-meta metric-meta-stacked">
+            <span class="helper-text">{{ item.helperText }}</span>
+            <span class="trend-text">{{ item.deltaText }}</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="metric-row metric-row-bottom">
+        <article
+          v-for="item in bottomRowItems"
+          :key="item.key"
+          class="metric-card"
+          :class="item.status"
+          :style="{ '--metric-accent': item.color }"
+          @click="handleCardClick(item)"
+        >
+          <div class="metric-head">
+            <div class="metric-title">
+              <div class="icon-box">
+                <ArtSvgIcon :icon="item.icon" />
+              </div>
+              <span class="label label-bottom">{{ item.label }}</span>
+            </div>
+            <el-tag
+              :type="getStatusType(item.status)"
+              size="small"
+              effect="light"
+              class="status-tag"
+            >
+              {{ item.statusText }}
+            </el-tag>
+          </div>
+
+          <div class="metric-main">
+            <span class="value">{{ formatMetricNumber(item.value) }}</span>
+            <span v-if="item.unit" class="unit">{{ item.unit }}</span>
+          </div>
+
+          <div class="metric-meta metric-meta-inline metric-meta-bottom">
+            <span class="helper-text">{{ item.helperText }}</span>
+            <span class="trend-text">{{ item.deltaText }}</span>
+          </div>
+        </article>
+      </div>
+    </div>
 
     <el-dialog
       v-model="dialogVisible"
-      :title="currentItem ? `${currentItem.label} 24 小时趋势` : '24 小时趋势'"
+      :title="currentItem ? `${currentItem.label} 24小时趋势` : '24小时趋势'"
       width="700px"
       append-to-body
       @opened="handleDialogOpened"
@@ -74,11 +111,7 @@
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import ArtChart from '@/components/core/charts/art-chart/index.vue'
   import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
-  import {
-    WATER_QUALITY_METRIC_ORDER,
-    WATER_QUALITY_METRICS,
-    getWaterQualityMetricColor
-  } from '@/config/theme'
+  import { WATER_QUALITY_METRICS, getWaterQualityMetricColor } from '@/config/theme'
   import { useChartStyles } from '@/hooks/core/useChart'
   import waterQualityMockData from '@/mock/water-quality-data.json'
   import type { EChartsOption } from '@/plugins/echarts'
@@ -94,10 +127,17 @@
     icon: string
     color: string
     status: 'normal' | 'warning' | 'danger'
+    statusText: string
+    helperText: string
+    deltaText: string
   }
+
+  const TOP_ROW_KEYS: MetricKey[] = ['temperature', 'ammoniaNitrogen', 'ph']
+  const BOTTOM_ROW_KEYS: MetricKey[] = ['dissolvedOxygen', 'nitrite']
 
   const props = defineProps<{
     data: WaterQualityData | null
+    previousData?: WaterQualityData | null
   }>()
 
   const { getAxisLineStyle, getAxisLabelStyle, getSplitLineStyle, getTooltipStyle } =
@@ -108,54 +148,174 @@
   const currentMetricKey = ref<MetricKey | null>(null)
   const trendChartRef = ref<InstanceType<typeof ArtChart> | null>(null)
 
-  const items = computed<MetricItem[]>(() => {
-    if (!props.data) {
-      return []
-    }
-
-    const getStatus = (value: number, key: keyof typeof WATER_QUALITY_THRESHOLDS) => {
-      const rule = WATER_QUALITY_THRESHOLDS[key]
-      if (!rule) {
-        return 'normal'
-      }
-
-      if (
-        (rule.max !== undefined && value > rule.max) ||
-        (rule.min !== undefined && value < rule.min)
-      ) {
-        return 'warning'
-      }
-
-      return 'normal'
-    }
-
-    return WATER_QUALITY_METRIC_ORDER.map((key) => {
-      const metric = WATER_QUALITY_METRICS[key]
-
-      return {
-        key,
-        label: metric.label,
-        value: props.data?.[key] as number,
-        unit: metric.unit,
-        icon: metric.icon,
-        color: getWaterQualityMetricColor(key),
-        status: getStatus(props.data?.[key] as number, key)
-      }
-    })
-  })
-
-  const currentItem = computed<MetricItem | null>(() => {
-    if (!props.data || !currentMetricKey.value) {
-      return null
-    }
-
-    return items.value.find((item) => item.key === currentMetricKey.value) ?? null
-  })
-
   const historyData = computed(() => {
     return [...(waterQualityMockData as unknown as WaterQualityData[])]
       .sort((a, b) => a.collectTime.localeCompare(b.collectTime))
       .slice(-24)
+  })
+
+  const METRIC_DISPLAY_META: Record<MetricKey, { label: string; unit: string }> = {
+    temperature: { label: '水温', unit: '℃' },
+    ammoniaNitrogen: { label: '氨氮', unit: 'mg/L' },
+    ph: { label: 'pH值', unit: '' },
+    dissolvedOxygen: { label: '溶解氧', unit: 'mg/L' },
+    nitrite: { label: '亚硝酸盐', unit: 'mg/L' }
+  }
+
+  const formatMetricNumber = (value: number) => {
+    if (Number.isInteger(value)) {
+      return value.toString()
+    }
+
+    return value.toFixed(value >= 10 ? 1 : 2).replace(/\.?0+$/, '')
+  }
+
+  const getMetricStatus = (
+    value: number,
+    key: keyof typeof WATER_QUALITY_THRESHOLDS
+  ): MetricItem['status'] => {
+    const rule = WATER_QUALITY_THRESHOLDS[key]
+    if (!rule) {
+      return 'normal'
+    }
+
+    if (rule.max !== undefined && value > rule.max) {
+      const overflowRatio = rule.max === 0 ? 0 : (value - rule.max) / rule.max
+      return overflowRatio >= 0.2 ? 'danger' : 'warning'
+    }
+
+    if (rule.min !== undefined && value < rule.min) {
+      const underflowRatio = rule.min === 0 ? 0 : (rule.min - value) / rule.min
+      return underflowRatio >= 0.2 ? 'danger' : 'warning'
+    }
+
+    return 'normal'
+  }
+
+  const getStatusText = (status: MetricItem['status']) => {
+    const statusMap = {
+      normal: '正常',
+      warning: '预警',
+      danger: '告警'
+    } as const
+
+    return statusMap[status]
+  }
+
+  const getStatusType = (
+    status: MetricItem['status']
+  ): 'success' | 'warning' | 'danger' | 'info' => {
+    const statusMap = {
+      normal: 'success',
+      warning: 'warning',
+      danger: 'danger'
+    } as const
+
+    return statusMap[status] ?? 'info'
+  }
+
+  const getHelperText = (value: number, key: MetricKey, status: MetricItem['status']) => {
+    const rule = WATER_QUALITY_THRESHOLDS[key]
+    if (!rule) {
+      return '范围 --'
+    }
+
+    const unit = METRIC_DISPLAY_META[key].unit || rule.unit || ''
+
+    if (status === 'normal') {
+      if (rule.min !== undefined && rule.max !== undefined) {
+        return `范围 ${formatMetricNumber(rule.min)}-${formatMetricNumber(rule.max)}${unit}`
+      }
+
+      if (rule.min !== undefined) {
+        return `范围 ≥ ${formatMetricNumber(rule.min)}${unit}`
+      }
+
+      if (rule.max !== undefined) {
+        return `范围 ≤ ${formatMetricNumber(rule.max)}${unit}`
+      }
+    }
+
+    if (rule.max !== undefined && value > rule.max) {
+      return `高于上限 ${formatMetricNumber(value - rule.max)}${unit}`
+    }
+
+    if (rule.min !== undefined && value < rule.min) {
+      return `低于下限 ${formatMetricNumber(rule.min - value)}${unit}`
+    }
+
+    return '范围 --'
+  }
+
+  const getDeltaText = (key: MetricKey) => {
+    const latestValue = props.data?.[key]
+    const previousValue = props.previousData?.[key]
+
+    if (typeof latestValue !== 'number' || typeof previousValue !== 'number') {
+      return '趋势 --'
+    }
+
+    const delta = latestValue - previousValue
+    if (Math.abs(delta) < 0.01) {
+      return '趋势 持平'
+    }
+
+    return `趋势 ${delta > 0 ? '+' : ''}${formatMetricNumber(delta)}`
+  }
+
+  const itemMap = computed<Record<MetricKey, MetricItem> | null>(() => {
+    if (!props.data) {
+      return null
+    }
+
+    return Object.fromEntries(
+      Object.keys(METRIC_DISPLAY_META).map((rawKey) => {
+        const key = rawKey as MetricKey
+        const metric = WATER_QUALITY_METRICS[key]
+        const value = props.data[key] as number
+        const status = getMetricStatus(value, key)
+        const displayMeta = METRIC_DISPLAY_META[key]
+
+        const item: MetricItem = {
+          key,
+          label: displayMeta.label,
+          value,
+          unit: displayMeta.unit,
+          icon: metric.icon,
+          color: getWaterQualityMetricColor(key),
+          status,
+          statusText: getStatusText(status),
+          helperText: getHelperText(value, key, status),
+          deltaText: getDeltaText(key)
+        }
+
+        return [key, item]
+      })
+    ) as Record<MetricKey, MetricItem>
+  })
+
+  const topRowItems = computed(() => {
+    if (!itemMap.value) {
+      return []
+    }
+
+    return TOP_ROW_KEYS.map((key) => itemMap.value![key])
+  })
+
+  const bottomRowItems = computed(() => {
+    if (!itemMap.value) {
+      return []
+    }
+
+    return BOTTOM_ROW_KEYS.map((key) => itemMap.value![key])
+  })
+
+  const currentItem = computed<MetricItem | null>(() => {
+    if (!currentMetricKey.value || !itemMap.value) {
+      return null
+    }
+
+    return itemMap.value[currentMetricKey.value] ?? null
   })
 
   const chartOption = computed<EChartsOption>(() => {
@@ -244,28 +404,6 @@
     }
   })
 
-  const getStatusType = (
-    status: MetricItem['status']
-  ): 'success' | 'warning' | 'danger' | 'info' => {
-    const statusMap = {
-      normal: 'success',
-      warning: 'warning',
-      danger: 'danger'
-    } as const
-
-    return statusMap[status] ?? 'info'
-  }
-
-  const getStatusText = (status: MetricItem['status']) => {
-    const statusMap = {
-      normal: '正常',
-      warning: '预警',
-      danger: '告警'
-    } as const
-
-    return statusMap[status] ?? '未知'
-  }
-
   const handleCardClick = (item: MetricItem) => {
     currentMetricKey.value = item.key
     dialogVisible.value = true
@@ -286,8 +424,45 @@
 
 <style scoped lang="scss">
   .water-quality-panel {
+    height: 100%;
+    min-height: 0;
+
+    .metric-grid {
+      display: flex;
+      height: 100%;
+      min-height: 0;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .metric-row {
+      display: grid;
+      width: 100%;
+      min-height: 0;
+      gap: 12px;
+    }
+
+    .metric-row-top {
+      flex: 1.04 1 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .metric-row-bottom {
+      flex: 0.96 1 0;
+      width: 96%;
+      margin-inline: auto;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .metric-card {
+      display: flex;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      flex-direction: column;
+      padding: 11px 12px 11px;
       cursor: pointer;
+      background: var(--metric-card-bg, var(--default-box-color));
       border: 1px solid var(--art-card-border);
       border-left: 4px solid var(--metric-accent, var(--el-color-primary));
       border-radius: 12px;
@@ -295,75 +470,170 @@
       transition:
         border-color 0.25s ease,
         box-shadow 0.25s ease,
-        transform 0.25s ease;
-
-      :deep(.el-card__body) {
-        padding: 16px;
-      }
+        transform 0.25s ease,
+        background-color 0.25s ease;
 
       &:hover {
+        background: var(--metric-card-hover-bg, var(--metric-card-bg, var(--default-box-color)));
         box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
-        transform: translateY(-3px) scale(1.02);
+        transform: translateY(-1px);
       }
     }
 
     .metric-head {
-      min-height: 26px;
+      display: flex;
+      min-height: 32px;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .metric-title {
+      display: flex;
+      min-width: 0;
+      flex: 1;
+      align-items: flex-start;
+      gap: 8px;
+      overflow: hidden;
     }
 
     .icon-box {
       display: flex;
+      width: 30px;
+      height: 30px;
+      flex-shrink: 0;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
-      font-size: 18px;
+      font-size: 15px;
       color: var(--metric-accent);
-      background-color: color-mix(in oklch, var(--metric-accent) 16%, transparent);
+      background-color: color-mix(in oklch, var(--metric-accent) 14%, transparent);
       border-radius: 8px;
     }
 
     .label {
-      font-size: 14px;
-      font-weight: 500;
-      line-height: 1.4;
-      color: var(--el-text-color-regular);
+      min-width: 0;
+      display: -webkit-box;
+      overflow: hidden;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--el-text-color-primary);
+      -webkit-box-orient: vertical;
+    }
+
+    .label-top {
+      -webkit-line-clamp: 2;
+      white-space: normal;
+      word-break: keep-all;
+    }
+
+    .label-bottom {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .status-tag {
-      font-size: 11px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-size: 9px;
       font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
+      letter-spacing: 0;
+      opacity: 0.9;
     }
 
     .metric-main {
+      display: flex;
+      min-height: 48px;
       align-items: baseline;
-      margin-top: 14px;
+      gap: 4px;
+      padding-top: 9px;
       line-height: 1;
     }
 
     .value {
-      font-size: 28px;
-      font-weight: 700;
+      font-size: 30px;
+      font-weight: 800;
       line-height: 1;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
       color: var(--el-text-color-primary);
       font-variant-numeric: tabular-nums;
     }
 
     .unit {
-      font-size: 12px;
-      font-weight: 500;
+      font-size: 11px;
+      font-weight: 600;
       line-height: 1;
-      letter-spacing: 0.02em;
       color: var(--el-text-color-secondary);
-      text-transform: uppercase;
+    }
+
+    .metric-meta {
+      min-width: 0;
+      padding-top: 7px;
+    }
+
+    .metric-meta-stacked {
+      display: flex;
+      min-height: 40px;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-end;
+      gap: 5px;
+    }
+
+    .metric-meta-inline {
+      display: grid;
+      min-height: 24px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 10px;
+    }
+
+    .helper-text {
+      min-width: 0;
+      overflow: hidden;
+      font-size: 10px;
+      line-height: 1.3;
+      color: var(--el-text-color-secondary);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .trend-text {
+      display: inline-flex;
+      min-height: 18px;
+      align-items: center;
+      padding: 0 7px;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--metric-accent);
+      white-space: nowrap;
+      background-color: color-mix(in oklch, var(--metric-accent) 10%, transparent);
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-meta-inline .trend-text {
+      justify-self: end;
+    }
+
+    .metric-meta-bottom {
+      margin-top: auto;
     }
 
     :deep(.el-tag.status-tag) {
-      padding: 0 7px;
+      height: 18px;
+      padding: 0 5px;
+      border-color: color-mix(in oklch, currentColor 14%, transparent);
+      background-color: color-mix(in oklch, currentColor 7%, transparent);
     }
+  }
+
+  :global(.dark) .water-quality-panel {
+    --metric-card-bg: var(--art-nested-card-bg);
+    --metric-card-hover-bg: var(--art-nested-card-hover);
   }
 
   :global(.dark) .water-quality-panel .metric-card {
@@ -381,6 +651,15 @@
     .icon-box {
       color: color-mix(in oklch, var(--metric-accent) 72%, var(--el-text-color-primary));
       background-color: color-mix(in oklch, var(--metric-accent) 20%, transparent);
+    }
+
+    .trend-text {
+      background-color: color-mix(in oklch, var(--metric-accent) 16%, transparent);
+    }
+
+    :deep(.el-tag.status-tag) {
+      background-color: color-mix(in oklch, currentColor 10%, transparent);
+      border-color: color-mix(in oklch, currentColor 18%, transparent);
     }
   }
 </style>

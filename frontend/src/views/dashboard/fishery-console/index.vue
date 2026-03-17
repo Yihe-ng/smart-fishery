@@ -37,7 +37,7 @@
           <span>水质监测指标 (模拟)</span>
         </div>
         <div class="panel-content">
-          <WaterQualityPanel :data="currentWaterQuality" />
+          <WaterQualityPanel :data="currentWaterQuality" :previous-data="previousWaterQuality" />
         </div>
       </section>
 
@@ -156,6 +156,15 @@
   // 水质数据相关状态
   const currentIndex = ref(0)
   const currentWaterQuality = ref<WaterQualityData | null>(null)
+
+  const previousWaterQuality = computed<WaterQualityData | null>(() => {
+    if (!waterQualityMockData?.length || currentIndex.value <= 0) {
+      return null
+    }
+
+    const previous = waterQualityMockData[currentIndex.value - 1] as WaterQualityMockRow
+    return parseMockWaterQuality(previous, currentIndex.value - 1)
+  })
 
   const parseMockWaterQuality = (row: WaterQualityMockRow, index: number): WaterQualityData => {
     const normalizedStatus: WaterQualityData['status'] =
