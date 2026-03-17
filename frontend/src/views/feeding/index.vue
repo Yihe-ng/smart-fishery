@@ -61,6 +61,10 @@
       </el-col>
 
       <el-col :xs="24" :sm="24" :md="16">
+        <div class="feeding-video-wrap mb-5">
+          <VideoPlayer :src="videoSrc" />
+        </div>
+
         <el-card shadow="never">
           <template #header>
             <div class="flex-cb">
@@ -98,6 +102,8 @@
 <script setup lang="ts">
   import { ref, reactive, onMounted } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
+  import VideoPlayer from '@/views/dashboard/fishery-console/components/VideoPlayer.vue'
+  import { getCameraStream } from '@/api/growth-monitoring/detect'
   import {
     getFeedingConfig,
     updateFeedingConfig,
@@ -116,6 +122,7 @@
   const manualAmount = ref(500)
   const logs = ref<FeedingLog[]>([])
   const total = ref(0)
+  const videoSrc = ref('')
 
   const loadData = async () => {
     try {
@@ -128,6 +135,16 @@
       total.value = logRes.total
     } catch (error) {
       console.error('Failed to load feeding data:', error)
+    }
+  }
+
+  const initVideoStream = async () => {
+    try {
+      const streamUrl = await getCameraStream()
+      videoSrc.value = streamUrl || ''
+    } catch (error) {
+      console.error('Failed to load camera stream:', error)
+      ElMessage.warning('视频加载失败，投喂功能可继续使用')
     }
   }
 
@@ -152,11 +169,17 @@
     }
   }
 
-  onMounted(loadData)
+  onMounted(async () => {
+    await Promise.allSettled([loadData(), initVideoStream()])
+  })
 </script>
 
 <style scoped lang="scss">
   .feeding-page {
     padding: 20px;
+  }
+
+  .feeding-video-wrap {
+    height: 360px;
   }
 </style>
