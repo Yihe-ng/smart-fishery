@@ -59,7 +59,7 @@ interface RgbaResult {
  * @returns CSS变量值
  */
 export function getCssVar(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name)
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
 /**
@@ -258,12 +258,12 @@ export function handleElementThemeColor(theme: string, isDark: boolean = false):
  * 设置 Element Plus 主题颜色
  * @param color 主题颜色
  */
-export function setElementThemeColor(color: string): void {
+export function setElementThemeColor(color: string, isDark: boolean = useSettingStore().isDark): void {
   const mixColor = '#ffffff'
   const elStyle = document.documentElement.style
 
   elStyle.setProperty('--el-color-primary', color)
-  handleElementThemeColor(color, useSettingStore().isDark)
+  handleElementThemeColor(color, isDark)
 
   // 生成更淡一点的颜色
   for (let i = 1; i < 16; i++) {

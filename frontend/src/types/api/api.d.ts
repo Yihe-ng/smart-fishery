@@ -113,6 +113,18 @@ declare namespace Api {
         Api.Common.CommonSearchParams
     >
 
+    interface UserCreateParams {
+      userName: string
+      userEmail: string
+      userPhone: string
+      userGender?: string
+      userRoles?: string[]
+      password?: string
+      status?: string
+    }
+
+    interface UserUpdateParams extends Partial<UserCreateParams> {}
+
     /** 角色列表 */
     type RoleList = Api.Common.PaginatedResponse<RoleListItem>
 

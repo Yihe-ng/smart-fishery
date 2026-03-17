@@ -27,7 +27,7 @@ export function fetchUpdateUser(id: number, data: Api.SystemManage.UserUpdatePar
 
 // 删除用户
 export function fetchDeleteUser(id: number) {
-  return request.delete<boolean>({
+  return request.del<boolean>({
     url: `/api/user/${id}`
   })
 }

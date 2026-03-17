@@ -87,7 +87,9 @@
               :type="record.type === '常规盘点' ? 'primary' : 'info'"
             >
               <p class="text-sm font-bold text-g-900">{{ record.type }}</p>
-              <p class="text-xs text-g-500">存栏: {{ record.stock.toLocaleString() }}尾, 均重: {{ record.average_weight }}g</p>
+              <p class="text-xs text-g-500"
+                >存栏: {{ record.stock.toLocaleString() }}尾, 均重: {{ record.average_weight }}g</p
+              >
             </el-timeline-item>
           </el-timeline>
         </el-card>
@@ -101,7 +103,16 @@
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { ElMessage } from 'element-plus'
   import * as echarts from 'echarts'
-  import { getGrowthTrend, getSizeDistribution, getFCRRecords, getInventoryRecords } from '@/api/growth-monitoring/trend'
+  import {
+    getGrowthTrend,
+    getSizeDistribution,
+    getFCRRecords,
+    getInventoryRecords,
+    type FcrRecord,
+    type GrowthTrendRecord,
+    type InventoryRecord,
+    type SizeDistributionRecord
+  } from '@/api/growth-monitoring/trend'
 
   // 状态定义
   const loading = ref(false)
@@ -147,28 +158,28 @@
   ])
 
   // FCR 数据
-  const fcrData = ref([
+  const fcrData = ref<FcrRecord[]>([
     { date: '2024-03-20', fishWeight: 450, feedTotal: 125.5, fcr: 1.55 },
     { date: '2024-03-13', fishWeight: 435, feedTotal: 118.2, fcr: 1.58 },
     { date: '2024-03-06', fishWeight: 420, feedTotal: 112.4, fcr: 1.62 }
   ])
 
   // 盘点记录数据
-  const inventoryData = ref([
+  const inventoryData = ref<InventoryRecord[]>([
     { timestamp: '2024-03-15', type: '常规盘点', stock: 12500, average_weight: 450 },
     { timestamp: '2024-02-15', type: '常规盘点', stock: 12550, average_weight: 380 }
   ])
 
   // 初始化生长趋势图表
-  const initGrowthChart = (data: any[]) => {
+  const initGrowthChart = (data: GrowthTrendRecord[]) => {
     if (!growthChartRef.value) return
-    
+
     growthChart = echarts.init(growthChartRef.value)
-    
-    const dates = data.map(item => item.date)
-    const weights = data.map(item => item.weight)
-    const feeds = data.map(item => item.feed)
-    
+
+    const dates = data.map((item) => item.date)
+    const weights = data.map((item) => item.weight)
+    const feeds = data.map((item) => item.feed)
+
     const option = {
       tooltip: {
         trigger: 'axis',
@@ -239,16 +250,16 @@
         }
       ]
     }
-    
+
     growthChart.setOption(option)
   }
 
   // 初始化规格分布图表
-  const initSizeChart = (data: any[]) => {
+  const initSizeChart = (data: SizeDistributionRecord[]) => {
     if (!sizeChartRef.value) return
-    
+
     sizeChart = echarts.init(sizeChartRef.value)
-    
+
     const option = {
       tooltip: {
         trigger: 'item',
@@ -257,14 +268,14 @@
       legend: {
         orient: 'vertical',
         left: 'left',
-        data: data.map(item => item.size_range)
+        data: data.map((item) => item.size_range)
       },
       series: [
         {
           name: '规格分布',
           type: 'pie',
           radius: '60%',
-          data: data.map(item => ({
+          data: data.map((item) => ({
             value: item.percentage,
             name: item.size_range
           })),
@@ -278,7 +289,7 @@
         }
       ]
     }
-    
+
     sizeChart.setOption(option)
   }
 
@@ -291,19 +302,19 @@
       if (growthData) {
         initGrowthChart(growthData)
       }
-      
+
       // 获取规格分布数据
       const sizeData = await getSizeDistribution()
       if (sizeData) {
         initSizeChart(sizeData)
       }
-      
+
       // 获取 FCR 数据
       const fcrRecords = await getFCRRecords()
       if (fcrRecords) {
         fcrData.value = fcrRecords
       }
-      
+
       // 获取盘点记录
       const inventoryRecords = await getInventoryRecords()
       if (inventoryRecords) {

@@ -10,14 +10,14 @@ from fastapi.middleware.cors import CORSMiddleware
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
-    print("🚀 应用启动中...")
-    print("✅ 应用启动完成")
+    print("应用启动中...")
+    print("应用启动完成")
     
     yield
     
     # 关闭时执行
-    print("🛑 应用关闭中...")
-    print("✅ 应用已关闭")
+    print("应用关闭中...")
+    print("应用已关闭")
 
 
 app = FastAPI(
