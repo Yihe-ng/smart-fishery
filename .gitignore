@@ -10,6 +10,7 @@
 !dev.py
 !tests/
 !tests/**/*
+!pageAgent说明文档.md
 
 # 保留这两个目录下的所有内容
 !frontend/**/*

@@ -14,6 +14,12 @@ importers:
       '@iconify/vue':
         specifier: ^4.1.1
         version: 4.3.0(vue@3.5.22(typescript@5.3.3))
+      '@page-agent/llms':
+        specifier: ^1.5.9
+        version: 1.5.9(zod@4.3.6)
+      '@page-agent/page-controller':
+        specifier: ^1.5.9
+        version: 1.5.9
       '@tailwindcss/vite':
         specifier: ^4.0.0
         version: 4.1.14(vite@5.4.21(@types/node@20.19.33)(lightningcss@1.30.1)(sass@1.93.2)(terser@5.44.0))
@@ -35,6 +41,9 @@ importers:
       crypto-js:
         specifier: ^4.2.0
         version: 4.2.0
+      dompurify:
+        specifier: ^3.3.3
+        version: 3.3.3
       echarts:
         specifier: ^5.5.0
         version: 5.6.0
@@ -50,6 +59,9 @@ importers:
       hls.js:
         specifier: ^1.5.0
         version: 1.6.15
+      marked:
+        specifier: ^17.0.4
+        version: 17.0.4
       mitt:
         specifier: ^3.0.1
         version: 3.0.1
@@ -59,6 +71,9 @@ importers:
       ohash:
         specifier: ^1.1.3
         version: 1.1.6
+      page-agent:
+        specifier: ^1.5.9
+        version: 1.5.9(zod@4.3.6)
       pinia:
         specifier: ^2.1.7
         version: 2.3.1(typescript@5.3.3)(vue@3.5.22(typescript@5.3.3))
@@ -92,6 +107,9 @@ importers:
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@commitlint/cli':
         specifier: ^19.0.0
@@ -918,6 +936,22 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
+  '@page-agent/core@1.5.9':
+    resolution: {integrity: sha512-B369ADQP5pAWhcY/qlb7BwibbkVjBRVOG+2aUHn/Di7o+BEHzaiwJZJur1CgMv83ezVPAaY8c871sWVO7metiw==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@page-agent/llms@1.5.9':
+    resolution: {integrity: sha512-Q50mtmw8Dh4ksu88f1wuMrbVPZVMN8zFywAa1mdz/vebAK9zUuBzOhQ+MInfhJvQawd1k2PqGvZxNaH4l2c+SA==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@page-agent/page-controller@1.5.9':
+    resolution: {integrity: sha512-h1Q1WsBPyRHvyxmb6F0bcjVQJ/Hd8cXjzLZRvm/6HkQUyBrXcuwryOhEsAGIDt3uc6bUA7ml18R8/jmhka1xWw==}
+
+  '@page-agent/ui@1.5.9':
+    resolution: {integrity: sha512-TfscNDX9+Mfor7nwrGkrwNnRq3SHTojwAbi6Rq6AQoNdZyhmk+SGyWEVkfPozLAxwZp2UuKcZOvoJS7L4EmtWw==}
+
   '@parcel/watcher-android-arm64@2.5.1':
     resolution: {integrity: sha512-KF8+j9nNbUN8vzOFDpRMsaKBHZ/mcjEjMToVMJOhTozkDonQFFrRcfdLWn6yWKCmJKmdVxSgHiYvTCef4/qcBA==}
     engines: {node: '>= 10.0.0'}
@@ -1274,6 +1308,9 @@ packages:
   '@types/sortablejs@1.15.8':
     resolution: {integrity: sha512-b79830lW+RZfwaztgs1aVPgbasJ8e7AXtZYHTELNXZPsERt4ymJdjV4OccDbHQAvHrCcFpbF78jkm0R6h/pZVg==}
 
+  '@types/trusted-types@2.0.7':
+    resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+
   '@types/web-bluetooth@0.0.16':
     resolution: {integrity: sha512-oh8q2Zc32S6gd/j50GowEjKLoOVOwHP/bWVjKJInBwQqdOYMdPrf1oVlelTlyfFK3CKxL1uahMDAr+vy8T7yMQ==}
 
@@ -1564,6 +1601,9 @@ packages:
   adler-32@1.3.1:
     resolution: {integrity: sha512-ynZ4w/nUUv5rrsR8UUGoe1VC9hZj6V5hU9Qw1HlMDJGEJw5S7TfTErWTjMys6M7vr0YWcPqs3qAr4ss0nDfP+A==}
     engines: {node: '>=0.8'}
+
+  ai-motion@0.4.8:
+    resolution: {integrity: sha512-9nQVjf8lrYQWSW0sZdb9bES4x8Ei1w9C0S62po2KvRbMjslmjm0WMeszyW771SEauDnu4YGWqurLZ/gCkCTosQ==}
 
   ajv@6.12.6:
     resolution: {integrity: sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g==}
@@ -1985,6 +2025,9 @@ packages:
   domhandler@5.0.3:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
+
+  dompurify@3.3.3:
+    resolution: {integrity: sha512-Oj6pzI2+RqBfFG+qOaOLbFXLQ90ARpcGG6UePL82bJLtdsa6CYJD7nmiU8MW9nQNOtCHV3lZ/Bzq1X0QYbBZCA==}
 
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
@@ -2915,6 +2958,11 @@ packages:
   magic-string@0.30.19:
     resolution: {integrity: sha512-2N21sPY9Ws53PZvsEpVtNuSW+ScYbQdp4b9qUaL+9QkHUrGFKo56Lg9Emg5s9V/qrtNBmiR01sYhUOwu3H+VOw==}
 
+  marked@17.0.4:
+    resolution: {integrity: sha512-NOmVMM+KAokHMvjWmC5N/ZOvgmSWuqJB8FoYI019j4ogb/PeRMKoKIjReZ2w3376kkA8dSJIP8uD993Kxc0iRQ==}
+    engines: {node: '>= 20'}
+    hasBin: true
+
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
@@ -3115,6 +3163,11 @@ packages:
   p-locate@6.0.0:
     resolution: {integrity: sha512-wPrq66Llhl7/4AGC6I+cqxT07LhXvWL08LNXz1fENOw0Ap4sRZZ/gZpTTJ5jpurzzzfS2W/Ge9BY3LgLjCShcw==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
+  page-agent@1.5.9:
+    resolution: {integrity: sha512-9V0niAvxTi6UvzyyBHjjKt6YoGstywGFofmQyUv1UaHrkC1C8Yk+VrEWQH/R9OLSu2m5u7ZoU/TadF4Mbb0mfQ==}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -4020,6 +4073,9 @@ packages:
     resolution: {integrity: sha512-CzhO+pFNo8ajLM2d2IW/R93ipy99LWjtwblvC1RsoSUMZgyLbYFr221TnSNT7GjGdYui6P459mw9JH/g/zW2ug==}
     engines: {node: '>=18'}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
   zrender@5.6.1:
     resolution: {integrity: sha512-OFXkDJKcrlx5su2XbzJvj/34Q3m6PvyCZkVPHGYpcCJ52ek4U/ymZyfuV1nKE23AyBJ51E/6Yr0mhZ7xGTO4ag==}
 
@@ -4691,6 +4747,24 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
+  '@page-agent/core@1.5.9(zod@4.3.6)':
+    dependencies:
+      '@page-agent/llms': 1.5.9(zod@4.3.6)
+      '@page-agent/page-controller': 1.5.9
+      chalk: 5.6.2
+      zod: 4.3.6
+
+  '@page-agent/llms@1.5.9(zod@4.3.6)':
+    dependencies:
+      chalk: 5.6.2
+      zod: 4.3.6
+
+  '@page-agent/page-controller@1.5.9':
+    dependencies:
+      ai-motion: 0.4.8
+
+  '@page-agent/ui@1.5.9': {}
+
   '@parcel/watcher-android-arm64@2.5.1':
     optional: true
 
@@ -4930,6 +5004,9 @@ snapshots:
       undici-types: 6.21.0
 
   '@types/sortablejs@1.15.8': {}
+
+  '@types/trusted-types@2.0.7':
+    optional: true
 
   '@types/web-bluetooth@0.0.16': {}
 
@@ -5341,6 +5418,8 @@ snapshots:
 
   adler-32@1.3.1: {}
 
+  ai-motion@0.4.8: {}
+
   ajv@6.12.6:
     dependencies:
       fast-deep-equal: 3.1.3
@@ -5747,6 +5826,10 @@ snapshots:
   domhandler@5.0.3:
     dependencies:
       domelementtype: 2.3.0
+
+  dompurify@3.3.3:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
 
   domutils@3.2.2:
     dependencies:
@@ -6709,6 +6792,8 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  marked@17.0.4: {}
+
   math-intrinsics@1.1.0: {}
 
   mathml-tag-names@2.1.3: {}
@@ -6888,6 +6973,15 @@ snapshots:
   p-locate@6.0.0:
     dependencies:
       p-limit: 4.0.0
+
+  page-agent@1.5.9(zod@4.3.6):
+    dependencies:
+      '@page-agent/core': 1.5.9(zod@4.3.6)
+      '@page-agent/llms': 1.5.9(zod@4.3.6)
+      '@page-agent/page-controller': 1.5.9
+      '@page-agent/ui': 1.5.9
+      chalk: 5.6.2
+      zod: 4.3.6
 
   parent-module@1.0.1:
     dependencies:
@@ -7799,6 +7893,8 @@ snapshots:
   yocto-queue@1.2.1: {}
 
   yoctocolors@2.1.2: {}
+
+  zod@4.3.6: {}
 
   zrender@5.6.1:
     dependencies:

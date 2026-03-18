@@ -232,11 +232,13 @@
       return null
     }
 
+    const currentData = props.data
+
     return Object.fromEntries(
       Object.keys(METRIC_DISPLAY_META).map((rawKey) => {
         const key = rawKey as MetricKey
         const metric = WATER_QUALITY_METRICS[key]
-        const value = props.data[key] as number
+        const value = currentData[key] as number
         const status = getMetricStatus(value, key)
         const displayMeta = METRIC_DISPLAY_META[key]
 

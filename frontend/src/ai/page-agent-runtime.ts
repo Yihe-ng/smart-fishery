@@ -1,0 +1,99 @@
+import { PageAgentCore } from 'page-agent'
+import { PageController } from '@page-agent/page-controller'
+
+import { fetchAIInvoke } from '@/api/ai'
+import { createProxyTools } from '@/ai/proxy-tools'
+import type { AIBootstrapPayload, AIConfirmPreview, AIPageId } from '@/types'
+
+interface AgentRuntimeContext {
+  pageId: AIPageId
+  bootstrap: AIBootstrapPayload
+  intent: 'qa' | 'automation'
+}
+
+export interface QAResult {
+  data: string
+  success: boolean
+}
+
+export async function runQA(context: AgentRuntimeContext, text: string): Promise<QAResult> {
+  const allowedTools =
+    context.intent === 'automation'
+      ? context.bootstrap.allowedTools
+      : context.bootstrap.allowedTools.filter((t) => t !== 'preview_manual_feeding_action')
+
+  const response = await fetchAIInvoke({
+    pageId: context.pageId,
+    messages: [{ role: 'user', content: text }],
+    contextVersion: context.bootstrap.pageContextSummary.contextVersion,
+    pageContextSummary: context.bootstrap.pageContextSummary as unknown as Record<string, unknown>,
+    allowedTools,
+  })
+
+  const choice = response.choices?.[0] as Record<string, unknown> | undefined
+  const message = choice?.message as Record<string, unknown> | undefined
+  const toolCalls = message?.tool_calls as Array<Record<string, unknown>> | undefined
+  const args = toolCalls?.[0]?.function as Record<string, unknown> | undefined
+  const argsStr = args?.arguments
+  if (argsStr) {
+    try {
+      const parsed = JSON.parse(String(argsStr))
+      const doneText = parsed?.action?.done?.text
+      if (typeof doneText === 'string' && doneText.trim()) {
+        return { data: doneText.trim(), success: true }
+      }
+      return { data: String(argsStr), success: false }
+    } catch {
+      return { data: String(argsStr), success: false }
+    }
+  }
+  return { data: '当前暂无可返回结果。', success: false }
+}
+
+export async function createPageAgent(context: AgentRuntimeContext) {
+  const customFetch: typeof fetch = async (_input, init) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : {}
+    const messages = (body.messages ?? []).map((m: { role: string; content: unknown }) => ({
+      role: m.role,
+      content: String(m.content ?? ''),
+    }))
+
+    const response = await fetchAIInvoke({
+      pageId: context.pageId,
+      messages,
+      contextVersion: context.bootstrap.pageContextSummary.contextVersion,
+      pageContextSummary: context.bootstrap.pageContextSummary as unknown as Record<
+        string,
+        unknown
+      >,
+      allowedTools: context.bootstrap.allowedTools,
+    })
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  return new PageAgentCore({
+    baseURL: '/api/ai/agent/invoke',
+    apiKey: 'server-proxied',
+    model: 'smart-fish-page-agent-proxy',
+    customFetch,
+    pageController: new PageController({ enableMask: false }),
+    language: 'zh-CN',
+    stepDelay: 300,
+    customTools: {
+      execute_javascript: null,
+      ...createProxyTools(context.bootstrap.allowedTools),
+    },
+    instructions: {
+      system: context.bootstrap.systemInstructions,
+      getPageInstructions: () => context.bootstrap.pageInstructions,
+    },
+  })
+}
+
+export function createPreviewMessage(preview: AIConfirmPreview): string {
+  return `${preview.previewText}\n\n风险等级：${preview.riskLevel}\n确认令牌：${preview.confirmToken}`
+}

@@ -1,60 +1,81 @@
+import request from '@/utils/http'
+
 import type { PageResult, PageQuery } from '@/types'
 import type { FeedingConfig, FeedingLog } from '@/types/feeding'
 
-// 获取投喂配置
-// TODO: [后端接入] 此处为模拟数据，需替换为真实后端接口
+interface BackendFeedingConfig {
+  feed_coefficient: number
+  frequency: number
+  feed_size: string
+}
+
+interface BackendFeedingLog {
+  id: string
+  feed_time: string
+  amount: number
+  status: FeedingLog['status']
+  trigger_type: FeedingLog['triggerType']
+}
+
+function mapFeedingConfig(config: BackendFeedingConfig): FeedingConfig {
+  return {
+    feedCoefficient: config.feed_coefficient,
+    frequency: config.frequency,
+    feedSize: config.feed_size,
+  }
+}
+
+function mapFeedingLog(log: BackendFeedingLog): FeedingLog {
+  return {
+    id: log.id,
+    feedTime: log.feed_time,
+    amount: log.amount,
+    status: log.status,
+    triggerType: log.trigger_type,
+  }
+}
+
 export function getFeedingConfig(): Promise<FeedingConfig> {
-  // 模拟数据返回，请替换为 axios.get('/feeding/config')
-  return Promise.resolve({
-    feedCoefficient: 1.6,
-    frequency: 3,
-    feedSize: '2.0mm'
-  })
+  return request
+    .get<BackendFeedingConfig>({
+      url: '/api/feeding/config',
+    })
+    .then(mapFeedingConfig)
 }
 
-// 更新投喂配置
-// TODO: [后端接入] 此处为模拟数据，需替换为真实后端接口
 export function updateFeedingConfig(config: FeedingConfig): Promise<boolean> {
-  console.log('updateFeedingConfig:', config)
-  // 模拟成功返回，请替换为 axios.post('/feeding/config', config)
-  return Promise.resolve(true)
+  return request
+    .post<{ updated: boolean }>({
+      url: '/api/feeding/config',
+      data: {
+        feed_coefficient: config.feedCoefficient,
+        frequency: config.frequency,
+        feed_size: config.feedSize,
+      },
+    })
+    .then((response) => response.updated)
 }
 
-// 获取投喂日志
-// TODO: [后端接入] 此处为模拟数据，需替换为真实后端接口
 export function getFeedingLogs(params: PageQuery): Promise<PageResult<FeedingLog>> {
-  console.log('getFeedingLogs params:', params)
-  // 模拟数据返回，请替换为 axios.get('/feeding/logs', { params })
-  return Promise.resolve({
-    list: [
-      {
-        id: '1',
-        feedTime: '2024-03-20 08:00:00',
-        amount: 500,
-        status: 'completed',
-        triggerType: 'auto'
+  return request
+    .get<PageResult<BackendFeedingLog>>({
+      url: '/api/feeding/logs',
+      params: {
+        pageNum: params.current,
+        pageSize: params.size,
       },
-      {
-        id: '2',
-        feedTime: '2024-03-20 12:00:00',
-        amount: 500,
-        status: 'completed',
-        triggerType: 'auto'
-      },
-      {
-        id: '3',
-        feedTime: '2024-03-20 18:00:00',
-        amount: 600,
-        status: 'pending',
-        triggerType: 'manual'
-      }
-    ],
-    total: 3
-  })
+    })
+    .then((result) => ({
+      total: result.total,
+      list: result.list.map(mapFeedingLog),
+    }))
 }
 
-// 手动投喂
 export function manualFeeding(amount: number): Promise<boolean> {
-  console.log('manualFeeding amount:', amount)
-  return Promise.resolve(true)
+  return request
+    .post<{ id: string; amount: number }>({
+      url: '/api/feeding/manual',
+      params: { amount },
+    })
+    .then(() => true)
 }
