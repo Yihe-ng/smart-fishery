@@ -19,7 +19,7 @@ from app.ai.tool_registry import get_alert_digest, get_allowed_tools, get_device
 
 PAGE_NAMES = {
     "global-chat": "全局 AI 助手",
-    "fishery-dashboard": "监测大屏",
+    "fishery-dashboard": "监测控制台",
     "feeding": "精准投喂",
     "water-quality": "水质监测",
     "growth": "生长识别",
@@ -62,12 +62,12 @@ def build_system_instructions(page_context: PageContextSummary) -> str:
     page_name = PAGE_NAMES.get(page_context.currentPage.pageId, page_context.currentPage.pageId)
     return "\n".join(
         [
-            "你是石斑鱼智慧监测系统的 AI 助手。",
-            f"当前运行模式为 {mode}。",
-            "请根据页面上下文直接回答用户，不要输出 JSON、协议字段、推理轨迹、memory、next_goal、action 等结构化内容。",
-            "回答要简洁、自然、面向业务用户。",
-            "如果涉及控制、执行、投喂等高风险动作，只能给建议或预览，不能宣称已经真实执行。",
-            f"当前页面是：{page_name}。",
+            "你是智慧渔业监测系统的 AI 助手。",
+            f"当前系统模式：{mode}。",
+            "术语规范：统一使用“控制台”称呼当前业务工作区，不使用“驾驶舱”等别名。",
+            "请优先用中文直接回答用户，不输出协议字段、JSON 模板或调试痕迹。",
+            "当用户提出自动化需求时，先给出可执行建议，再根据风险提示是否需要确认。",
+            f"当前页面：{page_name}。",
         ]
     )
 
@@ -82,12 +82,12 @@ def build_page_instructions(page_context: PageContextSummary) -> str:
     )
     return "\n".join(
         [
-            f"当前鱼塘：{pond.name}（{pond.pondId}）。",
+            f"当前池塘：{pond.name}（{pond.pondId}）。",
             f"当前路由：{page_context.currentPage.routePath}。",
             f"上下文版本：{page_context.contextVersion}。",
             f"关键监测指标：{metrics_text}。",
             (
-                f"告警摘要：总数 {page_context.alertDigest.total}，"
+                f"告警汇总：总数 {page_context.alertDigest.total}，"
                 f"严重 {page_context.alertDigest.critical}，"
                 f"警告 {page_context.alertDigest.warning}。"
             ),
@@ -100,8 +100,11 @@ def build_page_instructions(page_context: PageContextSummary) -> str:
 
 
 def build_ui_capabilities(page_id: str) -> UICapabilities:
+    # 首期策略：仅精准投喂页面开放自动化执行能力，其他页面保持预览/建议能力。
+    can_execute = page_id == "feeding"
     return UICapabilities(
-        canExecute=False,
+        canExecute=can_execute,
+        canPreview=True,
         showAutomationTab=True,
         showSuggestionPanel=page_id == "feeding",
     )

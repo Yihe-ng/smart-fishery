@@ -21,9 +21,8 @@ def build_manual_feeding_preview(pond_id: str | None, amount: float) -> ManualFe
     return ManualFeedingPreviewResponse(
         actionType="manual_feeding_preview",
         previewText=(
-            f"Current mode: {settings.ai_mode}. "
-            f"Manual feeding preview generated for pond {target_pond}, amount {amount:.0f}g. "
-            "This is a preview only and will not trigger device execution."
+            f"已生成手动投喂预览：池塘 {target_pond}，投喂量 {amount:.0f}g。"
+            "该结果仅为预览，需在前端确认后才会执行。"
         ),
         riskLevel="warning",
         confirmToken=f"preview-{uuid4().hex[:16]}",
@@ -40,25 +39,18 @@ def _get_pond_id(request: InvokeRequest) -> str | None:
 
 
 def _build_mock_response(request: InvokeRequest) -> InvokeResponse:
-    settings = get_ai_settings()
     pond_id = _get_pond_id(request)
     last_user_message = next((msg.content for msg in reversed(request.messages) if msg.role == "user"), "")
     lowered = last_user_message.lower()
-    warnings = [
-        f"Current environment mode is {settings.ai_mode}. Suggestions and previews are for reference only."
-    ]
 
     if "feed" in lowered or "投喂" in last_user_message:
         preview = build_manual_feeding_preview(pond_id, 600)
         return InvokeResponse(
-            assistantMessage=(
-                "I generated a manual feeding preview based on the current page context. "
-                "Review the preview result before taking any real action."
-            ),
+            assistantMessage="我已基于当前页面数据生成投喂预览，请确认后执行。",
             toolCalls=[],
             toolResults=None,
             confirmPreview=ConfirmPreview(**preview.model_dump()),
-            warnings=warnings,
+            warnings=[],
         )
 
     if "告警" in last_user_message or "alert" in lowered:
@@ -66,21 +58,21 @@ def _build_mock_response(request: InvokeRequest) -> InvokeResponse:
         device = get_device_status(pond_id)
         return InvokeResponse(
             assistantMessage=(
-                f"There are {digest['total']} recent alerts, including {digest['critical']} critical and "
-                f"{digest['warning']} warning alerts. Devices online: {device['onlineCount']}, "
-                f"offline: {device['offlineCount']}."
+                f"当前共有 {digest['total']} 条告警，其中严重 {digest['critical']} 条、"
+                f"警告 {digest['warning']} 条。设备在线 {device['onlineCount']} 台，"
+                f"离线 {device['offlineCount']} 台。"
             ),
-            warnings=warnings,
+            warnings=[],
         )
 
     water = get_water_quality_summary(pond_id)
     feeding = get_feeding_recommendation(pond_id)
     return InvokeResponse(
         assistantMessage=(
-            f"{water['overview']} Feeding recommendation: {feeding['recommendation']} "
-            f"Latest context update: {water['updatedAt']}."
+            f"{water['overview']} 当前投喂建议：{feeding['recommendation']}。"
+            f"数据更新时间：{water['updatedAt']}。"
         ),
-        warnings=warnings,
+        warnings=[],
     )
 
 
@@ -102,7 +94,7 @@ def _extract_display_text(content: str) -> str:
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
-        return content
+        return text
 
     action = payload.get("action")
     if isinstance(action, dict):
@@ -116,20 +108,28 @@ def _extract_display_text(content: str) -> str:
         if isinstance(action_text, str) and action_text.strip():
             return action_text.strip()
 
-    for key in ("response", "answer", "content", "message"):
+    for key in ("response", "answer", "content", "message", "text"):
         value = payload.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
 
-    return content
+    return text
 
 
 def _build_real_messages(request: InvokeRequest) -> list[dict[str, str]]:
     pond = request.pageContextSummary.get("pond", {}) if isinstance(request.pageContextSummary, dict) else {}
-    current_page = request.pageContextSummary.get("currentPage", {}) if isinstance(request.pageContextSummary, dict) else {}
+    current_page = (
+        request.pageContextSummary.get("currentPage", {})
+        if isinstance(request.pageContextSummary, dict)
+        else {}
+    )
     metrics = request.pageContextSummary.get("keyMetrics", []) if isinstance(request.pageContextSummary, dict) else []
     alerts = request.pageContextSummary.get("alertDigest", {}) if isinstance(request.pageContextSummary, dict) else {}
-    devices = request.pageContextSummary.get("deviceStatus", {}) if isinstance(request.pageContextSummary, dict) else {}
+    devices = (
+        request.pageContextSummary.get("deviceStatus", {})
+        if isinstance(request.pageContextSummary, dict)
+        else {}
+    )
     updated_at = request.pageContextSummary.get("updatedAt", "") if isinstance(request.pageContextSummary, dict) else ""
 
     metrics_text = ", ".join(
@@ -153,22 +153,22 @@ def _build_real_messages(request: InvokeRequest) -> list[dict[str, str]]:
         f"devices_online={devices.get('onlineCount', 0)} offline={devices.get('offlineCount', 0)}"
     )
 
-    latest_user_message = next((message.content for message in reversed(request.messages) if message.role == "user"), "")
+    latest_user_message = next(
+        (message.content for message in reversed(request.messages) if message.role == "user"),
+        "",
+    )
 
     return [
         {
             "role": "system",
             "content": (
-                "You are an AI assistant for a smart fishery monitoring system. "
-                "Answer the user directly in Chinese. "
-                "Do not return JSON, Markdown code fences, planning traces, memory fields, or tool protocol text. "
-                "If the user asks a simple greeting, respond naturally in one short paragraph. "
-                "If the user asks for advice, base the answer on the provided context and keep it concise."
+                "你是智慧渔业系统助手，请直接用简洁中文回答。"
+                "不要返回 JSON、代码块、协议字段、规划痕迹或 memory/next_goal 等内部字段。"
             ),
         },
         {
             "role": "system",
-            "content": f"Current page context:\n{context_text}",
+            "content": f"当前页面上下文：\n{context_text}",
         },
         {
             "role": "user",
@@ -203,27 +203,27 @@ def invoke_llm(request: InvokeRequest) -> InvokeResponse:
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
         return InvokeResponse(
-            assistantMessage="LLM request failed. Falling back to an error response.",
-            warnings=[f"HTTP {exc.code}", detail[:500] or "No response body returned by upstream model service."],
+            assistantMessage="模型服务请求失败，请稍后重试。",
+            warnings=[f"HTTP {exc.code}", detail[:500] or "上游模型服务未返回详细信息。"],
         )
     except urllib.error.URLError as exc:
         return InvokeResponse(
-            assistantMessage="LLM request failed. Falling back to an error response.",
-            warnings=[f"Network error: {exc.reason}"],
+            assistantMessage="模型服务网络异常，请稍后重试。",
+            warnings=[f"网络错误: {exc.reason}"],
         )
     except Exception as exc:
         return InvokeResponse(
-            assistantMessage="Unexpected model invocation error.",
+            assistantMessage="模型调用出现异常，请稍后重试。",
             warnings=[str(exc)],
         )
 
     content = raw_payload.get("choices", [{}])[0].get("message", {}).get("content")
     if not content:
-        content = "Model service returned an empty response."
+        content = "模型服务暂未返回有效内容。"
     else:
         content = _extract_display_text(content)
 
     return InvokeResponse(
         assistantMessage=content,
-        warnings=["Response generated by upstream model service."],
+        warnings=[],
     )

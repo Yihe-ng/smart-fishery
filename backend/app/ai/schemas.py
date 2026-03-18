@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 PageId = Literal["global-chat", "fishery-dashboard", "feeding", "water-quality", "growth"]
 EnvironmentMode = Literal["mock", "real"]
 Severity = Literal["info", "warning", "critical"]
+RiskLevel = Literal["low", "warning", "critical"]
 Role = Literal["system", "user", "assistant", "tool"]
 
 
@@ -17,6 +18,7 @@ class SessionPolicy(BaseModel):
 
 class UICapabilities(BaseModel):
     canExecute: bool = False
+    canPreview: bool = True
     showAutomationTab: bool = True
     showSuggestionPanel: bool = False
 
@@ -106,7 +108,7 @@ class ToolCall(BaseModel):
 class ConfirmPreview(BaseModel):
     actionType: str
     previewText: str
-    riskLevel: Severity
+    riskLevel: RiskLevel
     confirmToken: str
     expiresAt: str
     mode: EnvironmentMode
@@ -154,7 +156,7 @@ class ManualFeedingPreviewRequest(BaseModel):
 class ManualFeedingPreviewResponse(BaseModel):
     actionType: str
     previewText: str
-    riskLevel: Severity
+    riskLevel: RiskLevel
     confirmToken: str
     expiresAt: str
     mode: EnvironmentMode

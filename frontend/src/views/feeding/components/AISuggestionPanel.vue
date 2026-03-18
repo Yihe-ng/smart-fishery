@@ -3,8 +3,8 @@
     <template #header>
       <div class="panel-header">
         <div class="title-wrap">
-          <ArtSvgIcon icon="ri:robot-2-line" class="text-[18px] text-sky-500" />
-          <span class="font-bold">AI 建议栏</span>
+          <ArtAiIcon />
+          <span class="title">AI 投喂建议</span>
         </div>
         <ElTag size="small" :type="panelTagType">{{ panelTagText }}</ElTag>
       </div>
@@ -12,13 +12,13 @@
 
     <div class="panel-body" v-loading="loading">
       <div class="panel-meta">
-        <span>数据模式：MOCK</span>
+        <span>状态：{{ modeLabel }}</span>
         <span v-if="latestUpdatedAt">更新时间：{{ latestUpdatedAt }}</span>
       </div>
 
       <div v-if="cards.length === 0" class="empty-state">
         <ArtSvgIcon icon="ri:message-3-line" size="24" />
-        <p>当前没有可展示的 AI 建议。</p>
+        <p>当前暂无投喂建议，请稍后刷新。</p>
       </div>
 
       <article v-for="card in cards" :key="card.id" class="suggestion-card" :class="card.severity">
@@ -27,7 +27,9 @@
             <h4>{{ card.title }}</h4>
             <p>{{ card.summary }}</p>
           </div>
-          <ElTag :type="getSeverityType(card.severity)" effect="light">{{ card.severity }}</ElTag>
+          <ElTag :type="getSeverityType(card.severity)" effect="light">
+            {{ severityText(card.severity) }}
+          </ElTag>
         </div>
 
         <ul class="rationale-list">
@@ -36,17 +38,21 @@
 
         <div class="card-footer">
           <div class="metrics">
+            <span>置信度 {{ Math.round(card.confidence * 100) }}%</span>
             <span>{{ card.updatedAt }}</span>
           </div>
           <div class="actions">
-            <ElButton text type="primary" @click="continueInAssistant(card)">查看依据</ElButton>
+            <ElButton type="primary" size="small" @click="continueInAssistant(card)">
+              继续分析
+            </ElButton>
             <ElButton
               v-if="card.confirmRequired"
               text
               type="warning"
-              @click="previewAction(card)"
+              size="small"
+              @click="previewAction()"
             >
-              生成预览
+              动作预览
             </ElButton>
           </div>
         </div>
@@ -57,9 +63,11 @@
 
 <script setup lang="ts">
   import { fetchFeedingSuggestions } from '@/api/ai'
+  import ArtAiIcon from '@/components/core/base/art-ai-icon/index.vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
+  import { AI_MODE_LABEL } from '@/config/ai'
   import { useAIStore } from '@/store/modules/ai'
-  import type { AISuggestionCard } from '@/types'
+  import type { AISeverity, AISuggestionCard } from '@/types'
 
   const props = defineProps<{
     pondId?: string
@@ -71,31 +79,42 @@
   const panelState = ref({ hasNewRisk: false, hasNewSuggestion: false })
 
   const latestUpdatedAt = computed(() => cards.value[0]?.updatedAt ?? '')
-  const panelTagText = computed(() => {
-    if (panelState.value.hasNewRisk) return '有风险'
-    if (panelState.value.hasNewSuggestion) return '有更新'
-    return '稳定'
+  const modeLabel = computed(() => {
+    const mode = cards.value[0]?.sourceMode ?? 'mock'
+    return AI_MODE_LABEL[mode]
   })
+
+  const panelTagText = computed(() => {
+    if (panelState.value.hasNewRisk) return '风险更新'
+    if (panelState.value.hasNewSuggestion) return '建议更新'
+    return '状态正常'
+  })
+
   const panelTagType = computed(() => {
     if (panelState.value.hasNewRisk) return 'warning'
     if (panelState.value.hasNewSuggestion) return 'success'
     return 'info'
   })
 
-  const getSeverityType = (severity: AISuggestionCard['severity']) => {
+  const getSeverityType = (severity: AISeverity) => {
     if (severity === 'critical') return 'danger'
     if (severity === 'warning') return 'warning'
     return 'info'
   }
 
+  const severityText = (severity: AISeverity) => {
+    if (severity === 'critical') return '高风险'
+    if (severity === 'warning') return '中风险'
+    return '低风险'
+  }
+
   const loadSuggestions = async () => {
     loading.value = true
-
     try {
       const response = await fetchFeedingSuggestions({
         pageId: 'feeding',
         routePath: '/fishery/feeding',
-        pondId: props.pondId,
+        pondId: props.pondId
       })
       cards.value = response.cards
       panelState.value = response.panelState
@@ -109,27 +128,27 @@
       {
         pageId: 'feeding',
         routePath: '/fishery/feeding',
-        pondId: props.pondId,
+        pondId: props.pondId
       },
       {
         activeTab: 'chat',
-        initialPrompt: `请解释这条建议的依据，并结合当前页面上下文展开说明：${card.title}。建议摘要：${card.summary}`,
-      },
+        initialPrompt: `请继续分析建议“${card.title}”，并结合当前页面数据给出处理建议：${card.summary}`
+      }
     )
   }
 
-  const previewAction = async (card: AISuggestionCard) => {
+  const previewAction = async () => {
     await aiStore.openAssistant(
       {
         pageId: 'feeding',
         routePath: '/fishery/feeding',
-        pondId: props.pondId,
+        pondId: props.pondId
       },
       {
-        activeTab: 'automation',
-        initialPrompt: `请为当前建议生成一次 600g 的手动投喂预览，并说明风险：${card.title}`,
-      },
+        activeTab: 'automation'
+      }
     )
+    await aiStore.requestManualFeedingPreview(600)
   }
 
   onMounted(() => {
@@ -165,6 +184,10 @@
     justify-content: flex-start;
   }
 
+  .title {
+    font-weight: 700;
+  }
+
   .panel-body {
     display: flex;
     height: 100%;
@@ -188,9 +211,9 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    color: var(--el-text-color-secondary);
     border: 1px dashed var(--art-card-border);
     border-radius: 14px;
+    color: var(--el-text-color-secondary);
   }
 
   .suggestion-card {
@@ -198,34 +221,34 @@
     flex-direction: column;
     gap: 12px;
     padding: 14px;
-    border-radius: 16px;
     border: 1px solid var(--art-card-border);
+    border-radius: 16px;
     background: var(--default-box-color);
+  }
 
-    &.warning {
-      border-color: rgb(245 158 11 / 35%);
-      background: linear-gradient(180deg, rgb(245 158 11 / 7%), transparent);
-    }
+  .suggestion-card.warning {
+    border-color: rgb(245 158 11 / 35%);
+    background: color-mix(in srgb, var(--el-color-warning) 7%, var(--default-box-color));
+  }
 
-    &.critical {
-      border-color: rgb(239 68 68 / 35%);
-      background: linear-gradient(180deg, rgb(239 68 68 / 7%), transparent);
-    }
+  .suggestion-card.critical {
+    border-color: rgb(239 68 68 / 35%);
+    background: color-mix(in srgb, var(--el-color-danger) 7%, var(--default-box-color));
   }
 
   .suggestion-head {
     align-items: flex-start;
+  }
 
-    h4 {
-      margin: 0 0 6px;
-      font-size: 15px;
-    }
+  .suggestion-head h4 {
+    margin: 0 0 6px;
+    font-size: 15px;
+  }
 
-    p {
-      margin: 0;
-      color: var(--el-text-color-regular);
-      line-height: 1.6;
-    }
+  .suggestion-head p {
+    margin: 0;
+    color: var(--el-text-color-regular);
+    line-height: 1.6;
   }
 
   .rationale-list {

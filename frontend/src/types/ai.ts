@@ -1,14 +1,12 @@
-export type AIPageId =
-  | 'global-chat'
-  | 'fishery-dashboard'
-  | 'feeding'
-  | 'water-quality'
-  | 'growth'
+export type AIPageId = 'global-chat' | 'fishery-dashboard' | 'feeding' | 'water-quality' | 'growth'
 
 export type AIEnvironmentMode = 'mock' | 'real'
 export type AISeverity = 'info' | 'warning' | 'critical'
+export type AIRiskLevel = 'low' | 'warning' | 'critical'
 export type AIRole = 'user' | 'assistant'
 export type AITabKey = 'chat' | 'automation'
+export type AIIntentType = 'qa' | 'automation'
+export type AIUIState = 'idle' | 'chatting' | 'previewing' | 'confirming' | 'executing' | 'failed'
 
 export interface AIContextRequest {
   pageId: AIPageId
@@ -61,6 +59,7 @@ export interface AIBootstrapPayload {
   toolSchemas: Array<Record<string, unknown>>
   uiCapabilities: {
     canExecute: boolean
+    canPreview: boolean
     showAutomationTab: boolean
     showSuggestionPanel: boolean
   }
@@ -74,7 +73,7 @@ export interface AIBootstrapPayload {
 export interface AIConfirmPreview {
   actionType: string
   previewText: string
-  riskLevel: AISeverity
+  riskLevel: AIRiskLevel
   confirmToken: string
   expiresAt: string
   mode: AIEnvironmentMode

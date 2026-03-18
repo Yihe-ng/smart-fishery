@@ -87,11 +87,11 @@
           @click="toggleFullScreen"
         />
 
-        <ArtIconButton
-          icon="ri:robot-2-line"
-          class="ai-entry-btn max-md:!hidden"
-          @click="openAIAssistant"
-        />
+        <ElTooltip content="AI 助手" placement="bottom" effect="light">
+          <ArtIconButton icon="" class="ai-entry-btn max-md:!hidden" @click="openAIAssistant">
+            <ArtAiIcon />
+          </ArtIconButton>
+        </ElTooltip>
 
         <!-- 国际化按钮 -->
         <ElDropdown
@@ -171,6 +171,7 @@
   import { themeAnimation } from '@/utils/ui/animation'
   import { useCommon } from '@/hooks/core/useCommon'
   import { useHeaderBar } from '@/hooks/core/useHeaderBar'
+  import ArtAiIcon from '@/components/core/base/art-ai-icon/index.vue'
   import ArtUserMenu from './widget/ArtUserMenu.vue'
 
   defineOptions({ name: 'ArtHeaderBar' })
@@ -408,8 +409,9 @@
     animation: rotate180 0.5s;
   }
 
-  .ai-entry-btn:hover :deep(.art-svg-icon) {
-    animation: breathing 0.8s ease-in-out;
+  .ai-entry-btn:hover :deep(.art-svg-icon),
+  .ai-entry-btn:hover :deep(.art-ai-icon) {
+    animation: moveUp 0.4s;
   }
 
   .full-screen-btn:hover :deep(.art-svg-icon) {

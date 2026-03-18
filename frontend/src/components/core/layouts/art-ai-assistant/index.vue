@@ -1,33 +1,34 @@
 <template>
   <ElDialog
     v-model="visible"
-    title="AI 助手"
     width="720px"
     class="ai-assistant-dialog"
     append-to-body
     destroy-on-close
     @closed="handleClosed"
   >
-    <div class="assistant-shell">
-      <div class="assistant-header">
-        <div class="context-meta">
-          <span class="context-badge">{{ currentPageLabel }}</span>
-          <span class="mode-badge" :class="environmentMode">{{ environmentMode.toUpperCase() }}</span>
-        </div>
-        <div class="context-summary">
-          <span v-if="currentContext">上下文版本 {{ currentContext.contextVersion }}</span>
-          <span v-if="currentContext">更新时间 {{ currentContext.updatedAt }}</span>
-        </div>
+    <template #header>
+      <div class="dialog-title">
+        <ArtAiIcon />
+        <span>AI 助手</span>
       </div>
+    </template>
+
+    <div class="assistant-shell">
+      <header class="assistant-header">
+        <div class="context-main">
+          <span class="context-badge">{{ currentPageLabel }}</span>
+          <span class="mode-badge" :class="environmentMode">{{ modeLabel }}</span>
+        </div>
+        <div class="context-sub">
+          <span v-if="currentContext">上下文版本 {{ currentContext.contextVersion }}</span>
+          <span v-if="currentContext">更新时间 {{ formatDateTime(currentContext.updatedAt) }}</span>
+        </div>
+      </header>
 
       <ElTabs v-model="activeTab" class="assistant-tabs">
         <ElTabPane label="问答" name="chat">
           <div class="messages-panel">
-            <div v-if="messages.length === 0" class="empty-state">
-              <ArtSvgIcon icon="ri:robot-2-line" size="28" />
-              <p>当前会话为空，可以直接询问水质、投喂建议或页面异常。</p>
-            </div>
-
             <article
               v-for="message in messages"
               :key="message.id"
@@ -39,31 +40,13 @@
                 <time>{{ formatTime(message.createdAt) }}</time>
               </header>
               <p class="message-content">{{ message.content }}</p>
-
-              <div v-if="message.warnings?.length" class="message-warnings">
-                <span v-for="warning in message.warnings" :key="warning">{{ warning }}</span>
-              </div>
-
-              <div v-if="message.confirmPreview" class="preview-card">
-                <div class="preview-head">
-                  <span>操作预览</span>
-                  <ElTag :type="getSeverityType(message.confirmPreview.riskLevel)" size="small">
-                    {{ message.confirmPreview.riskLevel }}
-                  </ElTag>
-                </div>
-                <p>{{ message.confirmPreview.previewText }}</p>
-                <div class="preview-meta">
-                  <span>令牌：{{ message.confirmPreview.confirmToken }}</span>
-                  <span>失效：{{ message.confirmPreview.expiresAt }}</span>
-                </div>
-              </div>
             </article>
           </div>
         </ElTabPane>
 
-        <ElTabPane label="自动化" name="automation">
+        <ElTabPane v-if="showAutomationTab" label="自动化" name="automation">
           <div class="automation-panel">
-            <div class="preset-grid">
+            <section class="preset-grid">
               <button
                 v-for="preset in automationPresets"
                 :key="preset.key"
@@ -74,91 +57,127 @@
                 <span class="preset-title">{{ preset.title }}</span>
                 <span class="preset-desc">{{ preset.prompt }}</span>
               </button>
-            </div>
+            </section>
 
-            <div class="latest-preview" v-if="latestPreview">
+            <section v-if="latestPreview" class="latest-preview">
               <div class="preview-head">
-                <span>最近操作预览</span>
-                <ElButton link type="primary" @click="requestManualFeedingPreview(600)">
-                  重新生成 600g 预览
-                </ElButton>
+                <span>操作预览</span>
+                <ElTag :type="getRiskType(latestPreview.riskLevel)" size="small">
+                  {{ getRiskLabel(latestPreview.riskLevel) }}
+                </ElTag>
               </div>
               <p>{{ latestPreview.previewText }}</p>
               <div class="preview-meta">
-                <span>风险：{{ latestPreview.riskLevel }}</span>
-                <span>模式：{{ latestPreview.mode }}</span>
+                <span>确认令牌 {{ latestPreview.confirmToken }}</span>
+                <span>失效时间 {{ formatDateTime(latestPreview.expiresAt) }}</span>
               </div>
-            </div>
+              <div class="preview-actions">
+                <ElButton
+                  type="primary"
+                  :disabled="!canExecute"
+                  :loading="uiState === 'executing'"
+                  @click="executeLatestPreview()"
+                >
+                  确认执行
+                </ElButton>
+                <ElButton
+                  text
+                  type="primary"
+                  :disabled="!canPreview"
+                  @click="requestManualFeedingPreview(600)"
+                >
+                  重新预览
+                </ElButton>
+              </div>
+            </section>
           </div>
         </ElTabPane>
       </ElTabs>
 
-      <div class="assistant-input">
+      <footer class="assistant-input">
         <ElInput
           v-model="draft"
           type="textarea"
           :rows="3"
           resize="none"
-          placeholder="输入你的问题或自动化需求"
-          @keydown.ctrl.enter.prevent="sendMessage()"
+          :disabled="loading"
+          placeholder="请输入你的问题或自动化需求"
+          @keydown.ctrl.enter.prevent="submitDraft()"
         />
         <div class="input-actions">
           <span class="hint">Ctrl + Enter 发送</span>
-          <ElButton type="primary" :loading="loading" @click="sendMessage()">发送</ElButton>
+          <ElButton
+            type="primary"
+            :loading="loading"
+            :disabled="!draft.trim()"
+            @click="submitDraft()"
+          >
+            发送
+          </ElButton>
         </div>
-      </div>
+      </footer>
     </div>
   </ElDialog>
 </template>
 
 <script setup lang="ts">
   import { storeToRefs } from 'pinia'
-  import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
+  import ArtAiIcon from '@/components/core/base/art-ai-icon/index.vue'
+  import { AI_PAGE_LABEL } from '@/config/ai'
   import { useAIStore } from '@/store/modules/ai'
-  import type { AIAutomationPreset, AISeverity } from '@/types'
+  import type { AIAutomationPreset, AIRiskLevel } from '@/types'
 
   defineOptions({ name: 'ArtAIAssistant' })
 
   const aiStore = useAIStore()
-  const { visible, loading, draft, activeTab, currentContext, bootstrap, messages, latestPreview, automationPresets } =
-    storeToRefs(aiStore)
+  const {
+    visible,
+    loading,
+    draft,
+    activeTab,
+    currentContext,
+    bootstrap,
+    messages,
+    latestPreview,
+    automationPresets,
+    canExecute,
+    canPreview,
+    showAutomationTab,
+    modeLabel,
+    uiState
+  } = storeToRefs(aiStore)
 
   const environmentMode = computed(() => bootstrap.value?.environmentMode ?? 'mock')
 
   const currentPageLabel = computed(() => {
-    const pageId = (currentContext.value?.currentPage.pageId ?? 'global-chat') as
-      | 'global-chat'
-      | 'fishery-dashboard'
-      | 'feeding'
-      | 'water-quality'
-      | 'growth'
-    const pageMap = {
-      'global-chat': '全局会话',
-      'fishery-dashboard': '渔业总览',
-      feeding: '精准投喂',
-      'water-quality': '水质监测',
-      growth: '生长监测',
-    } as const
-
-    return pageMap[pageId]
+    const currentPageId = currentContext.value?.currentPage.pageId ?? 'global-chat'
+    return AI_PAGE_LABEL[currentPageId]
   })
 
   const formatTime = (value: string) => {
     const date = new Date(value)
-    return `${date.getHours().toString().padStart(2, '0')}:${date
-      .getMinutes()
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+  }
+
+  const formatDateTime = (value: string) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date
+      .getDate()
       .toString()
-      .padStart(2, '0')}`
+      .padStart(2, '0')} ${formatTime(value)}`
   }
 
-  const getSeverityType = (severity: AISeverity) => {
-    if (severity === 'critical') return 'danger'
-    if (severity === 'warning') return 'warning'
-    return 'info'
+  const getRiskType = (level: AIRiskLevel) => {
+    if (level === 'critical') return 'danger'
+    if (level === 'warning') return 'warning'
+    return 'success'
   }
 
-  const sendMessage = async () => {
-    await aiStore.sendMessage()
+  const getRiskLabel = (level: AIRiskLevel) => {
+    if (level === 'critical') return '高风险'
+    if (level === 'warning') return '中风险'
+    return '低风险'
   }
 
   const runAutomationPreset = async (preset: AIAutomationPreset) => {
@@ -169,40 +188,68 @@
     await aiStore.requestManualFeedingPreview(amount)
   }
 
+  const executeLatestPreview = async () => {
+    await aiStore.executeLatestPreview()
+  }
+
+  const submitDraft = async () => {
+    await aiStore.submitDraft()
+  }
+
   const handleClosed = () => {
     aiStore.closeAssistant()
   }
 </script>
 
 <style scoped lang="scss">
+  .dialog-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+
   .assistant-shell {
     display: flex;
     min-height: 560px;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
   }
 
   .assistant-header {
     display: flex;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--art-card-border);
+    border-radius: 12px;
+    background: var(--default-box-color);
   }
 
-  .context-meta,
-  .context-summary,
+  .context-main,
+  .context-sub,
   .input-actions,
   .preview-head,
   .preview-meta,
   .message-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
+  }
+
+  .context-sub {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
   }
 
   .context-badge,
   .mode-badge {
+    display: inline-flex;
+    align-items: center;
     padding: 4px 10px;
     font-size: 12px;
     font-weight: 700;
@@ -211,7 +258,7 @@
 
   .context-badge {
     color: var(--el-color-primary);
-    background: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+    background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
   }
 
   .mode-badge {
@@ -219,9 +266,9 @@
     background: #fef3c7;
   }
 
-  .context-summary {
-    color: var(--el-text-color-secondary);
-    font-size: 12px;
+  .mode-badge.real {
+    color: #166534;
+    background: #dcfce7;
   }
 
   .assistant-tabs {
@@ -242,31 +289,19 @@
     padding-right: 6px;
   }
 
-  .empty-state {
-    display: flex;
-    height: 100%;
-    min-height: 240px;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    color: var(--el-text-color-secondary);
-    border: 1px dashed var(--art-card-border);
-    border-radius: 16px;
+  .message-card {
+    padding: 14px;
+    border: 1px solid var(--art-card-border);
+    border-radius: 14px;
+    background: var(--default-box-color);
   }
 
-  .message-card {
-    padding: 14px 16px;
-    border: 1px solid var(--art-card-border);
-    border-radius: 16px;
-    background: var(--default-box-color);
-
-    &.user {
-      background: color-mix(in srgb, var(--el-color-primary) 8%, var(--default-box-color));
-    }
+  .message-card.user {
+    border-color: color-mix(in srgb, var(--el-color-primary) 25%, var(--art-card-border));
   }
 
   .message-head {
+    justify-content: space-between;
     font-size: 12px;
     color: var(--el-text-color-secondary);
   }
@@ -277,76 +312,66 @@
     line-height: 1.65;
   }
 
-  .message-warnings {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-
-    span {
-      padding: 4px 8px;
-      font-size: 12px;
-      color: #92400e;
-      background: #fef3c7;
-      border-radius: 999px;
-    }
-  }
-
-  .preview-card,
-  .latest-preview {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 14px;
-    margin-top: 12px;
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--el-color-warning) 10%, var(--default-box-color));
-    border: 1px solid color-mix(in srgb, var(--el-color-warning) 24%, transparent);
-  }
-
-  .preview-meta {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    color: var(--el-text-color-secondary);
-    font-size: 12px;
-  }
-
   .preset-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    gap: 10px;
   }
 
   .preset-card {
     display: flex;
-    min-height: 126px;
+    min-height: 116px;
     flex-direction: column;
     gap: 8px;
-    padding: 16px;
+    padding: 14px;
     text-align: left;
     cursor: pointer;
-    background: linear-gradient(160deg, rgb(14 165 233 / 8%), rgb(34 197 94 / 4%));
     border: 1px solid var(--art-card-border);
-    border-radius: 18px;
+    border-radius: 14px;
+    background: var(--default-box-color);
     transition:
-      transform 0.2s ease,
-      box-shadow 0.2s ease;
+      transform 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease;
+  }
 
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgb(15 23 42 / 10%);
-    }
+  .preset-card:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--el-color-primary) 30%, var(--art-card-border));
+    box-shadow: 0 8px 22px rgb(15 23 42 / 8%);
   }
 
   .preset-title {
-    font-weight: 700;
     color: var(--el-text-color-primary);
+    font-weight: 700;
   }
 
   .preset-desc {
     font-size: 13px;
-    line-height: 1.6;
+    line-height: 1.5;
     color: var(--el-text-color-secondary);
+  }
+
+  .latest-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--el-color-warning) 20%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--el-color-warning) 9%, var(--default-box-color));
+  }
+
+  .preview-meta {
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .assistant-input {
@@ -366,7 +391,7 @@
 
   @media (width <= 900px) {
     .assistant-header,
-    .context-summary,
+    .context-sub,
     .input-actions {
       flex-direction: column;
       align-items: flex-start;
@@ -375,5 +400,29 @@
     .preset-grid {
       grid-template-columns: 1fr;
     }
+  }
+
+  :global(.dark) .assistant-header,
+  :global(.dark) .message-card,
+  :global(.dark) .preset-card {
+    border-color: color-mix(in oklch, var(--el-color-primary) 18%, var(--art-card-border));
+    background: var(--art-nested-card-bg);
+  }
+
+  :global(.dark) .message-card.user {
+    border-color: color-mix(in oklch, var(--el-color-primary) 36%, var(--art-card-border));
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--el-color-primary) 12%, transparent);
+  }
+
+  :global(.dark) .preset-card:hover {
+    background: var(--art-nested-card-hover);
+    box-shadow:
+      0 10px 22px rgb(0 0 0 / 34%),
+      0 0 0 1px color-mix(in oklch, var(--el-color-primary) 25%, transparent);
+  }
+
+  :global(.dark) .latest-preview {
+    border-color: color-mix(in oklch, var(--el-color-warning) 32%, transparent);
+    background: color-mix(in oklch, var(--el-color-warning) 14%, var(--art-nested-card-bg));
   }
 </style>

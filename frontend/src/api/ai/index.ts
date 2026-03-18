@@ -5,20 +5,20 @@ import type {
   AIContextSummary,
   AIInvokeResponse,
   AISuggestionResponse,
-  AIConfirmPreview,
+  AIConfirmPreview
 } from '@/types'
 
 export function fetchAIBootstrap(payload: AIContextRequest) {
   return request.post<AIBootstrapPayload>({
     url: '/api/ai/agent/bootstrap',
-    data: payload,
+    data: payload
   })
 }
 
 export function fetchAIContext(payload: AIContextRequest) {
   return request.post<AIContextSummary>({
     url: '/api/ai/agent/context',
-    data: payload,
+    data: payload
   })
 }
 
@@ -31,20 +31,35 @@ export function fetchAIInvoke(payload: {
 }) {
   return request.post<AIInvokeResponse>({
     url: '/api/ai/agent/invoke',
-    data: payload,
+    data: payload
   })
 }
 
 export function fetchFeedingSuggestions(payload: AIContextRequest) {
   return request.post<AISuggestionResponse>({
     url: '/api/ai/suggestions/feeding',
-    data: payload,
+    data: payload
   })
 }
 
 export function fetchManualFeedingPreview(payload: { pondId?: string; amount: number }) {
   return request.post<AIConfirmPreview>({
     url: '/api/ai/actions/manual-feeding/preview',
-    data: payload,
+    data: payload
+  })
+}
+
+export function executeManualFeeding(payload: {
+  feederId: string
+  amount: number
+  duration?: number
+}) {
+  return request.post<{ success: boolean; message?: string }>({
+    url: '/api/feeding/execute',
+    params: {
+      feeder_id: payload.feederId,
+      amount: payload.amount,
+      duration: payload.duration ?? 10
+    }
   })
 }
