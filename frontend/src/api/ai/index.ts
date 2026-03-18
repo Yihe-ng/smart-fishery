@@ -1,24 +1,26 @@
 import request from '@/utils/http'
 import type {
+  AIAgentInvokeResponse,
   AIBootstrapPayload,
+  AIConfirmPreview,
   AIContextRequest,
   AIContextSummary,
-  AIInvokeResponse,
   AISuggestionResponse,
-  AIConfirmPreview
+  AIToolExecuteRequest,
+  AIToolExecuteResponse,
 } from '@/types'
 
 export function fetchAIBootstrap(payload: AIContextRequest) {
   return request.post<AIBootstrapPayload>({
     url: '/api/ai/agent/bootstrap',
-    data: payload
+    data: payload,
   })
 }
 
 export function fetchAIContext(payload: AIContextRequest) {
   return request.post<AIContextSummary>({
     url: '/api/ai/agent/context',
-    data: payload
+    data: payload,
   })
 }
 
@@ -29,23 +31,30 @@ export function fetchAIInvoke(payload: {
   pageContextSummary: Record<string, unknown>
   allowedTools: string[]
 }) {
-  return request.post<AIInvokeResponse>({
+  return request.post<AIAgentInvokeResponse>({
     url: '/api/ai/agent/invoke',
-    data: payload
+    data: payload,
+  })
+}
+
+export function fetchExecuteTool(toolName: string, payload: AIToolExecuteRequest) {
+  return request.post<AIToolExecuteResponse>({
+    url: `/api/ai/tools/${toolName}`,
+    data: payload,
   })
 }
 
 export function fetchFeedingSuggestions(payload: AIContextRequest) {
   return request.post<AISuggestionResponse>({
     url: '/api/ai/suggestions/feeding',
-    data: payload
+    data: payload,
   })
 }
 
 export function fetchManualFeedingPreview(payload: { pondId?: string; amount: number }) {
   return request.post<AIConfirmPreview>({
     url: '/api/ai/actions/manual-feeding/preview',
-    data: payload
+    data: payload,
   })
 }
 
@@ -59,7 +68,7 @@ export function executeManualFeeding(payload: {
     params: {
       feeder_id: payload.feederId,
       amount: payload.amount,
-      duration: payload.duration ?? 10
-    }
+      duration: payload.duration ?? 10,
+    },
   })
 }

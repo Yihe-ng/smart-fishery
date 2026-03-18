@@ -38,7 +38,6 @@
 
         <div class="card-footer">
           <div class="metrics">
-            <span>置信度 {{ Math.round(card.confidence * 100) }}%</span>
             <span>{{ card.updatedAt }}</span>
           </div>
           <div class="actions">

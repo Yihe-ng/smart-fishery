@@ -1,19 +1,23 @@
-from fastapi import APIRouter
+import json
+
+from fastapi import APIRouter, HTTPException
 
 from app.ai.context_builder import build_bootstrap_payload, build_page_context
 from app.ai.llm_service import build_manual_feeding_preview, invoke_llm
 from app.ai.schemas import (
+    AgentInvokeResponse,
     BootstrapResponse,
     InvokeRequest,
-    InvokeResponse,
     ManualFeedingPreviewRequest,
     ManualFeedingPreviewResponse,
     PageContextRequest,
     PageContextSummary,
     SuggestionResponse,
+    ToolExecuteRequest,
+    ToolExecuteResponse,
 )
 from app.ai.suggestion_service import build_feeding_suggestions
-from app.ai.tool_registry import get_tool_schemas
+from app.ai.tool_registry import run_tool
 from app.schemas.base import BaseResponse
 
 router = APIRouter()
@@ -21,12 +25,11 @@ router = APIRouter()
 
 @router.post("/agent/bootstrap", response_model=BaseResponse[BootstrapResponse])
 async def bootstrap_agent(request: PageContextRequest):
-    payload = build_bootstrap_payload(request)
-    payload["toolSchemas"] = get_tool_schemas(request.pageId)
+    data = build_bootstrap_payload(request)
     return BaseResponse[BootstrapResponse](
         code=200,
         msg="AI bootstrap success",
-        data=BootstrapResponse(**payload),
+        data=data,
     )
 
 
@@ -40,13 +43,29 @@ async def refresh_page_context(request: PageContextRequest):
     )
 
 
-@router.post("/agent/invoke", response_model=BaseResponse[InvokeResponse])
+@router.post("/agent/invoke", response_model=BaseResponse[AgentInvokeResponse])
 async def invoke_agent(request: InvokeRequest):
-    response = invoke_llm(request)
-    return BaseResponse[InvokeResponse](
+    return BaseResponse[AgentInvokeResponse](
         code=200,
         msg="AI invoke success",
-        data=response,
+        data=invoke_llm(request),
+    )
+
+
+@router.post("/tools/{tool_name}", response_model=BaseResponse[ToolExecuteResponse])
+async def execute_tool(tool_name: str, request: ToolExecuteRequest):
+    try:
+        result = run_tool(tool_name, **request.arguments)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Tool execution failed")
+    return BaseResponse[ToolExecuteResponse](
+        code=200,
+        msg="Tool executed",
+        data=ToolExecuteResponse(result=json.dumps(result, ensure_ascii=False)),
     )
 
 

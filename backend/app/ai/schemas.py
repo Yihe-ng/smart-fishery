@@ -3,7 +3,9 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
-PageId = Literal["global-chat", "fishery-dashboard", "feeding", "water-quality", "growth"]
+PageId = Literal[
+    "global-chat", "fishery-dashboard", "feeding", "water-quality", "growth"
+]
 EnvironmentMode = Literal["mock", "real"]
 Severity = Literal["info", "warning", "critical"]
 RiskLevel = Literal["low", "warning", "critical"]
@@ -161,3 +163,20 @@ class ManualFeedingPreviewResponse(BaseModel):
     expiresAt: str
     mode: EnvironmentMode
     sessionId: Optional[str] = None
+
+
+class ToolExecuteRequest(BaseModel):
+    arguments: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ToolExecuteResponse(BaseModel):
+    result: str
+
+
+class AgentInvokeResponse(BaseModel):
+    id: str
+    object: str
+    created: int
+    model: str
+    choices: List[Dict[str, Any]]
+    usage: Dict[str, int]

@@ -30,7 +30,7 @@
         <ElTabPane label="问答" name="chat">
           <div class="messages-panel">
             <article
-              v-for="message in messages"
+              v-for="message in qaMessages"
               :key="message.id"
               class="message-card"
               :class="message.role"
@@ -39,7 +39,12 @@
                 <span>{{ message.role === 'user' ? '你' : 'AI 助手' }}</span>
                 <time>{{ formatTime(message.createdAt) }}</time>
               </header>
-              <p class="message-content">{{ message.content }}</p>
+              <div
+                v-if="message.role === 'assistant'"
+                class="message-content markdown-body"
+                v-html="renderMarkdown(message.content)"
+              />
+              <p v-else class="message-content">{{ message.content }}</p>
             </article>
           </div>
         </ElTabPane>
@@ -57,6 +62,26 @@
                 <span class="preset-title">{{ preset.title }}</span>
                 <span class="preset-desc">{{ preset.prompt }}</span>
               </button>
+            </section>
+
+            <section v-if="automationMessages.length" class="messages-panel automation-messages">
+              <article
+                v-for="message in automationMessages"
+                :key="message.id"
+                class="message-card"
+                :class="message.role"
+              >
+                <header class="message-head">
+                  <span>{{ message.role === 'user' ? '你' : 'AI 助手' }}</span>
+                  <time>{{ formatTime(message.createdAt) }}</time>
+                </header>
+                <div
+                  v-if="message.role === 'assistant'"
+                  class="message-content markdown-body"
+                  v-html="renderMarkdown(message.content)"
+                />
+                <p v-else class="message-content">{{ message.content }}</p>
+              </article>
             </section>
 
             <section v-if="latestPreview" class="latest-preview">
@@ -125,6 +150,7 @@
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { AI_PAGE_LABEL } from '@/config/ai'
   import { useAIStore } from '@/store/modules/ai'
+  import { renderMarkdown } from '@/utils/markdown'
   import type { AIAutomationPreset, AIRiskLevel } from '@/types'
 
   defineOptions({ name: 'ArtAIAssistant' })
@@ -140,6 +166,8 @@
     messages,
     latestPreview,
     automationPresets,
+    automationMessages,
+    qaMessages,
     canExecute,
     canPreview,
     showAutomationTab,
@@ -219,9 +247,10 @@
 
   .assistant-shell {
     display: flex;
-    min-height: 560px;
+    height: 600px;
     flex-direction: column;
     gap: 14px;
+    overflow: hidden;
   }
 
   .assistant-header {
@@ -280,18 +309,35 @@
   .assistant-tabs {
     flex: 1;
     min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-tabs__content) {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :deep(.el-tab-pane) {
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .messages-panel,
   .automation-panel {
     display: flex;
-    min-height: 360px;
+    flex: 1;
+    min-height: 0;
     flex-direction: column;
     gap: 12px;
   }
 
   .messages-panel {
-    overflow: auto;
+    overflow-y: auto;
     padding-right: 6px;
   }
 

@@ -1,10 +1,11 @@
 from hashlib import md5
-from typing import Dict
+from typing import Literal
 
 from app.ai.config import get_ai_settings
 from app.ai.mock_data import get_mock_pond, get_mock_water_quality
 from app.ai.schemas import (
     AlertSummary,
+    BootstrapResponse,
     CurrentPageSummary,
     DeviceStatusSummary,
     MetricSummary,
@@ -14,7 +15,12 @@ from app.ai.schemas import (
     SessionPolicy,
     UICapabilities,
 )
-from app.ai.tool_registry import get_alert_digest, get_allowed_tools, get_device_status
+from app.ai.tool_registry import (
+    get_alert_digest,
+    get_allowed_tools,
+    get_device_status,
+    get_tool_schemas,
+)
 
 
 PAGE_NAMES = {
@@ -57,16 +63,25 @@ def build_page_context(request: PageContextRequest) -> PageContextSummary:
     )
 
 
-def build_system_instructions(page_context: PageContextSummary) -> str:
+def build_system_instructions(
+    page_context: PageContextSummary, intent: Literal["qa", "automation"] = "qa"
+) -> str:
     mode = get_ai_settings().ai_mode
-    page_name = PAGE_NAMES.get(page_context.currentPage.pageId, page_context.currentPage.pageId)
+    page_name = PAGE_NAMES.get(
+        page_context.currentPage.pageId, page_context.currentPage.pageId
+    )
+    intent_instruction = (
+        "仅回答用户问题，不执行页面操作。"
+        if intent == "qa"
+        else "可以调用工具执行页面操作，完成用户的自动化需求。"
+    )
     return "\n".join(
         [
             "你是智慧渔业监测系统的 AI 助手。",
             f"当前系统模式：{mode}。",
-            "术语规范：统一使用“控制台”称呼当前业务工作区，不使用“驾驶舱”等别名。",
+            '术语规范：统一使用"控制台"称呼当前业务工作区，不使用"驾驶舱"等别名。',
             "请优先用中文直接回答用户，不输出协议字段、JSON 模板或调试痕迹。",
-            "当用户提出自动化需求时，先给出可执行建议，再根据风险提示是否需要确认。",
+            intent_instruction,
             f"当前页面：{page_name}。",
         ]
     )
@@ -118,15 +133,17 @@ def build_session_policy() -> SessionPolicy:
     )
 
 
-def build_bootstrap_payload(request: PageContextRequest) -> Dict[str, object]:
-    mode = get_ai_settings().ai_mode
+def build_bootstrap_payload(
+    request: PageContextRequest, intent: Literal["qa", "automation"] = "qa"
+) -> BootstrapResponse:
     page_context = build_page_context(request)
-    return {
-        "environmentMode": mode,
-        "systemInstructions": build_system_instructions(page_context),
-        "pageInstructions": build_page_instructions(page_context),
-        "pageContextSummary": page_context,
-        "allowedTools": get_allowed_tools(request.pageId),
-        "uiCapabilities": build_ui_capabilities(request.pageId),
-        "sessionPolicy": build_session_policy(),
-    }
+    return BootstrapResponse(
+        environmentMode=get_ai_settings().ai_mode,
+        systemInstructions=build_system_instructions(page_context, intent),
+        pageInstructions=build_page_instructions(page_context),
+        pageContextSummary=page_context,
+        allowedTools=get_allowed_tools(request.pageId),
+        toolSchemas=get_tool_schemas(request.pageId),
+        uiCapabilities=build_ui_capabilities(request.pageId),
+        sessionPolicy=build_session_policy(),
+    )

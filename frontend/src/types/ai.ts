@@ -80,13 +80,21 @@ export interface AIConfirmPreview {
   sessionId?: string
 }
 
-export interface AIInvokeResponse {
-  assistantMessage: string
-  toolCalls?: Array<{ name: string; arguments: Record<string, unknown> }>
-  toolResults?: Array<Record<string, unknown>> | null
-  confirmPreview?: AIConfirmPreview | null
-  warnings?: string[]
-  messageId?: string | null
+export interface AIAgentInvokeResponse {
+  id: string
+  object: string
+  created: number
+  model: string
+  choices: Array<Record<string, unknown>>
+  usage: Record<string, number>
+}
+
+export interface AIToolExecuteRequest {
+  arguments: Record<string, unknown>
+}
+
+export interface AIToolExecuteResponse {
+  result: string
 }
 
 export interface AISuggestionCard {
@@ -116,6 +124,7 @@ export interface AIChatMessage {
   role: AIRole
   content: string
   createdAt: string
+  intent?: AIIntentType
   warnings?: string[]
   confirmPreview?: AIConfirmPreview | null
 }
