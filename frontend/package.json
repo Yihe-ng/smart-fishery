@@ -54,6 +54,8 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
     "@iconify/vue": "^4.1.1",
+    "@page-agent/llms": "^1.5.9",
+    "@page-agent/page-controller": "^1.5.9",
     "@tailwindcss/vite": "^4.0.0",
     "@vue/reactivity": "^3.5.21",
     "@vueuse/core": "^13.9.0",
@@ -69,6 +71,7 @@
     "mitt": "^3.0.1",
     "nprogress": "^0.2.0",
     "ohash": "^1.1.3",
+    "page-agent": "^1.5.9",
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.0",
     "qrcode.vue": "^3.4.1",
@@ -79,7 +82,8 @@
     "vue-i18n": "^9.10.0",
     "vue-router": "^4.3.0",
     "xgplayer": "^3.0.10",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",

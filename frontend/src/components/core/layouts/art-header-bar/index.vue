@@ -87,6 +87,12 @@
           @click="toggleFullScreen"
         />
 
+        <ArtIconButton
+          icon="ri:robot-2-line"
+          class="ai-entry-btn max-md:!hidden"
+          @click="openAIAssistant"
+        />
+
         <!-- 国际化按钮 -->
         <ElDropdown
           @command="changeLanguage"
@@ -152,10 +158,11 @@
 
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n'
-  import { useRouter } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
   import { useFullscreen, useWindowSize } from '@vueuse/core'
   import { LanguageEnum, MenuTypeEnum } from '@/enums/appEnum'
   import { useSettingStore } from '@/store/modules/setting'
+  import { useAIStore } from '@/store/modules/ai'
   import { useUserStore } from '@/store/modules/user'
   import { useMenuStore } from '@/store/modules/menu'
   import AppConfig from '@/config'
@@ -172,9 +179,11 @@
   const isWindows = navigator.userAgent.includes('Windows')
 
   const router = useRouter()
+  const route = useRoute()
   const { locale } = useI18n()
   const { width } = useWindowSize()
 
+  const aiStore = useAIStore()
   const settingStore = useSettingStore()
   const userStore = useUserStore()
   const menuStore = useMenuStore()
@@ -284,6 +293,13 @@
   const openSearchDialog = (): void => {
     mittBus.emit('openSearchDialog')
   }
+
+  const openAIAssistant = async (): Promise<void> => {
+    await aiStore.openAssistant({
+      pageId: 'global-chat',
+      routePath: route.fullPath
+    })
+  }
 </script>
 
 <style lang="scss" scoped>
@@ -390,6 +406,10 @@
 
   .setting-btn:hover :deep(.art-svg-icon) {
     animation: rotate180 0.5s;
+  }
+
+  .ai-entry-btn:hover :deep(.art-svg-icon) {
+    animation: breathing 0.8s ease-in-out;
   }
 
   .full-screen-btn:hover :deep(.art-svg-icon) {
