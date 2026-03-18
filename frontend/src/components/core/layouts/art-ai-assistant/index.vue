@@ -9,7 +9,7 @@
   >
     <template #header>
       <div class="dialog-title">
-        <ArtAiIcon />
+        <ArtSvgIcon icon="ri:deepseek-fill" class="dialog-title-icon" />
         <span>AI 助手</span>
       </div>
     </template>
@@ -122,7 +122,7 @@
 
 <script setup lang="ts">
   import { storeToRefs } from 'pinia'
-  import ArtAiIcon from '@/components/core/base/art-ai-icon/index.vue'
+  import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { AI_PAGE_LABEL } from '@/config/ai'
   import { useAIStore } from '@/store/modules/ai'
   import type { AIAutomationPreset, AIRiskLevel } from '@/types'
@@ -208,6 +208,12 @@
     gap: 8px;
     font-size: 18px;
     font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+
+  .dialog-title-icon {
+    font-size: 18px;
+    line-height: 1;
     color: var(--el-text-color-primary);
   }
 

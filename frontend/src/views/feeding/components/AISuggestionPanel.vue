@@ -3,7 +3,7 @@
     <template #header>
       <div class="panel-header">
         <div class="title-wrap">
-          <ArtAiIcon />
+          <ArtSvgIcon icon="ri:deepseek-fill" class="title-icon" />
           <span class="title">AI 投喂建议</span>
         </div>
         <ElTag size="small" :type="panelTagType">{{ panelTagText }}</ElTag>
@@ -63,7 +63,6 @@
 
 <script setup lang="ts">
   import { fetchFeedingSuggestions } from '@/api/ai'
-  import ArtAiIcon from '@/components/core/base/art-ai-icon/index.vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { AI_MODE_LABEL } from '@/config/ai'
   import { useAIStore } from '@/store/modules/ai'
@@ -186,6 +185,12 @@
 
   .title {
     font-weight: 700;
+  }
+
+  .title-icon {
+    font-size: 18px;
+    line-height: 1;
+    color: var(--el-text-color-primary);
   }
 
   .panel-body {
