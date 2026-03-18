@@ -70,7 +70,6 @@
             <div class="quick-feed">
               <div>
                 <h4>快速投喂</h4>
-                <p>第一阶段仍为 mock 联调，仅生成后端 mock 日志与 AI 预览。</p>
               </div>
               <div class="quick-actions">
                 <el-input-number v-model="manualAmount" :min="100" :step="100" class="w-full" />
