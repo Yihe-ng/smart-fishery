@@ -5,7 +5,6 @@ from app.api.v1.endpoints import (
     alert,
     auth,
     device,
-    growth,
     feeding,
     fish_pond,
     growth,
@@ -19,7 +18,9 @@ from app.api.v1.endpoints import (
 api_router = APIRouter()
 
 api_router.include_router(auth.router, tags=["auth"])
-api_router.include_router(water_quality.router, prefix="/water-quality", tags=["water-quality"])
+api_router.include_router(
+    water_quality.router, prefix="/water-quality", tags=["water-quality"]
+)
 api_router.include_router(user.router, prefix="/user", tags=["user"])
 api_router.include_router(role.router, prefix="/role", tags=["role"])
 api_router.include_router(menu.router, prefix="/v3/system/menus", tags=["menu"])
@@ -28,6 +29,5 @@ api_router.include_router(feeding.router, prefix="/feeding", tags=["feeding"])
 api_router.include_router(device.router, prefix="/device", tags=["device"])
 api_router.include_router(alert.router, prefix="/alert", tags=["alert"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
-api_router.include_router(growth.router, prefix="/disease", tags=["disease"])
 api_router.include_router(growth.router, prefix="/growth", tags=["growth"])
 api_router.include_router(ai_router, prefix="/ai", tags=["ai-gateway"])

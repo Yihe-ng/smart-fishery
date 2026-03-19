@@ -1,4 +1,3 @@
-# 修改 backend/app/api/v1/endpoints/disease.py
 from fastapi import APIRouter
 from app.schemas.base import BaseResponse
 from pydantic import BaseModel
@@ -6,45 +5,48 @@ from typing import List, Optional
 from app.models.ai.yolo_detector import YOLODetector
 import os
 
-# 确保 router 变量被正确定义
 router = APIRouter()
 
-# 使用绝对路径加载模型
-current_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(current_dir, "..", "..", "..", "models", "ai", "best.pt")
+MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..",
+    "..",
+    "..",
+    "models",
+    "ai",
+    "best.pt",
+)
 
-print(f"Model path: {model_path}")
-print(f"File exists: {os.path.exists(model_path)}")
+_detector: Optional[YOLODetector] = None
 
-detector = YOLODetector(model_path)
+
+def get_detector() -> YOLODetector:
+    global _detector
+    if _detector is None:
+        print(f"[Growth] Loading model from: {MODEL_PATH}")
+        _detector = YOLODetector(MODEL_PATH)
+    return _detector
 
 
 class DetectionRequest(BaseModel):
-    """鱼长检测请求模型"""
-
-    image: str  # base64 编码的图片数据
+    image: str
 
 
 class DetectionItem(BaseModel):
-    """检测结果项"""
-
-    class_name: str  # 类别
-    confidence: float  # 置信度
-    bbox: List[float]  # 边界框坐标 [x, y, width, height]
-    length: float  # 鱼的长度（像素）
+    class_name: str
+    confidence: float
+    bbox: List[float]
+    length: float
 
 
 class DetectionResponse(BaseModel):
-    """鱼长检测响应模型"""
-
     detections: List[DetectionItem]
 
 
 @router.post("/detect", response_model=BaseResponse[DetectionResponse])
 def detect_fish(request: DetectionRequest):
-    """鱼长检测接口"""
-    # 使用 AI 模型进行检测
     try:
+        detector = get_detector()
         raw_detections = detector.detect(request.image)
         detections = [DetectionItem(**d) for d in raw_detections]
         return BaseResponse[DetectionResponse](
