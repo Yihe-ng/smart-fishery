@@ -60,8 +60,6 @@ def detect_fish(request: DetectionRequest):
 
 @router.get("/camera/stream", response_model=BaseResponse[str])
 def get_camera_stream():
-    """获取摄像头视频流"""
-    # 返回一个公共的 HLS 测试流，用于前端展示
     return BaseResponse[str](
         code=200,
         msg="获取成功",

@@ -16,8 +16,9 @@ const CM_PER_PIXEL = 0.1
 
 function mapClassName(className: string): 'small' | 'normal' | 'large' {
   const lower = className.toLowerCase()
-  if (lower.includes('small') || lower.includes('小')) return 'small'
-  if (lower.includes('large') || lower.includes('大')) return 'large'
+  if (lower === 'small') return 'small'
+  if (lower === 'medium') return 'normal'
+  if (lower === 'large') return 'large'
   return 'normal'
 }
 

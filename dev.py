@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent
 BACKEND_DIR = ROOT / "backend"
 FRONTEND_DIR = ROOT / "frontend"
 
-STARTUP_DELAY_SECONDS = 1.5
+STARTUP_DELAY_SECONDS = 3.0
 POLL_INTERVAL_SECONDS = 0.5
 TERMINATE_TIMEOUT_SECONDS = 5
 
@@ -81,7 +81,11 @@ def resolve_pnpm_command() -> str:
 
 
 def build_commands() -> tuple[list[str], list[str]]:
-    return ["uv", "run", "python", "-m", "app.main"], [resolve_pnpm_command(), "run", "dev"]
+    return ["uv", "run", "python", "-m", "app.main"], [
+        resolve_pnpm_command(),
+        "run",
+        "dev",
+    ]
 
 
 def stream_output(label: str, stream: TextIO | None) -> None:
@@ -115,7 +119,9 @@ def start_process(label: str, command: list[str], cwd: Path) -> subprocess.Popen
             env=env,
         )
     except FileNotFoundError as exc:
-        raise RuntimeError(f"{label} 启动失败，命令不可执行：{' '.join(command)}") from exc
+        raise RuntimeError(
+            f"{label} 启动失败，命令不可执行：{' '.join(command)}"
+        ) from exc
     except OSError as exc:
         raise RuntimeError(f"{label} 启动失败：{exc}") from exc
 
@@ -179,7 +185,9 @@ def main() -> int:
         time.sleep(STARTUP_DELAY_SECONDS)
         backend_return_code = backend_process.poll()
         if backend_return_code is not None and backend_return_code != 0:
-            print_message(f"[error] backend 启动后立即退出，退出码：{backend_return_code}")
+            print_message(
+                f"[error] backend 启动后立即退出，退出码：{backend_return_code}"
+            )
             return backend_return_code
 
         print_message("[system] 启动前端服务...")
@@ -196,7 +204,9 @@ def main() -> int:
         time.sleep(STARTUP_DELAY_SECONDS)
         frontend_return_code = frontend_process.poll()
         if frontend_return_code is not None and frontend_return_code != 0:
-            print_message(f"[error] frontend 启动后立即退出，退出码：{frontend_return_code}")
+            print_message(
+                f"[error] frontend 启动后立即退出，退出码：{frontend_return_code}"
+            )
             return frontend_return_code
 
         print_message("[system] 前后端开发服务已启动，按 Ctrl+C 可统一退出。")
@@ -208,7 +218,9 @@ def main() -> int:
                     if return_code == 0:
                         print_message(f"[system] {label} 已退出。")
                     else:
-                        print_message(f"[error] {label} 异常退出，退出码：{return_code}")
+                        print_message(
+                            f"[error] {label} 异常退出，退出码：{return_code}"
+                        )
                     return return_code
 
             time.sleep(POLL_INTERVAL_SECONDS)
