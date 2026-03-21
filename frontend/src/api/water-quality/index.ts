@@ -1,5 +1,9 @@
 import request from '@/utils/http'
-import type { WaterQualityData, WaterQualityThreshold } from '@/types/water-quality'
+import type {
+  DashboardFrameResponse,
+  WaterQualityData,
+  WaterQualityThreshold
+} from '@/types/water-quality'
 
 interface WaterQualityApiRecord {
   id: number | string
@@ -26,7 +30,36 @@ interface WaterQualityHistoryResponse {
   total: number
 }
 
+interface DashboardFrameApiResponse {
+  index: number
+  nextIndex: number
+  total: number
+  hasNext: boolean
+  collectTime: string | null
+  waterQuality: DashboardFrameWaterQualityApi | null
+  previousWaterQuality: DashboardFrameWaterQualityApi | null
+  metrics: DashboardFrameResponse['metrics']
+  devices: DashboardFrameResponse['devices']
+  alerts: DashboardFrameResponse['alerts']
+}
+
+interface DashboardFrameWaterQualityApi {
+  id: string
+  temperature: number
+  ph: number
+  dissolvedOxygen: number
+  ammoniaNitrogen: number
+  nitrite: number
+  collectTime: string
+  status: string
+}
+
 function normalizeWaterQuality(item: WaterQualityApiRecord): WaterQualityData {
+  const statusMap: Record<string, WaterQualityData['status']> = {
+    '正常': 'normal',
+    '警戒': 'warning',
+    '危险': 'danger'
+  }
   return {
     id: String(item.id ?? ''),
     temperature: item.temperature,
@@ -35,7 +68,24 @@ function normalizeWaterQuality(item: WaterQualityApiRecord): WaterQualityData {
     ammoniaNitrogen: item.ammonia_nitrogen,
     nitrite: item.nitrite,
     collectTime: item.collect_time,
-    status: item.status === '正常' ? 'normal' : 'warning'
+    status: statusMap[item.status] ?? 'warning'
+  }
+}
+
+function normalizeFrameWaterQuality(item: DashboardFrameWaterQualityApi | null): WaterQualityData | null {
+  if (!item) {
+    return null
+  }
+
+  const statusMap: Record<string, WaterQualityData['status']> = {
+    '正常': 'normal',
+    '警戒': 'warning',
+    '危险': 'danger'
+  }
+
+  return {
+    ...item,
+    status: statusMap[item.status] ?? 'warning'
   }
 }
 
@@ -69,15 +119,20 @@ export function getWaterQualityHistory(
 }
 
 export function getThresholdConfig(): Promise<WaterQualityThreshold> {
+  return request.get<WaterQualityThreshold>({
+    url: '/api/water-quality/threshold'
+  })
+}
+
+export function getDashboardFrame(index: number): Promise<DashboardFrameResponse> {
   return request
-    .get<Record<string, { min: number; max: number }>>({
-      url: '/api/water-quality/threshold'
+    .get<DashboardFrameApiResponse>({
+      url: '/api/water-quality/dashboard-frame',
+      params: { index }
     })
     .then((res) => ({
-      temperature: res.temperature,
-      ph: res.ph,
-      dissolvedOxygen: res.dissolved_oxygen,
-      ammoniaNitrogen: res.ammonia_nitrogen,
-      nitrite: res.nitrite
+      ...res,
+      waterQuality: normalizeFrameWaterQuality(res.waterQuality),
+      previousWaterQuality: normalizeFrameWaterQuality(res.previousWaterQuality)
     }))
 }

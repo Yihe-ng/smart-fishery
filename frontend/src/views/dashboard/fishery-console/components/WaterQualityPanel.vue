@@ -7,7 +7,7 @@
           v-for="item in topRowItems"
           :key="item.key"
           class="metric-card"
-          :class="item.status"
+          :class="item.statusClass"
           :style="{ '--metric-accent': item.color }"
           @click="handleCardClick(item)"
         >
@@ -19,7 +19,7 @@
               <span class="label">{{ item.label }}</span>
             </div>
             <el-tag
-              :type="getStatusType(item.status)"
+              :type="getStatusType(item.statusText)"
               size="small"
               effect="light"
               class="status-tag"
@@ -34,7 +34,7 @@
           </div>
 
           <div class="metric-meta metric-meta-inline">
-            <span class="trend-text">{{ item.deltaText }}</span>
+            <span class="trend-text">{{ item.trendText }}</span>
           </div>
         </article>
       </div>
@@ -44,7 +44,7 @@
           v-for="item in bottomRowItems"
           :key="item.key"
           class="metric-card"
-          :class="item.status"
+          :class="item.statusClass"
           :style="{ '--metric-accent': item.color }"
           @click="handleCardClick(item)"
         >
@@ -56,7 +56,7 @@
               <span class="label">{{ item.label }}</span>
             </div>
             <el-tag
-              :type="getStatusType(item.status)"
+              :type="getStatusType(item.statusText)"
               size="small"
               effect="light"
               class="status-tag"
@@ -71,7 +71,7 @@
           </div>
 
           <div class="metric-meta metric-meta-inline">
-            <span class="trend-text">{{ item.deltaText }}</span>
+            <span class="trend-text">{{ item.trendText }}</span>
           </div>
         </article>
       </div>
@@ -104,38 +104,29 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, onMounted, ref, watch } from 'vue'
+  import { computed, nextTick, onMounted, ref } from 'vue'
   import { Loading } from '@element-plus/icons-vue'
+
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import ArtChart from '@/components/core/charts/art-chart/index.vue'
-  import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
   import { WATER_QUALITY_METRICS, getWaterQualityMetricColor } from '@/config/theme'
   import { useChartStyles } from '@/hooks/core/useChart'
   import { getWaterQualityHistory } from '@/api/water-quality'
   import type { EChartsOption } from '@/plugins/echarts'
-  import type { WaterQualityData } from '@/types/water-quality'
+  import type { DashboardFrameMetric, WaterQualityData } from '@/types/water-quality'
+  import type { WaterQualityMetricKey } from '@/config/theme'
 
-  type MetricKey = keyof WaterQualityData & keyof typeof WATER_QUALITY_METRICS
-
-  interface MetricItem {
-    key: MetricKey
-    label: string
-    value: number
-    unit: string
+  interface MetricCardItem extends DashboardFrameMetric {
     icon: string
     color: string
-    status: 'normal' | 'warning' | 'danger'
-    statusText: string
-    deltaText: string
+    statusClass: 'normal' | 'warning' | 'danger'
   }
 
-  const TOP_ROW_KEYS: MetricKey[] = ['temperature', 'ammoniaNitrogen', 'ph']
-  const BOTTOM_ROW_KEYS: MetricKey[] = ['dissolvedOxygen', 'nitrite']
+  const TOP_ROW_KEYS: WaterQualityMetricKey[] = ['temperature', 'ammoniaNitrogen', 'ph']
+  const BOTTOM_ROW_KEYS: WaterQualityMetricKey[] = ['dissolvedOxygen', 'nitrite']
 
   const props = defineProps<{
-    data: WaterQualityData | null
-    previousData?: WaterQualityData | null
-    pondId?: string
+    metrics: Record<WaterQualityMetricKey, DashboardFrameMetric> | null
   }>()
 
   const { getAxisLineStyle, getAxisLabelStyle, getSplitLineStyle, getTooltipStyle } =
@@ -143,7 +134,7 @@
 
   const dialogVisible = ref(false)
   const chartReady = ref(false)
-  const currentMetricKey = ref<MetricKey | null>(null)
+  const currentMetricKey = ref<WaterQualityMetricKey | null>(null)
   const trendChartRef = ref<InstanceType<typeof ArtChart> | null>(null)
   const historyData = ref<WaterQualityData[]>([])
 
@@ -151,12 +142,11 @@
     try {
       const res = await getWaterQualityHistory({
         pageNum: 1,
-        pageSize: 100,
-        pondId: props.pondId
+        pageSize: 100
       })
       historyData.value = res.list
         .slice()
-        .sort((a: WaterQualityData, b: WaterQualityData) => a.collectTime.localeCompare(b.collectTime))
+        .sort((a, b) => a.collectTime.localeCompare(b.collectTime))
         .slice(-24)
     } catch (err) {
       historyData.value = []
@@ -168,21 +158,6 @@
     loadHistoryData()
   })
 
-  watch(
-    () => props.pondId,
-    () => {
-      loadHistoryData()
-    }
-  )
-
-  const METRIC_DISPLAY_META: Record<MetricKey, { label: string; unit: string }> = {
-    temperature: { label: '水温', unit: '℃' },
-    ammoniaNitrogen: { label: '氨氮', unit: 'mg/L' },
-    ph: { label: 'pH值', unit: '' },
-    dissolvedOxygen: { label: '溶解氧', unit: 'mg/L' },
-    nitrite: { label: '亚硝酸盐', unit: 'mg/L' }
-  }
-
   const formatMetricNumber = (value: number) => {
     if (Number.isInteger(value)) {
       return value.toString()
@@ -191,96 +166,48 @@
     return value.toFixed(value >= 10 ? 1 : 2).replace(/\.?0+$/, '')
   }
 
-  const getMetricStatus = (
-    value: number,
-    key: keyof typeof WATER_QUALITY_THRESHOLDS
-  ): MetricItem['status'] => {
-    const rule = WATER_QUALITY_THRESHOLDS[key]
-    if (!rule) {
-      return 'normal'
-    }
-
-    if (rule.max !== undefined && value > rule.max) {
-      const overflowRatio = rule.max === 0 ? 0 : (value - rule.max) / rule.max
-      return overflowRatio >= 0.2 ? 'danger' : 'warning'
-    }
-
-    if (rule.min !== undefined && value < rule.min) {
-      const underflowRatio = rule.min === 0 ? 0 : (rule.min - value) / rule.min
-      return underflowRatio >= 0.2 ? 'danger' : 'warning'
-    }
-
-    return 'normal'
-  }
-
-  const getStatusText = (status: MetricItem['status']) => {
-    const statusMap = {
-      normal: '正常',
-      warning: '预警',
-      danger: '告警'
-    } as const
-
-    return statusMap[status]
-  }
-
   const getStatusType = (
-    status: MetricItem['status']
+    statusText: DashboardFrameMetric['statusText']
   ): 'success' | 'warning' | 'danger' | 'info' => {
     const statusMap = {
-      normal: 'success',
-      warning: 'warning',
-      danger: 'danger'
+      正常: 'success',
+      警戒: 'warning',
+      危险: 'danger'
     } as const
 
-    return statusMap[status] ?? 'info'
+    return statusMap[statusText] ?? 'info'
   }
 
-  const getDeltaText = (key: MetricKey) => {
-    const latestValue = props.data?.[key]
-    const previousValue = props.previousData?.[key]
+  const getStatusClass = (statusText: DashboardFrameMetric['statusText']) => {
+    const statusMap = {
+      正常: 'normal',
+      警戒: 'warning',
+      危险: 'danger'
+    } as const
 
-    if (typeof latestValue !== 'number' || typeof previousValue !== 'number') {
-      return '趋势 --'
-    }
-
-    const delta = latestValue - previousValue
-    if (Math.abs(delta) < 0.01) {
-      return '趋势 持平'
-    }
-
-    return `趋势 ${delta > 0 ? '+' : ''}${formatMetricNumber(delta)}`
+    return statusMap[statusText]
   }
 
-  const itemMap = computed<Record<MetricKey, MetricItem> | null>(() => {
-    if (!props.data) {
+  const itemMap = computed<Record<WaterQualityMetricKey, MetricCardItem> | null>(() => {
+    if (!props.metrics) {
       return null
     }
 
-    const currentData = props.data
-
     return Object.fromEntries(
-      Object.keys(METRIC_DISPLAY_META).map((rawKey) => {
-        const key = rawKey as MetricKey
+      Object.entries(props.metrics).map(([rawKey, item]) => {
+        const key = rawKey as WaterQualityMetricKey
         const metric = WATER_QUALITY_METRICS[key]
-        const value = currentData[key] as number
-        const status = getMetricStatus(value, key)
-        const displayMeta = METRIC_DISPLAY_META[key]
-
-        const item: MetricItem = {
+        return [
           key,
-          label: displayMeta.label,
-          value,
-          unit: displayMeta.unit,
-          icon: metric.icon,
-          color: getWaterQualityMetricColor(key),
-          status,
-          statusText: getStatusText(status),
-          deltaText: getDeltaText(key)
-        }
-
-        return [key, item]
+          {
+            ...item,
+            icon: metric.icon,
+            color: getWaterQualityMetricColor(key),
+            statusClass: getStatusClass(item.statusText)
+          }
+        ]
       })
-    ) as Record<MetricKey, MetricItem>
+    ) as Record<WaterQualityMetricKey, MetricCardItem>
   })
 
   const topRowItems = computed(() => {
@@ -299,7 +226,7 @@
     return BOTTOM_ROW_KEYS.map((key) => itemMap.value![key])
   })
 
-  const currentItem = computed<MetricItem | null>(() => {
+  const currentItem = computed<MetricCardItem | null>(() => {
     if (!currentMetricKey.value || !itemMap.value) {
       return null
     }
@@ -393,7 +320,7 @@
     }
   })
 
-  const handleCardClick = (item: MetricItem) => {
+  const handleCardClick = (item: MetricCardItem) => {
     currentMetricKey.value = item.key
     dialogVisible.value = true
   }

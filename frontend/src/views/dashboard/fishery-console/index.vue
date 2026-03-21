@@ -16,14 +16,6 @@
         </div>
       </div>
       <div class="flex-c gap-4">
-        <el-radio-group v-model="currentPond" size="small">
-          <el-radio-button label="T001">
-            <div class="flex-c gap-1"><ArtSvgIcon icon="ri:database-2-line" />1号试验池</div>
-          </el-radio-button>
-          <el-radio-button label="T002">
-            <div class="flex-c gap-1"><ArtSvgIcon icon="ri:database-2-line" />2号试验池</div>
-          </el-radio-button>
-        </el-radio-group>
         <el-tag type="success" effect="plain" class="flex-c gap-1">
           <ArtSvgIcon icon="ri:shield-check-line" />系统运行中
         </el-tag>
@@ -34,19 +26,15 @@
       <section class="panel-section dashboard-panel area-water">
         <div class="section-title flex-c gap-2">
           <ArtSvgIcon icon="ri:temp-hot-line" />
-          <span>水质监测指标 (模拟)</span>
+          <span>水质监测指标</span>
         </div>
         <div class="panel-content">
-          <WaterQualityPanel
-            :data="currentWaterQuality"
-            :previous-data="previousWaterQuality"
-            :pond-id="currentPond"
-          />
+          <WaterQualityPanel :metrics="dashboardFrame?.metrics ?? null" />
         </div>
       </section>
 
       <AlertList
-        :alerts="allAlerts"
+        :alerts="visibleAlerts"
         class="area-alert dashboard-card-base dashboard-fill"
         @resolve="handleResolveAlert"
       />
@@ -60,7 +48,7 @@
       <section class="panel-section dashboard-panel area-sensor">
         <div class="section-title flex-c gap-2">
           <ArtSvgIcon icon="ri:cpu-line" />
-          <span>传感器设备状态 (模拟)</span>
+          <span>传感器设备状态</span>
         </div>
         <div class="panel-content sensor-scroll">
           <el-row :gutter="10">
@@ -83,7 +71,6 @@
 
       <FeedingPanel class="area-feed dashboard-card-base dashboard-fill" />
 
-      <!-- 生产数据预留 -->
       <el-card shadow="never" class="production-card area-kpi dashboard-card-base dashboard-fill">
         <template #header>
           <div class="flex-cb">
@@ -104,7 +91,7 @@
           </el-col>
           <el-col :span="8">
             <div class="kpi-item">
-              <div class="kpi-label">存栏预估</div>
+              <div class="kpi-label">存栏预计</div>
               <div class="kpi-value">12,500<span class="kpi-unit">尾</span></div>
             </div>
           </el-col>
@@ -121,7 +108,9 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted, computed, watch } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
+  import { ElMessage } from 'element-plus'
+
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import WaterQualityPanel from './components/WaterQualityPanel.vue'
   import SensorCard from './components/SensorCard.vue'
@@ -131,98 +120,19 @@
   import VideoPlayer from './components/VideoPlayer.vue'
   import AIDetectionResult from './components/AIDetectionResult.vue'
 
-  import { getSensorDevices } from '@/api/device'
-  import { getRecentAlerts, resolveAlert } from '@/api/alert'
   import { getHealthOverview } from '@/api/fish-disease/detect'
-  import { getWaterQualityHistory } from '@/api/water-quality'
-  import type { SensorDevice } from '@/types/device'
+  import { getDashboardFrame } from '@/api/water-quality'
   import type { Alert } from '@/types/alert'
   import type { DetectionResult } from '@/types/fish-disease'
-  import type { WaterQualityData } from '@/types/water-quality'
-  import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
-  import { ElMessage } from 'element-plus'
+  import type { SensorDevice } from '@/types/device'
+  import type { DashboardFrameResponse } from '@/types/water-quality'
 
   const lastUpdateTime = ref('--:--:--')
-  const currentPond = ref('T001')
+  const currentFrameIndex = ref(0)
+  const nextFrameIndex = ref(0)
+  const dashboardFrame = ref<DashboardFrameResponse | null>(null)
   const sensorDevices = ref<SensorDevice[]>([])
-  const deviceAlerts = ref<Alert[]>([])
-
-  // 水质数据相关状态
-  const waterQualityTimeline = ref<WaterQualityData[]>([])
-  const currentWaterQualityIndex = ref(0)
-  const currentWaterQuality = ref<WaterQualityData | null>(null)
-  const previousWaterQuality = computed<WaterQualityData | null>(() => {
-    if (currentWaterQualityIndex.value <= 0) {
-      return null
-    }
-
-    return waterQualityTimeline.value[currentWaterQualityIndex.value - 1] ?? null
-  })
-
-  type WaterMetricKey = keyof Pick<
-    WaterQualityData,
-    'temperature' | 'ph' | 'dissolvedOxygen' | 'ammoniaNitrogen' | 'nitrite'
-  >
-
-  // 基于当前水质数据生成的告警
-  const waterQualityAlerts = computed<Alert[]>(() => {
-    if (!currentWaterQuality.value) return []
-
-    const alerts: Alert[] = []
-    const data = currentWaterQuality.value
-    const time = data.collectTime.split(' ')[1] || '刚刚'
-
-    // 遍历检查每个指标
-    Object.entries(WATER_QUALITY_THRESHOLDS).forEach(([rawKey, rule]) => {
-      const key = rawKey as WaterMetricKey
-      const val = data[key]
-      if (typeof val === 'number') {
-        const isDangerHigh = rule.max !== undefined && val > rule.max * 1.2
-        const isDangerLow = rule.min !== undefined && val < rule.min * 0.8
-        const level: Alert['level'] = isDangerHigh || isDangerLow ? 'critical' : 'warning'
-
-        if (rule.max !== undefined && val > rule.max) {
-          alerts.push({
-            id: `wq-${key}-high`,
-            title: `${rule.label}过高`,
-            message: `当前${rule.label} ${val}，超过阈值 ${rule.max}`,
-            createTime: time,
-            level,
-            type: 'water_quality',
-            status: 'pending'
-          })
-        } else if (rule.min !== undefined && val < rule.min) {
-          alerts.push({
-            id: `wq-${key}-low`,
-            title: `${rule.label}过低`,
-            message: `当前${rule.label} ${val}，低于阈值 ${rule.min}`,
-            createTime: time,
-            level,
-            type: 'water_quality',
-            status: 'pending'
-          })
-        }
-      }
-    })
-
-    return alerts
-  })
-
-  // 混合显示所有告警，优先显示水质告警
-  const allAlerts = computed(() => {
-    return [...waterQualityAlerts.value, ...deviceAlerts.value]
-  })
-
-  const handleResolveAlert = async (alert: Alert) => {
-    try {
-      await resolveAlert(alert.id)
-      deviceAlerts.value = deviceAlerts.value.filter((item) => item.id !== alert.id)
-      ElMessage.success('告警已忽略')
-    } catch (error) {
-      console.error('resolve alert failed:', error)
-      ElMessage.error('告警处理失败，请稍后重试')
-    }
-  }
+  const dismissedAlertIds = ref<string[]>([])
 
   const healthData = ref<{
     score: number
@@ -246,86 +156,51 @@
     bbox: { x: 30, y: 40, width: 25, height: 20 }
   })
 
-  const formatRecordTime = (collectTime: string) => {
-    if (!collectTime) return '--'
+  const visibleAlerts = computed(() => {
+    const sourceAlerts = dashboardFrame.value?.alerts ?? []
+    return sourceAlerts.filter((alert) => !dismissedAlertIds.value.includes(alert.id))
+  })
 
-    const normalized = collectTime.replace('T', ' ')
-    const [dateText, timeText] = normalized.split(' ')
-
-    if (!dateText) return normalized
-    if (!timeText) return dateText
-
-    return `${dateText} ${timeText.slice(0, 8)}`
+  const applyFrame = (frame: DashboardFrameResponse) => {
+    dashboardFrame.value = frame
+    currentFrameIndex.value = frame.index
+    nextFrameIndex.value = frame.nextIndex
+    lastUpdateTime.value = frame.collectTime ?? '--'
+    sensorDevices.value = frame.devices
+    dismissedAlertIds.value = []
   }
 
-  const applyCurrentWaterQuality = (index: number) => {
-    const nextRecord = waterQualityTimeline.value[index] ?? null
-    currentWaterQualityIndex.value = index
-    currentWaterQuality.value = nextRecord
-    lastUpdateTime.value = nextRecord ? formatRecordTime(nextRecord.collectTime) : '--'
+  const loadDashboardFrame = async (index: number) => {
+    const frame = await getDashboardFrame(index)
+    applyFrame(frame)
   }
 
-  const loadWaterQualityTimeline = async () => {
-    const res = await getWaterQualityHistory({
-      pageNum: 1,
-      pageSize: 100,
-      pondId: currentPond.value
-    })
-
-    waterQualityTimeline.value = res.list
-      .slice()
-      .sort((a: WaterQualityData, b: WaterQualityData) => a.collectTime.localeCompare(b.collectTime))
-
-    applyCurrentWaterQuality(0)
-  }
-
-  const stepWaterQualityForward = () => {
-    if (!waterQualityTimeline.value.length) {
-      applyCurrentWaterQuality(0)
-      return
-    }
-
-    const nextIndex = (currentWaterQualityIndex.value + 1) % waterQualityTimeline.value.length
-    applyCurrentWaterQuality(nextIndex)
-  }
-
-  const loadDashboardSideData = async () => {
-    lastUpdateTime.value = currentWaterQuality.value
-      ? formatRecordTime(currentWaterQuality.value.collectTime)
-      : '--'
-
+  const loadSideData = async () => {
     try {
-      const [devices, recentAlerts, health] = await Promise.all([
-        getSensorDevices(),
-        getRecentAlerts(),
-        getHealthOverview()
-      ])
-      sensorDevices.value = devices
-      deviceAlerts.value = recentAlerts
-      healthData.value = health
-    } catch (err) {
-      console.error('Failed to refresh dashboard data:', err)
+      healthData.value = await getHealthOverview()
+    } catch (error) {
+      console.error('Failed to load dashboard side data:', error)
     }
   }
 
   const refreshData = async () => {
-    stepWaterQualityForward()
-    await loadDashboardSideData()
+    try {
+      await loadDashboardFrame(nextFrameIndex.value)
+    } catch (error) {
+      console.error('Failed to refresh dashboard frame:', error)
+      ElMessage.error('刷新失败，请稍后重试')
+    }
+  }
+
+  const handleResolveAlert = async (alert: Alert) => {
+    dismissedAlertIds.value = [...dismissedAlertIds.value, alert.id]
+    ElMessage.success('告警已忽略')
   }
 
   onMounted(() => {
-    Promise.all([loadWaterQualityTimeline(), loadDashboardSideData()]).catch((err) => {
-      currentWaterQuality.value = null
-      lastUpdateTime.value = '--'
-      console.error('Failed to initialize dashboard data:', err)
-    })
-  })
-
-  watch(currentPond, () => {
-    Promise.all([loadWaterQualityTimeline(), loadDashboardSideData()]).catch((err) => {
-      currentWaterQuality.value = null
-      lastUpdateTime.value = '--'
-      console.error('Failed to switch pond data:', err)
+    Promise.all([loadDashboardFrame(0), loadSideData()]).catch((error) => {
+      console.error('Failed to initialize dashboard:', error)
+      ElMessage.error('监测大屏初始化失败')
     })
   })
 </script>
@@ -541,7 +416,6 @@
       }
     }
 
-    // water 区域外层容器加深，形成容器深、内卡片浅的层次
     .area-water.dashboard-panel {
       background: var(--art-deep-surface-bg);
     }

@@ -1,23 +1,26 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from datetime import datetime
 from typing import Optional
-from app.schemas.water import (
-    WaterQualityCreate,
-    WaterQualityResponse,
-    WaterQualityHistoryResponse,
-)
-from app.schemas.base import BaseResponse
-from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import desc
+from sqlalchemy.orm import Session
+
 from app.db.session import get_db
 from app.models.water import WaterQualityData
+from app.schemas.base import BaseResponse
+from app.schemas.water import (
+    DashboardFrameResponse,
+    WaterQualityCreate,
+    WaterQualityHistoryResponse,
+    WaterQualityResponse,
+)
+from app.services.water_quality_dashboard import get_dashboard_frame, get_threshold_config
 
 router = APIRouter()
 
 
 @router.post("/data", response_model=BaseResponse[WaterQualityResponse])
 def receive_water_quality_data(data: WaterQualityCreate, db: Session = Depends(get_db)):
-    """接收传感器上传的水质数据"""
     db_data = WaterQualityData(
         pond_id=data.pond_id,
         dissolved_oxygen=data.dissolved_oxygen,
@@ -31,16 +34,13 @@ def receive_water_quality_data(data: WaterQualityCreate, db: Session = Depends(g
     db.add(db_data)
     db.commit()
     db.refresh(db_data)
-    return BaseResponse[WaterQualityResponse](
-        code=200, msg="数据接收成功", data=db_data
-    )
+    return BaseResponse[WaterQualityResponse](code=200, msg="数据接收成功", data=db_data)
 
 
 @router.get("/latest", response_model=BaseResponse[WaterQualityResponse])
 def get_latest_water_quality_data(
-    pond_id: str = Query(None), db: Session = Depends(get_db)
+    pond_id: Optional[str] = Query(None), db: Session = Depends(get_db)
 ):
-    """获取最新的水质数据"""
     query = db.query(WaterQualityData).order_by(desc(WaterQualityData.collect_time))
     if pond_id:
         query = query.filter(WaterQualityData.pond_id == pond_id)
@@ -54,12 +54,11 @@ def get_latest_water_quality_data(
 def get_water_quality_history_data(
     start_time: Optional[datetime] = Query(None),
     end_time: Optional[datetime] = Query(None),
-    pond_id: str = Query(None),
+    pond_id: Optional[str] = Query(None),
     page_num: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    """获取水质历史数据"""
     query = db.query(WaterQualityData)
     if start_time:
         query = query.filter(WaterQualityData.collect_time >= start_time)
@@ -81,17 +80,15 @@ def get_water_quality_history_data(
     )
 
 
-@router.get("/threshold")
+@router.get("/threshold", response_model=BaseResponse[dict])
 def get_water_quality_threshold():
-    """获取水质阈值配置"""
-    return BaseResponse(
-        code=200,
-        msg="获取成功",
-        data={
-            "temperature": {"min": 20, "max": 28},
-            "ph": {"min": 6.5, "max": 8.5},
-            "dissolved_oxygen": {"min": 5, "max": 15},
-            "ammonia_nitrogen": {"min": 0, "max": 0.5},
-            "nitrite": {"min": 0, "max": 0.1},
-        },
-    )
+    return BaseResponse(code=200, msg="获取成功", data=get_threshold_config())
+
+
+@router.get("/dashboard-frame", response_model=BaseResponse[DashboardFrameResponse])
+def get_water_quality_dashboard_frame(
+    index: int = Query(0),
+    db: Session = Depends(get_db),
+):
+    frame = get_dashboard_frame(db, index)
+    return BaseResponse[DashboardFrameResponse](code=200, msg="获取成功", data=frame)
