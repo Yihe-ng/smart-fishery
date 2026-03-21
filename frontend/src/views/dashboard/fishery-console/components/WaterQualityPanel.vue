@@ -104,14 +104,14 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, nextTick, ref } from 'vue'
+  import { computed, nextTick, onMounted, ref, watch } from 'vue'
   import { Loading } from '@element-plus/icons-vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import ArtChart from '@/components/core/charts/art-chart/index.vue'
   import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
   import { WATER_QUALITY_METRICS, getWaterQualityMetricColor } from '@/config/theme'
   import { useChartStyles } from '@/hooks/core/useChart'
-  import waterQualityMockData from '@/mock/water-quality-data.json'
+  import { getWaterQualityHistory } from '@/api/water-quality'
   import type { EChartsOption } from '@/plugins/echarts'
   import type { WaterQualityData } from '@/types/water-quality'
 
@@ -135,6 +135,7 @@
   const props = defineProps<{
     data: WaterQualityData | null
     previousData?: WaterQualityData | null
+    pondId?: string
   }>()
 
   const { getAxisLineStyle, getAxisLabelStyle, getSplitLineStyle, getTooltipStyle } =
@@ -144,12 +145,35 @@
   const chartReady = ref(false)
   const currentMetricKey = ref<MetricKey | null>(null)
   const trendChartRef = ref<InstanceType<typeof ArtChart> | null>(null)
+  const historyData = ref<WaterQualityData[]>([])
 
-  const historyData = computed(() => {
-    return [...(waterQualityMockData as unknown as WaterQualityData[])]
-      .sort((a, b) => a.collectTime.localeCompare(b.collectTime))
-      .slice(-24)
+  const loadHistoryData = async () => {
+    try {
+      const res = await getWaterQualityHistory({
+        pageNum: 1,
+        pageSize: 100,
+        pondId: props.pondId
+      })
+      historyData.value = res.list
+        .slice()
+        .sort((a: WaterQualityData, b: WaterQualityData) => a.collectTime.localeCompare(b.collectTime))
+        .slice(-24)
+    } catch (err) {
+      historyData.value = []
+      console.error('Failed to load history data:', err)
+    }
+  }
+
+  onMounted(() => {
+    loadHistoryData()
   })
+
+  watch(
+    () => props.pondId,
+    () => {
+      loadHistoryData()
+    }
+  )
 
   const METRIC_DISPLAY_META: Record<MetricKey, { label: string; unit: string }> = {
     temperature: { label: '水温', unit: '℃' },

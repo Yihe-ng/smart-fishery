@@ -1,273 +1,127 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional
-from pydantic import BaseModel
-from datetime import datetime
+from fastapi import APIRouter, HTTPException, Query, Depends
+from sqlalchemy.orm import Session
+from typing import Optional
+from app.db.session import get_db
+from app.models.user import User
+from app.schemas.user import UserResponse
 
 router = APIRouter()
 
 
-class UserListItem(BaseModel):
-    """用户列表项"""
-    id: int
-    userName: str
-    email: str
-    phone: Optional[str] = None
-    status: int  # 1: 启用, 0: 禁用
-    createTime: str
-    roleNames: List[str] = []
-
-
-class UserListResponse(BaseModel):
-    """用户列表响应"""
-    code: int
-    msg: str
-    data: dict
-
-
-class UserCreateRequest(BaseModel):
-    """创建用户请求"""
-    userName: str
-    email: str
-    phone: Optional[str] = None
-    password: str
-    roleIds: List[int] = []
-    status: int = 1
-
-
-class UserUpdateRequest(BaseModel):
-    """更新用户请求"""
-    userName: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    roleIds: Optional[List[int]] = None
-    status: Optional[int] = None
-
-
-@router.get("/list", response_model=UserListResponse)
-async def get_user_list(
-    current: int = Query(1, description="当前页码"),
-    size: int = Query(20, description="每页大小"),
-    status: Optional[int] = Query(None, description="状态筛选"),
-    keyword: Optional[str] = Query(None, description="关键词搜索")
+@router.get("/list")
+def get_user_list(
+    current: int = Query(1),
+    size: int = Query(20),
+    status: Optional[int] = Query(None),
+    keyword: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
 ):
     """获取用户列表"""
-    # 模拟数据
-    mock_users = [
-        {
-            "id": 1,
-            "userName": "admin",
-            "email": "admin@example.com",
-            "phone": "13800138000",
-            "status": 1,
-            "createTime": "2024-01-01 00:00:00",
-            "roleNames": ["管理员"]
-        },
-        {
-            "id": 2,
-            "userName": "user1",
-            "email": "user1@example.com",
-            "phone": "13800138001",
-            "status": 1,
-            "createTime": "2024-01-02 00:00:00",
-            "roleNames": ["普通用户"]
-        },
-        {
-            "id": 3,
-            "userName": "user2",
-            "email": "user2@example.com",
-            "phone": "13800138002",
-            "status": 0,
-            "createTime": "2024-01-03 00:00:00",
-            "roleNames": ["普通用户"]
-        }
-    ]
-    
-    # 状态筛选
+    query = db.query(User)
     if status is not None:
-        mock_users = [user for user in mock_users if user["status"] == status]
-    
-    # 关键词搜索
+        query = query.filter(User.status == status)
     if keyword:
-        mock_users = [
-            user for user in mock_users
-            if keyword.lower() in user["userName"].lower() or keyword.lower() in user["email"].lower()
-        ]
-    
-    total = len(mock_users)
-    
-    # 分页
-    start = (current - 1) * size
-    end = start + size
-    page_data = mock_users[start:end]
-    
-    return UserListResponse(
-        code=200,
-        msg="success",
-        data={
-            "list": page_data,
-            "total": total,
-            "current": current,
-            "size": size
-        }
-    )
-
-
-@router.get("/{user_id}")
-async def get_user(user_id: int):
-    """获取用户详情"""
-    # 模拟数据
-    mock_users = [
-        {
-            "id": 1,
-            "userName": "admin",
-            "email": "admin@example.com",
-            "phone": "13800138000",
-            "status": 1,
-            "createTime": "2024-01-01 00:00:00",
-            "roleNames": ["管理员"]
-        },
-        {
-            "id": 2,
-            "userName": "user1",
-            "email": "user1@example.com",
-            "phone": "13800138001",
-            "status": 1,
-            "createTime": "2024-01-02 00:00:00",
-            "roleNames": ["普通用户"]
-        },
-        {
-            "id": 3,
-            "userName": "user2",
-            "email": "user2@example.com",
-            "phone": "13800138002",
-            "status": 0,
-            "createTime": "2024-01-03 00:00:00",
-            "roleNames": ["普通用户"]
-        }
-    ]
-    
-    user = next((u for u in mock_users if u["id"] == user_id), None)
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
-    
+        query = query.filter(
+            (User.userName.contains(keyword)) | (User.email.contains(keyword))
+        )
+    total = query.count()
+    users = query.offset((current - 1) * size).limit(size).all()
+    user_list = [UserResponse.model_validate(u).model_dump() for u in users]
+    for u in user_list:
+        if u.get("createTime"):
+            u["createTime"] = u["createTime"].strftime("%Y-%m-%d %H:%M:%S")
+        u["roleNames"] = [u.get("role", "")]
     return {
         "code": 200,
         "msg": "success",
-        "data": user
+        "data": {"list": user_list, "total": total, "current": current, "size": size},
     }
+
+
+@router.get("/{user_id}")
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    """获取用户详情"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    user_data = UserResponse.model_validate(user).model_dump()
+    if user_data.get("createTime"):
+        user_data["createTime"] = user_data["createTime"].strftime("%Y-%m-%d %H:%M:%S")
+    user_data["roleNames"] = [user_data.get("role", "")]
+    return {"code": 200, "msg": "success", "data": user_data}
 
 
 @router.post("")
-async def create_user(request: UserCreateRequest):
+def create_user(
+    userName: str,
+    email: str,
+    password: str,
+    phone: str = None,
+    status: int = 1,
+    db: Session = Depends(get_db),
+):
     """创建用户"""
-    # 模拟数据
-    mock_users = [
-        {"id": 1, "email": "admin@example.com"},
-        {"id": 2, "email": "user1@example.com"},
-        {"id": 3, "email": "user2@example.com"}
-    ]
-    
-    # 检查邮箱是否已存在
-    existing_user = next((u for u in mock_users if u["email"] == request.email), None)
-    if existing_user:
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
         raise HTTPException(status_code=400, detail="邮箱已存在")
-    
-    # 模拟密码处理
-    hashed_password = f"hashed_{request.password}"
-    
-    # 模拟创建新用户
-    new_user = {
-        "id": 4,
-        "userName": request.userName,
-        "email": request.email,
-        "phone": request.phone,
-        "status": request.status,
-        "createTime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "roleNames": ["普通用户"]
-    }
-    
+    user = User(
+        userName=userName,
+        email=email,
+        phone=phone,
+        password=f"hashed_{password}",
+        status=status,
+        role="user",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return {
         "code": 200,
         "msg": "创建成功",
-        "data": new_user
+        "data": {"id": user.id, "userName": user.userName, "email": user.email},
     }
 
 
 @router.put("/{user_id}")
-async def update_user(user_id: int, request: UserUpdateRequest):
+def update_user(
+    user_id: int,
+    userName: str = None,
+    email: str = None,
+    phone: str = None,
+    status: int = None,
+    db: Session = Depends(get_db),
+):
     """更新用户"""
-    # 模拟数据
-    mock_users = [
-        {
-            "id": 1,
-            "userName": "admin",
-            "email": "admin@example.com",
-            "phone": "13800138000",
-            "status": 1,
-            "createTime": "2024-01-01 00:00:00",
-            "roleNames": ["管理员"]
-        },
-        {
-            "id": 2,
-            "userName": "user1",
-            "email": "user1@example.com",
-            "phone": "13800138001",
-            "status": 1,
-            "createTime": "2024-01-02 00:00:00",
-            "roleNames": ["普通用户"]
-        },
-        {
-            "id": 3,
-            "userName": "user2",
-            "email": "user2@example.com",
-            "phone": "13800138002",
-            "status": 0,
-            "createTime": "2024-01-03 00:00:00",
-            "roleNames": ["普通用户"]
-        }
-    ]
-    
-    user = next((u for u in mock_users if u["id"] == user_id), None)
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
-    # 检查邮箱是否已被其他用户使用
-    if request.email:
-        existing_user = next((u for u in mock_users if u["email"] == request.email and u["id"] != user_id), None)
-        if existing_user:
+    if userName:
+        user.userName = userName
+    if email:
+        existing = (
+            db.query(User).filter(User.email == email, User.id != user_id).first()
+        )
+        if existing:
             raise HTTPException(status_code=400, detail="邮箱已被其他用户使用")
-    
-    # 更新字段
-    if request.userName:
-        user["userName"] = request.userName
-    if request.email:
-        user["email"] = request.email
-    if request.phone:
-        user["phone"] = request.phone
-    if request.status is not None:
-        user["status"] = request.status
-    
+        user.email = email
+    if phone:
+        user.phone = phone
+    if status is not None:
+        user.status = status
+    db.commit()
     return {
         "code": 200,
         "msg": "更新成功",
-        "data": user
+        "data": {"id": user.id, "userName": user.userName},
     }
 
 
 @router.delete("/{user_id}")
-async def delete_user(user_id: int):
+def delete_user(user_id: int, db: Session = Depends(get_db)):
     """删除用户"""
-    # 模拟数据
-    mock_users = [
-        {"id": 1}, {"id": 2}, {"id": 3}
-    ]
-    
-    user = next((u for u in mock_users if u["id"] == user_id), None)
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    
-    return {
-        "code": 200,
-        "msg": "删除成功",
-        "data": None
-    }
+    db.delete(user)
+    db.commit()
+    return {"code": 200, "msg": "删除成功", "data": None}

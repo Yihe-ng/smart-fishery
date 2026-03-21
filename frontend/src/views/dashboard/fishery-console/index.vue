@@ -17,10 +17,10 @@
       </div>
       <div class="flex-c gap-4">
         <el-radio-group v-model="currentPond" size="small">
-          <el-radio-button label="P001">
+          <el-radio-button label="T001">
             <div class="flex-c gap-1"><ArtSvgIcon icon="ri:database-2-line" />1号试验池</div>
           </el-radio-button>
-          <el-radio-button label="P002">
+          <el-radio-button label="T002">
             <div class="flex-c gap-1"><ArtSvgIcon icon="ri:database-2-line" />2号试验池</div>
           </el-radio-button>
         </el-radio-group>
@@ -37,7 +37,11 @@
           <span>水质监测指标 (模拟)</span>
         </div>
         <div class="panel-content">
-          <WaterQualityPanel :data="currentWaterQuality" :previous-data="previousWaterQuality" />
+          <WaterQualityPanel
+            :data="currentWaterQuality"
+            :previous-data="previousWaterQuality"
+            :pond-id="currentPond"
+          />
         </div>
       </section>
 
@@ -117,7 +121,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted, computed } from 'vue'
+  import { ref, onMounted, computed, watch } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import WaterQualityPanel from './components/WaterQualityPanel.vue'
   import SensorCard from './components/SensorCard.vue'
@@ -130,57 +134,30 @@
   import { getSensorDevices } from '@/api/device'
   import { getRecentAlerts, resolveAlert } from '@/api/alert'
   import { getHealthOverview } from '@/api/fish-disease/detect'
+  import { getWaterQualityHistory } from '@/api/water-quality'
   import type { SensorDevice } from '@/types/device'
   import type { Alert } from '@/types/alert'
   import type { DetectionResult } from '@/types/fish-disease'
   import type { WaterQualityData } from '@/types/water-quality'
-  import waterQualityMockData from '@/mock/water-quality-data.json'
   import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
   import { ElMessage } from 'element-plus'
 
-  interface WaterQualityMockRow {
-    collectTime: string
-    temperature: number
-    ph: number
-    dissolvedOxygen: number
-    ammoniaNitrogen: number
-    nitrite: number
-    status: string
-  }
-
-  const lastUpdateTime = ref(new Date().toLocaleTimeString())
-  const currentPond = ref('P001')
+  const lastUpdateTime = ref('--:--:--')
+  const currentPond = ref('T001')
   const sensorDevices = ref<SensorDevice[]>([])
-  const deviceAlerts = ref<Alert[]>([]) // 原有的设备告警
+  const deviceAlerts = ref<Alert[]>([])
 
   // 水质数据相关状态
-  const currentIndex = ref(0)
+  const waterQualityTimeline = ref<WaterQualityData[]>([])
+  const currentWaterQualityIndex = ref(0)
   const currentWaterQuality = ref<WaterQualityData | null>(null)
-
   const previousWaterQuality = computed<WaterQualityData | null>(() => {
-    if (!waterQualityMockData?.length || currentIndex.value <= 0) {
+    if (currentWaterQualityIndex.value <= 0) {
       return null
     }
 
-    const previous = waterQualityMockData[currentIndex.value - 1] as WaterQualityMockRow
-    return parseMockWaterQuality(previous, currentIndex.value - 1)
+    return waterQualityTimeline.value[currentWaterQualityIndex.value - 1] ?? null
   })
-
-  const parseMockWaterQuality = (row: WaterQualityMockRow, index: number): WaterQualityData => {
-    const normalizedStatus: WaterQualityData['status'] =
-      row.status === 'danger' || row.status === 'warning' ? row.status : 'normal'
-
-    return {
-      id: `mock-${index}`,
-      collectTime: row.collectTime,
-      temperature: row.temperature,
-      ph: row.ph,
-      dissolvedOxygen: row.dissolvedOxygen,
-      ammoniaNitrogen: row.ammoniaNitrogen,
-      nitrite: row.nitrite,
-      status: normalizedStatus
-    }
-  }
 
   type WaterMetricKey = keyof Pick<
     WaterQualityData,
@@ -269,15 +246,53 @@
     bbox: { x: 30, y: 40, width: 25, height: 20 }
   })
 
-  const refreshData = async () => {
-    lastUpdateTime.value = new Date().toLocaleTimeString()
+  const formatRecordTime = (collectTime: string) => {
+    if (!collectTime) return '--'
 
-    // 更新水质数据（循环切换下一条）
-    if (waterQualityMockData && waterQualityMockData.length > 0) {
-      currentIndex.value = (currentIndex.value + 1) % waterQualityMockData.length
-      const current = waterQualityMockData[currentIndex.value] as WaterQualityMockRow
-      currentWaterQuality.value = parseMockWaterQuality(current, currentIndex.value)
+    const normalized = collectTime.replace('T', ' ')
+    const [dateText, timeText] = normalized.split(' ')
+
+    if (!dateText) return normalized
+    if (!timeText) return dateText
+
+    return `${dateText} ${timeText.slice(0, 8)}`
+  }
+
+  const applyCurrentWaterQuality = (index: number) => {
+    const nextRecord = waterQualityTimeline.value[index] ?? null
+    currentWaterQualityIndex.value = index
+    currentWaterQuality.value = nextRecord
+    lastUpdateTime.value = nextRecord ? formatRecordTime(nextRecord.collectTime) : '--'
+  }
+
+  const loadWaterQualityTimeline = async () => {
+    const res = await getWaterQualityHistory({
+      pageNum: 1,
+      pageSize: 100,
+      pondId: currentPond.value
+    })
+
+    waterQualityTimeline.value = res.list
+      .slice()
+      .sort((a: WaterQualityData, b: WaterQualityData) => a.collectTime.localeCompare(b.collectTime))
+
+    applyCurrentWaterQuality(0)
+  }
+
+  const stepWaterQualityForward = () => {
+    if (!waterQualityTimeline.value.length) {
+      applyCurrentWaterQuality(0)
+      return
     }
+
+    const nextIndex = (currentWaterQualityIndex.value + 1) % waterQualityTimeline.value.length
+    applyCurrentWaterQuality(nextIndex)
+  }
+
+  const loadDashboardSideData = async () => {
+    lastUpdateTime.value = currentWaterQuality.value
+      ? formatRecordTime(currentWaterQuality.value.collectTime)
+      : '--'
 
     try {
       const [devices, recentAlerts, health] = await Promise.all([
@@ -291,21 +306,27 @@
     } catch (err) {
       console.error('Failed to refresh dashboard data:', err)
     }
+  }
 
-    // TODO: 接入 WebSocket 实时告警推送
-    // 示例：
-    // socket.on('alert', (newAlert) => {
-    //   deviceAlerts.value.unshift(newAlert)
-    // })
+  const refreshData = async () => {
+    stepWaterQualityForward()
+    await loadDashboardSideData()
   }
 
   onMounted(() => {
-    // 初始化第一条数据
-    if (waterQualityMockData && waterQualityMockData.length > 0) {
-      const first = waterQualityMockData[0] as WaterQualityMockRow
-      currentWaterQuality.value = parseMockWaterQuality(first, 0)
-    }
-    refreshData()
+    Promise.all([loadWaterQualityTimeline(), loadDashboardSideData()]).catch((err) => {
+      currentWaterQuality.value = null
+      lastUpdateTime.value = '--'
+      console.error('Failed to initialize dashboard data:', err)
+    })
+  })
+
+  watch(currentPond, () => {
+    Promise.all([loadWaterQualityTimeline(), loadDashboardSideData()]).catch((err) => {
+      currentWaterQuality.value = null
+      lastUpdateTime.value = '--'
+      console.error('Failed to switch pond data:', err)
+    })
   })
 </script>
 
