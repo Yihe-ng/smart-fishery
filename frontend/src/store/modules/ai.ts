@@ -6,8 +6,8 @@ import {
   fetchAIBootstrap,
   fetchAIContext,
   fetchManualFeedingPreview,
-} from '@/api/ai'
-import { runQA } from '@/ai/page-agent-runtime'
+} from '@/api/agent'
+import { runQA } from '@/agent/page-agent-runtime'
 import { AI_MODE_LABEL, AI_WARNING_BLACKLIST, AI_WELCOME_MESSAGE } from '@/config/ai'
 import type {
   AIAutomationPreset,

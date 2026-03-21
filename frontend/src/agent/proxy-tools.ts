@@ -1,7 +1,7 @@
 import * as z from 'zod/v4'
 import type { PageAgentCore } from 'page-agent'
 
-import { fetchExecuteTool } from '@/api/ai'
+import { fetchExecuteTool } from '@/api/agent'
 
 export interface PageAgentTool {
   description: string

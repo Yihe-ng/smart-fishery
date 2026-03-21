@@ -61,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-  import { fetchFeedingSuggestions } from '@/api/ai'
+  import { fetchFeedingSuggestions } from '@/api/agent'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { AI_MODE_LABEL } from '@/config/ai'
   import { useAIStore } from '@/store/modules/ai'
