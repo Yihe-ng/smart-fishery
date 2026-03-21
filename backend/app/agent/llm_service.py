@@ -6,14 +6,14 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 from uuid import uuid4
 
-from app.ai.config import get_ai_settings
-from app.ai.schemas import (
+from app.agent.config import get_ai_settings
+from app.agent.schemas import (
     AgentInvokeResponse,
     ConfirmPreview,
     InvokeRequest,
     ManualFeedingPreviewResponse,
 )
-from app.ai.tool_registry import (
+from app.agent.tool_registry import (
     get_alert_digest,
     get_device_status,
     get_feeding_recommendation,

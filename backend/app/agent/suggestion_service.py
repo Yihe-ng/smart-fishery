@@ -1,7 +1,11 @@
-from app.ai.config import get_ai_settings
-from app.ai.mock_data import get_mock_feeding_logs
-from app.ai.schemas import SuggestionCard, SuggestionPanelState, SuggestionResponse
-from app.ai.tool_registry import get_alert_digest, get_feeding_recommendation, get_water_quality_summary
+from app.agent.config import get_ai_settings
+from app.agent.mock_data import get_mock_feeding_logs
+from app.agent.schemas import SuggestionCard, SuggestionPanelState, SuggestionResponse
+from app.agent.tool_registry import (
+    get_alert_digest,
+    get_feeding_recommendation,
+    get_water_quality_summary,
+)
 
 
 def build_feeding_suggestions(pond_id: str | None = None) -> SuggestionResponse:

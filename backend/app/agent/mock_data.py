@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List
 
-from app.ai.config import get_ai_settings
+from app.agent.config import get_ai_settings
 from app.api.v1.endpoints.alert import mock_alerts
 from app.api.v1.endpoints.device import mock_devices
 from app.api.v1.endpoints.feeding import mock_feeding_config, mock_feeding_logs
@@ -26,7 +26,13 @@ def get_mock_water_quality(pond_id: str | None) -> Dict[str, Any]:
         "updatedAt": datetime.now().isoformat(),
         "sourceMode": mode,
         "metrics": [
-            {"key": "temperature", "label": "水温", "value": 25.5, "unit": "℃", "status": "normal"},
+            {
+                "key": "temperature",
+                "label": "水温",
+                "value": 25.5,
+                "unit": "℃",
+                "status": "normal",
+            },
             {"key": "ph", "label": "pH", "value": 7.2, "unit": "", "status": "normal"},
             {
                 "key": "dissolved_oxygen",
@@ -42,7 +48,13 @@ def get_mock_water_quality(pond_id: str | None) -> Dict[str, Any]:
                 "unit": "mg/L",
                 "status": "normal",
             },
-            {"key": "nitrite", "label": "亚硝酸盐", "value": 0.05, "unit": "mg/L", "status": "warning"},
+            {
+                "key": "nitrite",
+                "label": "亚硝酸盐",
+                "value": 0.05,
+                "unit": "mg/L",
+                "status": "warning",
+            },
         ],
     }
 

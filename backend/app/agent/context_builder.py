@@ -1,9 +1,9 @@
 from hashlib import md5
 from typing import Literal
 
-from app.ai.config import get_ai_settings
-from app.ai.mock_data import get_mock_pond, get_mock_water_quality
-from app.ai.schemas import (
+from app.agent.config import get_ai_settings
+from app.agent.mock_data import get_mock_pond, get_mock_water_quality
+from app.agent.schemas import (
     AlertSummary,
     BootstrapResponse,
     CurrentPageSummary,
@@ -15,7 +15,7 @@ from app.ai.schemas import (
     SessionPolicy,
     UICapabilities,
 )
-from app.ai.tool_registry import (
+from app.agent.tool_registry import (
     get_alert_digest,
     get_allowed_tools,
     get_device_status,

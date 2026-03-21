@@ -2,9 +2,9 @@ import json
 
 from fastapi import APIRouter, HTTPException
 
-from app.ai.context_builder import build_bootstrap_payload, build_page_context
-from app.ai.llm_service import build_manual_feeding_preview, invoke_llm
-from app.ai.schemas import (
+from app.agent.context_builder import build_bootstrap_payload, build_page_context
+from app.agent.llm_service import build_manual_feeding_preview, invoke_llm
+from app.agent.schemas import (
     AgentInvokeResponse,
     BootstrapResponse,
     InvokeRequest,
@@ -16,8 +16,8 @@ from app.ai.schemas import (
     ToolExecuteRequest,
     ToolExecuteResponse,
 )
-from app.ai.suggestion_service import build_feeding_suggestions
-from app.ai.tool_registry import run_tool
+from app.agent.suggestion_service import build_feeding_suggestions
+from app.agent.tool_registry import run_tool
 from app.schemas.base import BaseResponse
 
 router = APIRouter()

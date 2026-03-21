@@ -1,8 +1,8 @@
 import { PageAgentCore } from 'page-agent'
 import { PageController } from '@page-agent/page-controller'
 
-import { fetchAIInvoke } from '@/api/ai'
-import { createProxyTools } from '@/ai/proxy-tools'
+import { fetchAIInvoke } from '@/api/agent'
+import { createProxyTools } from '@/agent/proxy-tools'
 import type { AIBootstrapPayload, AIConfirmPreview, AIPageId } from '@/types'
 
 interface AgentRuntimeContext {
@@ -76,7 +76,7 @@ export async function createPageAgent(context: AgentRuntimeContext) {
   }
 
   return new PageAgentCore({
-    baseURL: '/api/ai/agent/invoke',
+    baseURL: '/api/agent/agent/invoke',
     apiKey: 'server-proxied',
     model: 'smart-fish-page-agent-proxy',
     customFetch,
