@@ -6,6 +6,8 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Callable, Iterable, TextIO
 
@@ -17,6 +19,8 @@ FRONTEND_DIR = ROOT / "frontend"
 STARTUP_DELAY_SECONDS = 3.0
 POLL_INTERVAL_SECONDS = 0.5
 TERMINATE_TIMEOUT_SECONDS = 5
+BACKEND_HEALTH_URL = "http://127.0.0.1:8000/health"
+BACKEND_READY_TIMEOUT_SECONDS = 30.0
 
 
 def print_message(message: str) -> None:
@@ -160,6 +164,27 @@ def validate_environment(root: Path) -> list[str]:
     return errors
 
 
+def wait_for_backend_ready(
+    process: subprocess.Popen[str],
+    timeout_seconds: float = BACKEND_READY_TIMEOUT_SECONDS,
+    poll_interval_seconds: float = POLL_INTERVAL_SECONDS,
+) -> bool:
+    deadline = time.monotonic() + timeout_seconds
+
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            return False
+
+        try:
+            with urllib.request.urlopen(BACKEND_HEALTH_URL, timeout=1) as response:
+                if 200 <= response.status < 300:
+                    return True
+        except (urllib.error.URLError, TimeoutError, OSError):
+            time.sleep(poll_interval_seconds)
+
+    return False
+
+
 def main() -> int:
     errors = validate_environment(ROOT)
     if errors:
@@ -191,6 +216,20 @@ def main() -> int:
             return backend_return_code
 
         print_message("[system] 启动前端服务...")
+        print_message("[system] waiting for backend health check...")
+        if not wait_for_backend_ready(backend_process):
+            backend_return_code = backend_process.poll()
+            if backend_return_code is not None:
+                print_message(
+                    f"[error] backend exited before health check was ready, exit code: {backend_return_code}"
+                )
+                return backend_return_code
+
+            print_message(
+                f"[error] backend health check timed out after {BACKEND_READY_TIMEOUT_SECONDS:.0f}s: {BACKEND_HEALTH_URL}"
+            )
+            return 1
+
         frontend_process = start_process("frontend", frontend_command, FRONTEND_DIR)
         processes["frontend"] = frontend_process
         frontend_thread = threading.Thread(

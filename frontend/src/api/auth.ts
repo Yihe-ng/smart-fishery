@@ -27,3 +27,15 @@ export function fetchGetUserInfo() {
     // }
   })
 }
+
+/**
+ * 登录态修改密码
+ * @param data 修改密码参数
+ * @returns 修改结果
+ */
+export function fetchChangePassword(data: Api.Auth.ChangePasswordParams) {
+  return request.post<{ userName: string }>({
+    url: '/api/auth/change-password',
+    data
+  })
+}

@@ -1,6 +1,7 @@
-from pydantic import BaseModel
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 class UserInfo(BaseModel):
@@ -11,6 +12,7 @@ class UserInfo(BaseModel):
     userId: int
     userName: str
     email: str
+    userPhone: Optional[str] = None
     avatar: Optional[str] = None
 
 
@@ -46,6 +48,7 @@ class UserInfoResponse(BaseModel):
     userId: int
     userName: str
     email: str
+    userPhone: Optional[str] = None
     avatar: Optional[str] = None
 
 
@@ -64,6 +67,31 @@ class ResetPasswordRequest(BaseModel):
     confirmPassword: str
 
 
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str
+    confirmPassword: str
+
+
+class UserCreateRequest(BaseModel):
+    userName: str
+    userEmail: str
+    userPhone: Optional[str] = None
+    userGender: Optional[str] = None
+    userRoles: List[str] = []
+    password: Optional[str] = None
+    status: Optional[str] = "1"
+
+
+class UserUpdateRequest(BaseModel):
+    userName: Optional[str] = None
+    userEmail: Optional[str] = None
+    userPhone: Optional[str] = None
+    userGender: Optional[str] = None
+    userRoles: Optional[List[str]] = None
+    status: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     """用户列表响应"""
 
@@ -75,5 +103,4 @@ class UserResponse(BaseModel):
     role: Optional[str] = None
     createTime: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

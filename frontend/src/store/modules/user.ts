@@ -83,6 +83,17 @@ export const useUserStore = defineStore(
     }
 
     /**
+     * 局部更新用户资料
+     * @param partial 局部资料字段
+     */
+    const updateUserProfile = (partial: Partial<Api.Auth.UserInfo>) => {
+      info.value = {
+        ...info.value,
+        ...partial
+      }
+    }
+
+    /**
      * 设置登录状态
      * @param status 登录状态
      */
@@ -216,6 +227,7 @@ export const useUserStore = defineStore(
       getSettingState,
       getWorktabState,
       setUserInfo,
+      updateUserProfile,
       setLoginStatus,
       setLanguage,
       setSearchHistory,
