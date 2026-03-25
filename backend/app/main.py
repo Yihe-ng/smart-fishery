@@ -9,13 +9,19 @@ from fastapi.middleware.cors import CORSMiddleware
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时执行
     print("应用启动中...")
+
+    from app.db.session import engine
+    from app.db.base import Base
+    from app.models.user import User
+    from app.models.water import WaterQualityData, AlertRecord
+
+    Base.metadata.create_all(bind=engine)
+    print("数据库表已初始化")
     print("应用启动完成")
-    
+
     yield
-    
-    # 关闭时执行
+
     print("应用关闭中...")
     print("应用已关闭")
 
@@ -24,19 +30,19 @@ app = FastAPI(
     title="石斑鱼养殖水质检测系统",
     description="智能渔业管理系统API文档",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # 实现跨域
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3006",      # Vite 本地地址
+        "http://localhost:3006",  # Vite 本地地址
         "http://127.0.0.1:3006",
-        "http://localhost:3008",      # 备用端口
+        "http://localhost:3008",  # 备用端口
         "http://127.0.0.1:3008",
     ],
-    allow_credentials=True,           # 允许携带 Cookie
+    allow_credentials=True,  # 允许携带 Cookie
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -58,27 +64,21 @@ async def root_route():
             "异步数据库操作",
             "WebSocket 实时通信",
             "后台任务调度",
-            "智能投喂决策"
-        ]
+            "智能投喂决策",
+        ],
     }
 
 
 @app.get("/health")
 async def health_check():
     """健康检查接口"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
 if __name__ == "__main__":
     import uvicorn
     from datetime import datetime
+
     uvicorn.run(
-        "app.main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
-        log_level="info"
+        "app.main:app", host="127.0.0.1", port=8000, reload=True, log_level="info"
     )

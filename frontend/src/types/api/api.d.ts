@@ -81,7 +81,14 @@ declare namespace Api {
       userId: number
       userName: string
       email: string
+      userPhone?: string
       avatar?: string
+    }
+
+    interface ChangePasswordParams {
+      currentPassword: string
+      newPassword: string
+      confirmPassword: string
     }
   }
 

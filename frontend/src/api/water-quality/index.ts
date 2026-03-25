@@ -1,56 +1,138 @@
-import type { PageResult, PageQuery } from '@/types'
-import type { WaterQualityData, WaterQualityThreshold } from '@/types/water-quality'
+import request from '@/utils/http'
+import type {
+  DashboardFrameResponse,
+  WaterQualityData,
+  WaterQualityThreshold
+} from '@/types/water-quality'
 
-// 获取最新水质数据（预留接口）
-// TODO: [后端接入] 此处为模拟数据，需替换为真实后端接口
-export function getLatestWaterQuality(): Promise<WaterQualityData> {
-  // TODO: 接入后端
-  // return request.get('/water-quality/latest')
-  return Promise.resolve({
-    id: '1',
-    temperature: 25.5,
-    ph: 7.2,
-    dissolvedOxygen: 6.8,
-    ammoniaNitrogen: 0.3,
-    nitrite: 0.05,
-    collectTime: new Date().toISOString(),
-    status: 'normal'
-  })
+interface WaterQualityApiRecord {
+  id: number | string
+  pond_id: string
+  temperature: number
+  ph_value: number
+  dissolved_oxygen: number
+  ammonia_nitrogen: number
+  nitrite: number
+  collect_time: string
+  status: string
 }
 
-// 获取历史数据（预留接口）
+interface WaterQualityHistoryParams {
+  pageNum?: number
+  pageSize?: number
+  startTime?: string
+  endTime?: string
+  pondId?: string
+}
+
+interface WaterQualityHistoryResponse {
+  data: WaterQualityApiRecord[]
+  total: number
+}
+
+interface DashboardFrameApiResponse {
+  index: number
+  nextIndex: number
+  total: number
+  hasNext: boolean
+  collectTime: string | null
+  waterQuality: DashboardFrameWaterQualityApi | null
+  previousWaterQuality: DashboardFrameWaterQualityApi | null
+  metrics: DashboardFrameResponse['metrics']
+  devices: DashboardFrameResponse['devices']
+  alerts: DashboardFrameResponse['alerts']
+}
+
+interface DashboardFrameWaterQualityApi {
+  id: string
+  temperature: number
+  ph: number
+  dissolvedOxygen: number
+  ammoniaNitrogen: number
+  nitrite: number
+  collectTime: string
+  status: string
+}
+
+function normalizeWaterQuality(item: WaterQualityApiRecord): WaterQualityData {
+  const statusMap: Record<string, WaterQualityData['status']> = {
+    '正常': 'normal',
+    '警戒': 'warning',
+    '危险': 'danger'
+  }
+  return {
+    id: String(item.id ?? ''),
+    temperature: item.temperature,
+    ph: item.ph_value,
+    dissolvedOxygen: item.dissolved_oxygen,
+    ammoniaNitrogen: item.ammonia_nitrogen,
+    nitrite: item.nitrite,
+    collectTime: item.collect_time,
+    status: statusMap[item.status] ?? 'warning'
+  }
+}
+
+function normalizeFrameWaterQuality(item: DashboardFrameWaterQualityApi | null): WaterQualityData | null {
+  if (!item) {
+    return null
+  }
+
+  const statusMap: Record<string, WaterQualityData['status']> = {
+    '正常': 'normal',
+    '警戒': 'warning',
+    '危险': 'danger'
+  }
+
+  return {
+    ...item,
+    status: statusMap[item.status] ?? 'warning'
+  }
+}
+
+export function getLatestWaterQuality(pondId?: string): Promise<WaterQualityData> {
+  return request
+    .get<WaterQualityApiRecord>({
+      url: '/api/water-quality/latest',
+      params: { pond_id: pondId }
+    })
+    .then((res) => normalizeWaterQuality(res))
+}
+
 export function getWaterQualityHistory(
-  params: PageQuery & { startTime?: string; endTime?: string }
-): Promise<PageResult<WaterQualityData>> {
-  console.log('getWaterQualityHistory params:', params)
-  // TODO: 接入后端
-  return Promise.resolve({
-    list: [
-      {
-        id: '1',
-        temperature: 25.5,
-        ph: 7.2,
-        dissolvedOxygen: 6.8,
-        ammoniaNitrogen: 0.3,
-        nitrite: 0.05,
-        collectTime: new Date().toISOString(),
-        status: 'normal'
+  params: WaterQualityHistoryParams
+): Promise<{ list: WaterQualityData[]; total: number }> {
+  return request
+    .get<WaterQualityHistoryResponse>({
+      url: '/api/water-quality/history',
+      params: {
+        start_time: params.startTime,
+        end_time: params.endTime,
+        pond_id: params.pondId,
+        page_num: params.pageNum || 1,
+        page_size: params.pageSize || 10
       }
-    ],
-    total: 1
+    })
+    .then((res) => ({
+      list: res.data.map((item) => normalizeWaterQuality(item)),
+      total: res.total
+    }))
+}
+
+export function getThresholdConfig(): Promise<WaterQualityThreshold> {
+  return request.get<WaterQualityThreshold>({
+    url: '/api/water-quality/threshold'
   })
 }
 
-// 获取阈值配置（预留接口）
-// TODO: [后端接入] 此处为模拟数据，需替换为真实后端接口
-export function getThresholdConfig(): Promise<WaterQualityThreshold> {
-  // TODO: 接入后端
-  // return request.get('/water-quality/threshold')
-  return Promise.resolve({
-    temperature: { min: 20, max: 28 },
-    ph: { min: 6.5, max: 8.5 },
-    dissolvedOxygen: { min: 5, max: 15 },
-    ammoniaNitrogen: { min: 0, max: 0.5 },
-    nitrite: { min: 0, max: 0.1 }
-  })
+export function getDashboardFrame(index: number): Promise<DashboardFrameResponse> {
+  return request
+    .get<DashboardFrameApiResponse>({
+      url: '/api/water-quality/dashboard-frame',
+      params: { index }
+    })
+    .then((res) => ({
+      ...res,
+      waterQuality: normalizeFrameWaterQuality(res.waterQuality),
+      previousWaterQuality: normalizeFrameWaterQuality(res.previousWaterQuality)
+    }))
 }

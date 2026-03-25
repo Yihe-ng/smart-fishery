@@ -39,7 +39,8 @@
 </template>
 
 <script setup lang="ts">
-  import { ROLE_LIST_DATA } from '@/mock/temp/formData'
+  import { onMounted, ref } from 'vue'
+  import { fetchGetRoleList } from '@/api/system-manage'
   import type { FormInstance, FormRules } from 'element-plus'
 
   interface Props {
@@ -57,7 +58,27 @@
   const emit = defineEmits<Emits>()
 
   // 角色列表数据
-  const roleList = ref(ROLE_LIST_DATA)
+  const roleList = ref<Array<{ roleCode: string; roleName: string }>>([])
+
+  const loadRoleList = async () => {
+    try {
+      const res = await fetchGetRoleList({ current: 1, size: 100 })
+      const records =
+        (res as unknown as { list?: Array<any>; records?: Array<any> }).list ||
+        (res as unknown as { records?: Array<any> }).records ||
+        []
+      roleList.value = records.map((item: any) => ({
+        roleCode: item.roleCode,
+        roleName: item.roleName
+      }))
+    } catch (err) {
+      console.error('Failed to load role list:', err)
+    }
+  }
+
+  onMounted(() => {
+    loadRoleList()
+  })
 
   // 对话框显示控制
   const dialogVisible = computed({

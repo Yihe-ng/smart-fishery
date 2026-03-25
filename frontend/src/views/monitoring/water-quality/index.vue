@@ -93,7 +93,7 @@
     getWaterQualityMetricColor
   } from '@/config/theme'
   import { useChartStyles } from '@/hooks/core/useChart'
-  import waterQualityMockData from '@/mock/water-quality-data.json'
+  import { getWaterQualityHistory } from '@/api/water-quality'
   import type { SearchFormItem } from '@/components/core/forms/art-search-bar/index.vue'
   import type { EChartsOption } from '@/plugins/echarts'
   import type { WaterQualityData } from '@/types/water-quality'
@@ -212,29 +212,28 @@
   })
 
   const loadData = async () => {
-    let filteredData = waterQualityMockData as unknown as WaterQualityData[]
+    const startTime = searchQuery.dateRange.length === 2 ? searchQuery.dateRange[0] + ' 00:00:00' : undefined
+    const endTime = searchQuery.dateRange.length === 2 ? searchQuery.dateRange[1] + ' 23:59:59' : undefined
 
-    if (searchQuery.dateRange.length === 2) {
-      const [start, end] = searchQuery.dateRange
-      filteredData = filteredData.filter((item) => {
-        const itemDate = item.collectTime.split(' ')[0]
-        return itemDate >= start && itemDate <= end
-      })
-    }
+    const res = await getWaterQualityHistory({
+      pageNum: currentPage.value,
+      pageSize: pageSize.value,
+      startTime,
+      endTime
+    })
 
-    const processedData = filteredData.map((item) => ({
-      ...item,
-      status: getRowStatus(item)
-    }))
+    total.value = res.total
+    tableData.value = res.list
 
-    total.value = processedData.length
-    chartDataList.value = [...processedData]
-      .sort((a, b) => a.collectTime.localeCompare(b.collectTime))
-      .slice(-50)
-
-    const start = (currentPage.value - 1) * pageSize.value
-    const end = start + pageSize.value
-    tableData.value = processedData.slice(start, end)
+    const chartRes = await getWaterQualityHistory({
+      pageNum: 1,
+      pageSize: 100,
+      startTime,
+      endTime
+    })
+    chartDataList.value = chartRes.list
+      .slice()
+      .sort((a: WaterQualityData, b: WaterQualityData) => a.collectTime.localeCompare(b.collectTime))
   }
 
   const getRowStatus = (item: WaterQualityData): WaterQualityData['status'] => {
