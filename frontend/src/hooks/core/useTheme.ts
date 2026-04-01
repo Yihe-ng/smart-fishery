@@ -45,10 +45,7 @@ export function useTheme() {
   const settingStore = useSettingStore()
   const prefersDark = usePreferredDark()
 
-  const setSystemTheme = (
-    theme: ResolvedTheme,
-    themeMode: SystemThemeEnum = theme
-  ) => {
+  const setSystemTheme = (theme: ResolvedTheme, themeMode: SystemThemeEnum = theme) => {
     disableTransitions()
     syncThemeState(theme, settingStore.systemThemeColor)
     settingStore.setSystemThemeState(theme, themeMode)

@@ -27,7 +27,12 @@ export const fisheryRoutes: AppRouteRecord = {
       name: 'FishDisease',
       component: '/outside/Iframe',
       redirect: '/fishery/growth',
-      meta: { title: 'menus.fishery.disease', icon: 'ri:microscope-line', keepAlive: true, isHide: true }
+      meta: {
+        title: 'menus.fishery.disease',
+        icon: 'ri:microscope-line',
+        keepAlive: true,
+        isHide: true
+      }
     },
     {
       path: 'growth',

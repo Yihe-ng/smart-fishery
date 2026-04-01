@@ -23,11 +23,7 @@
 <template>
   <div
     class="art-skeleton"
-    :class="[
-      `art-skeleton--${type}`,
-      { 'art-skeleton--animated': animated },
-      customClass
-    ]"
+    :class="[`art-skeleton--${type}`, { 'art-skeleton--animated': animated }, customClass]"
   >
     <!-- 卡片骨架屏 -->
     <template v-if="type === 'card'">
@@ -479,13 +475,27 @@
     border-radius: 4px 4px 0 0;
   }
 
-  .skeleton-bar:nth-child(1) { height: 60%; }
-  .skeleton-bar:nth-child(2) { height: 80%; }
-  .skeleton-bar:nth-child(3) { height: 45%; }
-  .skeleton-bar:nth-child(4) { height: 90%; }
-  .skeleton-bar:nth-child(5) { height: 70%; }
-  .skeleton-bar:nth-child(6) { height: 55%; }
-  .skeleton-bar:nth-child(7) { height: 85%; }
+  .skeleton-bar:nth-child(1) {
+    height: 60%;
+  }
+  .skeleton-bar:nth-child(2) {
+    height: 80%;
+  }
+  .skeleton-bar:nth-child(3) {
+    height: 45%;
+  }
+  .skeleton-bar:nth-child(4) {
+    height: 90%;
+  }
+  .skeleton-bar:nth-child(5) {
+    height: 70%;
+  }
+  .skeleton-bar:nth-child(6) {
+    height: 55%;
+  }
+  .skeleton-bar:nth-child(7) {
+    height: 85%;
+  }
 
   .skeleton-donut {
     position: relative;

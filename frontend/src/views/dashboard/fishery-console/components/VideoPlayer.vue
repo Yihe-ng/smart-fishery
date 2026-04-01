@@ -13,7 +13,23 @@
     </template>
 
     <div class="video-container bg-black rounded overflow-hidden relative group">
-      <video ref="videoRef" class="w-full aspect-video" autoplay muted playsinline></video>
+      <!-- 视频元素 -->
+      <video
+        ref="videoRef"
+        class="w-full aspect-video"
+        :src="currentSource"
+        autoplay
+        muted
+        playsinline
+        @ended="handleVideoEnded"
+      />
+
+      <!-- 黑屏过渡层 -->
+      <div
+        v-show="isTransitioning"
+        class="absolute inset-0 bg-black transition-opacity duration-300"
+        :class="isTransitioning ? 'opacity-100' : 'opacity-0'"
+      />
 
       <!-- 叠加层 -->
       <div
@@ -39,47 +55,114 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted, onUnmounted, watch } from 'vue'
+  import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
-  import Hls from 'hls.js'
 
-  const props = defineProps<{
-    src: string
-  }>()
+  // Props 定义
+  interface Props {
+    /** 视频源列表 */
+    sources: string[]
+    /** 过渡动画时长（毫秒） */
+    transitionDuration?: number
+  }
 
+  const props = withDefaults(defineProps<Props>(), {
+    transitionDuration: 300
+  })
+
+  // 状态管理
   const videoRef = ref<HTMLVideoElement>()
-  let hls: Hls | null = null
+  const currentIndex = ref(0)
+  const isTransitioning = ref(false)
+  const shuffledSources = ref<string[]>([])
+  let transitionTimer: ReturnType<typeof setTimeout> | null = null
 
-  const initHls = () => {
-    if (hls) {
-      hls.destroy()
-      hls = null
+  // 当前播放的视频源
+  const currentSource = computed(() => {
+    if (shuffledSources.value.length === 0) return ''
+    return shuffledSources.value[currentIndex.value]
+  })
+
+  /**
+   * Fisher-Yates 洗牌算法
+   * @param array 待洗牌的数组
+   * @returns 洗牌后的新数组
+   */
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
+    return shuffled
+  }
 
-    if (props.src && videoRef.value) {
-      if (Hls.isSupported()) {
-        hls = new Hls()
-        hls.loadSource(props.src)
-        hls.attachMedia(videoRef.value)
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          videoRef.value?.play().catch(() => console.warn('Auto-play blocked'))
-        })
-      } else if (videoRef.value.canPlayType('application/vnd.apple.mpegurl')) {
-        videoRef.value.src = props.src
-        videoRef.value.addEventListener('loadedmetadata', () => {
-          videoRef.value?.play()
-        })
+  /**
+   * 播放下一个视频
+   */
+  const playNextVideo = () => {
+    // 进入过渡状态
+    isTransitioning.value = true
+
+    transitionTimer = setTimeout(() => {
+      // 更新索引
+      currentIndex.value++
+
+      // 如果播放完一轮，重新洗牌
+      if (currentIndex.value >= shuffledSources.value.length) {
+        shuffledSources.value = shuffleArray(props.sources)
+        currentIndex.value = 0
       }
+
+      // 退出过渡状态
+      isTransitioning.value = false
+
+      // 播放新视频
+      videoRef.value?.play().catch(() => console.warn('Auto-play blocked'))
+    }, props.transitionDuration)
+  }
+
+  /**
+   * 视频结束事件处理
+   */
+  const handleVideoEnded = () => {
+    playNextVideo()
+  }
+
+  /**
+   * 恢复视频播放
+   * 在组件从 KeepAlive 缓存激活时调用
+   */
+  const resumePlayback = () => {
+    // 如果正在过渡中，不恢复播放
+    if (isTransitioning.value) return
+
+    // 检查视频元素存在且已暂停
+    if (videoRef.value && videoRef.value.paused) {
+      videoRef.value.play().catch(() => {
+        // 浏览器自动播放策略阻止，静默处理
+        console.log('Auto-play blocked by browser policy')
+      })
     }
   }
 
-  watch(() => props.src, initHls)
+  // 组件挂载时初始化
+  onMounted(() => {
+    if (props.sources.length > 0) {
+      shuffledSources.value = shuffleArray(props.sources)
+      currentIndex.value = 0
+    }
+  })
 
-  onMounted(initHls)
+  // 组件从 KeepAlive 缓存激活时恢复播放
+  onActivated(() => {
+    resumePlayback()
+  })
 
+  // 组件卸载时清理
   onUnmounted(() => {
-    if (hls) {
-      hls.destroy()
+    if (transitionTimer) {
+      clearTimeout(transitionTimer)
     }
   })
 </script>

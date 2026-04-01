@@ -3,7 +3,7 @@
     <div class="feeding-layout">
       <section class="main-column">
         <div class="video-wrap">
-          <VideoPlayer :src="videoSrc" />
+          <VideoPlayer :sources="videoSources" />
         </div>
 
         <div class="content-grid">
@@ -92,46 +92,49 @@
 <script setup lang="ts">
   import { ElMessage } from 'element-plus'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
-  import { getCameraStream } from '@/api/growth-monitoring/detect'
-  import { getFeedingConfig, getFeedingLogs, manualFeeding, updateFeedingConfig } from '@/api/feeding'
+  import {
+    getFeedingConfig,
+    getFeedingLogs,
+    manualFeeding,
+    updateFeedingConfig
+  } from '@/api/feeding'
   import VideoPlayer from '@/views/dashboard/fishery-console/components/VideoPlayer.vue'
   import AISuggestionPanel from './components/AISuggestionPanel.vue'
   import type { FeedingConfig, FeedingLog } from '@/types/feeding'
 
   defineOptions({ name: 'FeedingPage' })
 
+  // 本地视频源列表
+  const videoSources = [
+    '/video/VID_20260330_161745.mp4',
+    '/video/VID_20260330_161836.mp4',
+    '/video/VID_20260330_161930.mp4',
+    '/video/VID_20260330_162428.mp4',
+    '/video/VID_20260330_163542.mp4',
+    '/video/VID_20260330_163804.mp4'
+  ]
+
   const pondId = 'pond-001'
   const config = reactive<FeedingConfig>({
     feedCoefficient: 1.6,
     frequency: 3,
-    feedSize: '2.0mm',
+    feedSize: '2.0mm'
   })
   const pidEnabled = ref(true)
   const manualAmount = ref(500)
   const logs = ref<FeedingLog[]>([])
-  const videoSrc = ref('')
 
   const loadData = async () => {
     try {
       const [cfg, logRes] = await Promise.all([
         getFeedingConfig(),
-        getFeedingLogs({ current: 1, size: 10 }),
+        getFeedingLogs({ current: 1, size: 10 })
       ])
       Object.assign(config, cfg)
       logs.value = logRes.list
     } catch (error) {
       console.error('Failed to load feeding data:', error)
       ElMessage.error('投喂 mock 数据加载失败')
-    }
-  }
-
-  const initVideoStream = async () => {
-    try {
-      const streamUrl = await getCameraStream()
-      videoSrc.value = streamUrl || ''
-    } catch (error) {
-      console.error('Failed to load camera stream:', error)
-      ElMessage.warning('视频加载失败，但 AI 建议栏仍可使用')
     }
   }
 
@@ -157,7 +160,7 @@
   }
 
   onMounted(async () => {
-    await Promise.allSettled([loadData(), initVideoStream()])
+    await loadData()
   })
 </script>
 

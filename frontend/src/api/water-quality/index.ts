@@ -56,9 +56,9 @@ interface DashboardFrameWaterQualityApi {
 
 function normalizeWaterQuality(item: WaterQualityApiRecord): WaterQualityData {
   const statusMap: Record<string, WaterQualityData['status']> = {
-    '正常': 'normal',
-    '警戒': 'warning',
-    '危险': 'danger'
+    正常: 'normal',
+    警戒: 'warning',
+    危险: 'danger'
   }
   return {
     id: String(item.id ?? ''),
@@ -72,15 +72,17 @@ function normalizeWaterQuality(item: WaterQualityApiRecord): WaterQualityData {
   }
 }
 
-function normalizeFrameWaterQuality(item: DashboardFrameWaterQualityApi | null): WaterQualityData | null {
+function normalizeFrameWaterQuality(
+  item: DashboardFrameWaterQualityApi | null
+): WaterQualityData | null {
   if (!item) {
     return null
   }
 
   const statusMap: Record<string, WaterQualityData['status']> = {
-    '正常': 'normal',
-    '警戒': 'warning',
-    '危险': 'danger'
+    正常: 'normal',
+    警戒: 'warning',
+    危险: 'danger'
   }
 
   return {

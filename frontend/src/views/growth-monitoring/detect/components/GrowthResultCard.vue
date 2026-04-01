@@ -36,19 +36,27 @@
 
   const statusType = computed(() => {
     switch (props.result?.class) {
-      case 'small': return 'warning'
-      case 'normal': return 'success'
-      case 'large': return 'primary'
-      default: return 'info'
+      case 'small':
+        return 'warning'
+      case 'normal':
+        return 'success'
+      case 'large':
+        return 'primary'
+      default:
+        return 'info'
     }
   })
 
   const statusText = computed(() => {
     switch (props.result?.class) {
-      case 'small': return '偏小'
-      case 'normal': return '正常'
-      case 'large': return '偏大'
-      default: return '未知'
+      case 'small':
+        return '偏小'
+      case 'normal':
+        return '正常'
+      case 'large':
+        return '偏大'
+      default:
+        return '未知'
     }
   })
 </script>

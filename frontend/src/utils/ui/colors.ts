@@ -258,7 +258,10 @@ export function handleElementThemeColor(theme: string, isDark: boolean = false):
  * 设置 Element Plus 主题颜色
  * @param color 主题颜色
  */
-export function setElementThemeColor(color: string, isDark: boolean = useSettingStore().isDark): void {
+export function setElementThemeColor(
+  color: string,
+  isDark: boolean = useSettingStore().isDark
+): void {
   const mixColor = '#ffffff'
   const elStyle = document.documentElement.style
 

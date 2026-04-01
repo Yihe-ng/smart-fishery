@@ -5,7 +5,7 @@ import {
   executeManualFeeding,
   fetchAIBootstrap,
   fetchAIContext,
-  fetchManualFeedingPreview,
+  fetchManualFeedingPreview
 } from '@/api/agent'
 import { runQA } from '@/agent/page-agent-runtime'
 import { AI_MODE_LABEL, AI_WARNING_BLACKLIST, AI_WELCOME_MESSAGE } from '@/config/ai'
@@ -20,38 +20,38 @@ import type {
   AIPageId,
   AIRiskLevel,
   AITabKey,
-  AIUIState,
+  AIUIState
 } from '@/types'
 
 const AUTOMATION_PRESETS: AIAutomationPreset[] = [
   {
     key: 'manual-feeding-preview',
     title: '生成手动投喂预览',
-    prompt: '请基于当前页面状态，生成 600g 手动投喂预览，并说明风险。',
+    prompt: '请基于当前页面状态，生成 600g 手动投喂预览，并说明风险。'
   },
   {
     key: 'feeding-advice',
     title: '投喂建议分析',
-    prompt: '请根据当前监测数据给出投喂建议，并说明原因。',
+    prompt: '请根据当前监测数据给出投喂建议，并说明原因。'
   },
   {
     key: 'alert-summary',
     title: '告警快速摘要',
-    prompt: '请总结当前页面关键告警，并给出优先处理顺序。',
-  },
+    prompt: '请总结当前页面关键告警，并给出优先处理顺序。'
+  }
 ]
 
 function createMessage(
   role: AIChatMessage['role'],
   content: string,
-  overrides: Partial<AIChatMessage> = {},
+  overrides: Partial<AIChatMessage> = {}
 ): AIChatMessage {
   return {
     id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     role,
     content,
     createdAt: new Date().toISOString(),
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -59,9 +59,7 @@ function sanitizeWarnings(warnings: string[] = []): string[] {
   return warnings.filter(
     (warning) =>
       warning &&
-      !AI_WARNING_BLACKLIST.some((keyword) =>
-        warning.toLowerCase().includes(keyword.toLowerCase()),
-      ),
+      !AI_WARNING_BLACKLIST.some((keyword) => warning.toLowerCase().includes(keyword.toLowerCase()))
   )
 }
 
@@ -104,14 +102,10 @@ export const useAIStore = defineStore('aiStore', () => {
   const canExecute = computed(() => bootstrap.value?.uiCapabilities.canExecute ?? false)
   const canPreview = computed(() => bootstrap.value?.uiCapabilities.canPreview ?? true)
   const showAutomationTab = computed(
-    () => bootstrap.value?.uiCapabilities.showAutomationTab ?? true,
+    () => bootstrap.value?.uiCapabilities.showAutomationTab ?? true
   )
-  const automationMessages = computed(() =>
-    messages.value.filter((m) => m.intent === 'automation')
-  )
-  const qaMessages = computed(() =>
-    messages.value.filter((m) => !m.intent || m.intent === 'qa')
-  )
+  const automationMessages = computed(() => messages.value.filter((m) => m.intent === 'automation'))
+  const qaMessages = computed(() => messages.value.filter((m) => !m.intent || m.intent === 'qa'))
 
   const resetExecutionState = () => {
     latestPreview.value = null
@@ -154,7 +148,7 @@ export const useAIStore = defineStore('aiStore', () => {
     const runtimeContext = {
       pageId: pageId.value,
       bootstrap: bootstrap.value,
-      intent: currentIntent,
+      intent: currentIntent
     }
 
     let responseText: string
@@ -178,12 +172,16 @@ export const useAIStore = defineStore('aiStore', () => {
       uiState.value = 'idle'
     }
 
-    appendAssistantMessage(displayText, { warnings, confirmPreview: preview, intent: currentIntent })
+    appendAssistantMessage(displayText, {
+      warnings,
+      confirmPreview: preview,
+      intent: currentIntent
+    })
   }
 
   const openAssistant = async (
     payload: AIContextRequest,
-    options?: { activeTab?: AITabKey; initialPrompt?: string },
+    options?: { activeTab?: AITabKey; initialPrompt?: string }
   ) => {
     visible.value = true
     activeTab.value = options?.activeTab ?? 'chat'
@@ -233,7 +231,7 @@ export const useAIStore = defineStore('aiStore', () => {
     } catch (error) {
       uiState.value = 'failed'
       appendAssistantMessage(
-        `当前请求失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`,
+        `当前请求失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`
       )
     } finally {
       loading.value = false
@@ -258,7 +256,7 @@ export const useAIStore = defineStore('aiStore', () => {
     } catch (error) {
       uiState.value = 'failed'
       appendAssistantMessage(
-        `自动化请求失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`,
+        `自动化请求失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`
       )
     } finally {
       loading.value = false
@@ -288,7 +286,7 @@ export const useAIStore = defineStore('aiStore', () => {
     } catch (error) {
       uiState.value = 'failed'
       appendAssistantMessage(
-        `预览生成失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`,
+        `预览生成失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`
       )
     } finally {
       loading.value = false
@@ -318,7 +316,7 @@ export const useAIStore = defineStore('aiStore', () => {
       await executeManualFeeding({
         feederId: 'feeder-001',
         amount: Number(preview.previewText.match(/(\d+)\s*g/i)?.[1] ?? 600),
-        duration: 10,
+        duration: 10
       })
       appendAssistantMessage('操作已下发：手动投喂执行成功。')
       resetExecutionState()
@@ -327,7 +325,7 @@ export const useAIStore = defineStore('aiStore', () => {
     } catch (error) {
       uiState.value = 'failed'
       appendAssistantMessage(
-        `执行失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`,
+        `执行失败：${error instanceof Error ? error.message : '未知错误，请稍后重试。'}`
       )
     } finally {
       loading.value = false
@@ -375,6 +373,6 @@ export const useAIStore = defineStore('aiStore', () => {
     runAutomationPreset,
     requestManualFeedingPreview,
     executeLatestPreview,
-    submitDraft,
+    submitDraft
   }
 })

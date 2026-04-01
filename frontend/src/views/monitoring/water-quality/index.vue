@@ -212,8 +212,10 @@
   })
 
   const loadData = async () => {
-    const startTime = searchQuery.dateRange.length === 2 ? searchQuery.dateRange[0] + ' 00:00:00' : undefined
-    const endTime = searchQuery.dateRange.length === 2 ? searchQuery.dateRange[1] + ' 23:59:59' : undefined
+    const startTime =
+      searchQuery.dateRange.length === 2 ? searchQuery.dateRange[0] + ' 00:00:00' : undefined
+    const endTime =
+      searchQuery.dateRange.length === 2 ? searchQuery.dateRange[1] + ' 23:59:59' : undefined
 
     const res = await getWaterQualityHistory({
       pageNum: currentPage.value,
@@ -233,7 +235,9 @@
     })
     chartDataList.value = chartRes.list
       .slice()
-      .sort((a: WaterQualityData, b: WaterQualityData) => a.collectTime.localeCompare(b.collectTime))
+      .sort((a: WaterQualityData, b: WaterQualityData) =>
+        a.collectTime.localeCompare(b.collectTime)
+      )
   }
 
   const getRowStatus = (item: WaterQualityData): WaterQualityData['status'] => {
