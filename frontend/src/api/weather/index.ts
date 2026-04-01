@@ -111,7 +111,10 @@ export async function getWeatherData(): Promise<WeatherData> {
     'current',
     'temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,weather_code'
   )
-  url.searchParams.append('hourly', 'temperature_2m,surface_pressure,relative_humidity_2m,weather_code')
+  url.searchParams.append(
+    'hourly',
+    'temperature_2m,surface_pressure,relative_humidity_2m,weather_code'
+  )
   url.searchParams.append('timezone', 'Asia/Shanghai')
   url.searchParams.append('forecast_hours', '4')
 

@@ -4,7 +4,7 @@
       <div class="flex-cb">
         <div class="flex-c gap-2">
           <ArtSvgIcon icon="ri:video-line" class="text-lg text-blue-500" />
-          <span class="font-bold">实时视频监控 (模拟)</span>
+          <span class="font-bold">实时视频监控</span>
         </div>
         <el-tag type="success" size="small" effect="dark">
           <ArtSvgIcon icon="ri:record-circle-line" class="animate-pulse mr-1" />LIVE
@@ -30,13 +30,6 @@
         class="absolute inset-0 bg-black transition-opacity duration-300"
         :class="isTransitioning ? 'opacity-100' : 'opacity-0'"
       />
-
-      <!-- 叠加层 -->
-      <div
-        class="absolute top-2 left-2 px-2 py-1 bg-black/50 text-white text-xs rounded pointer-events-none"
-      >
-        Camera: Tank_P001_Front
-      </div>
 
       <!-- 控制层 (模拟) -->
       <div
