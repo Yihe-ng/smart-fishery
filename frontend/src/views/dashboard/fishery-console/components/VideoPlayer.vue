@@ -32,17 +32,6 @@
       />
 
       <!-- 控制层 (模拟) -->
-      <div
-        class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex-cb text-white"
-      >
-        <div class="flex-c gap-3">
-          <ArtSvgIcon icon="ri:play-fill" class="cursor-pointer" />
-          <ArtSvgIcon icon="ri:volume-mute-fill" class="cursor-pointer" />
-        </div>
-        <div class="flex-c gap-3">
-          <ArtSvgIcon icon="ri:fullscreen-line" class="cursor-pointer" />
-        </div>
-      </div>
     </div>
   </el-card>
 </template>
