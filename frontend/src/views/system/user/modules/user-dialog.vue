@@ -98,7 +98,7 @@
     gender: '男',
     role: [] as string[]
   })
-  
+
   // 导出表单数据给父组件
   defineExpose({
     formData

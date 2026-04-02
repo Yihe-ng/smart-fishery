@@ -137,6 +137,7 @@ class SuggestionCard(BaseModel):
     suggestedAction: str
     confirmRequired: bool
     suggestionId: Optional[str] = None
+    suggestedAmount: Optional[float] = None  # 建议投喂量（克）
 
 
 class SuggestionPanelState(BaseModel):

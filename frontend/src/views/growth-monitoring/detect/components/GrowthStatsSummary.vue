@@ -6,6 +6,7 @@
         <span>生长状态分布</span>
       </div>
     </template>
+
     <el-table :data="tableData" style="width: 100%">
       <el-table-column prop="type" label="生长状态" />
       <el-table-column prop="count" label="数量" align="center">
@@ -16,6 +17,11 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <div class="summary-footer">
+      <span>识别总数</span>
+      <el-tag type="info">{{ stats.detectedCount }}</el-tag>
+    </div>
   </el-card>
 </template>
 
@@ -41,7 +47,17 @@
       display: flex;
       gap: 8px;
       align-items: center;
-      font-weight: bold;
+      font-weight: 700;
+    }
+
+    .summary-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 12px;
+      margin-top: 12px;
+      color: var(--el-text-color-secondary);
+      border-top: 1px solid var(--el-border-color-light);
     }
   }
 </style>

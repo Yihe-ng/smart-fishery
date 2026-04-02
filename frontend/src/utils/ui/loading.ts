@@ -79,11 +79,13 @@ export const loadingService = {
    * @param options 骨架屏配置
    * @returns 关闭骨架屏的函数
    */
-  showSkeleton(options: {
-    type?: 'card' | 'list' | 'table' | 'dashboard'
-    rows?: number
-    container?: HTMLElement
-  } = {}): () => void {
+  showSkeleton(
+    options: {
+      type?: 'card' | 'list' | 'table' | 'dashboard'
+      rows?: number
+      container?: HTMLElement
+    } = {}
+  ): () => void {
     const { type = 'dashboard', rows = 5, container: parentContainer } = options
 
     if (!skeletonInstance) {
@@ -135,11 +137,7 @@ export const loadingService = {
       showLoading?: boolean
     } = {}
   ): Promise<T> {
-    const {
-      skeletonType = 'dashboard',
-      skeletonDuration = 300,
-      showLoading = true
-    } = options
+    const { skeletonType = 'dashboard', skeletonDuration = 300 } = options
 
     // 先显示骨架屏
     const closeSkeleton = this.showSkeleton({ type: skeletonType })
@@ -149,7 +147,7 @@ export const loadingService = {
       const result = await promise
 
       // 延迟关闭骨架屏，让用户看到内容已加载
-      await new Promise(resolve => setTimeout(resolve, skeletonDuration))
+      await new Promise((resolve) => setTimeout(resolve, skeletonDuration))
       closeSkeleton()
 
       return result

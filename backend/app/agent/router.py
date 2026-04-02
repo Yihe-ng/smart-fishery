@@ -71,7 +71,7 @@ async def execute_tool(tool_name: str, request: ToolExecuteRequest):
 
 @router.post("/suggestions/feeding", response_model=BaseResponse[SuggestionResponse])
 async def get_feeding_suggestions(request: PageContextRequest):
-    response = build_feeding_suggestions(request.pondId)
+    response = await build_feeding_suggestions(request.pondId)
     return BaseResponse[SuggestionResponse](
         code=200,
         msg="AI suggestions success",

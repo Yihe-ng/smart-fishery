@@ -19,11 +19,17 @@
               <span
                 class="text-4xl font-bold tracking-tight"
                 :style="{ color: scoreColor, fontVariantNumeric: 'tabular-nums' }"
-              >{{ percentage }}</span>
+                >{{ percentage }}</span
+              >
               <span
                 class="text-xs font-medium tracking-wide"
-                style="color: var(--art-gray-500); text-transform: uppercase; letter-spacing: 0.08em;"
-              >综合健康度</span>
+                style="
+                  color: var(--art-gray-500);
+                  text-transform: uppercase;
+                  letter-spacing: 0.08em;
+                "
+                >综合健康度</span
+              >
             </div>
           </template>
         </el-progress>

@@ -27,7 +27,7 @@ export async function runQA(context: AgentRuntimeContext, text: string): Promise
     messages: [{ role: 'user', content: text }],
     contextVersion: context.bootstrap.pageContextSummary.contextVersion,
     pageContextSummary: context.bootstrap.pageContextSummary as unknown as Record<string, unknown>,
-    allowedTools,
+    allowedTools
   })
 
   const choice = response.choices?.[0] as Record<string, unknown> | undefined
@@ -55,7 +55,7 @@ export async function createPageAgent(context: AgentRuntimeContext) {
     const body = init?.body ? JSON.parse(String(init.body)) : {}
     const messages = (body.messages ?? []).map((m: { role: string; content: unknown }) => ({
       role: m.role,
-      content: String(m.content ?? ''),
+      content: String(m.content ?? '')
     }))
 
     const response = await fetchAIInvoke({
@@ -66,12 +66,12 @@ export async function createPageAgent(context: AgentRuntimeContext) {
         string,
         unknown
       >,
-      allowedTools: context.bootstrap.allowedTools,
+      allowedTools: context.bootstrap.allowedTools
     })
 
     return new Response(JSON.stringify(response), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     })
   }
 
@@ -85,12 +85,12 @@ export async function createPageAgent(context: AgentRuntimeContext) {
     stepDelay: 300,
     customTools: {
       execute_javascript: null,
-      ...createProxyTools(context.bootstrap.allowedTools),
+      ...createProxyTools(context.bootstrap.allowedTools)
     },
     instructions: {
       system: context.bootstrap.systemInstructions,
-      getPageInstructions: () => context.bootstrap.pageInstructions,
-    },
+      getPageInstructions: () => context.bootstrap.pageInstructions
+    }
   })
 }
 

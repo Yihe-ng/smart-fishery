@@ -39,11 +39,7 @@
         @resolve="handleResolveAlert"
       />
 
-      <HealthOverview
-        :score="healthData.score"
-        :risks="healthData.risks"
-        class="area-health dashboard-card-base dashboard-fill"
-      />
+      <WeatherCard class="area-health dashboard-card-base dashboard-fill" />
 
       <section class="panel-section dashboard-panel area-sensor">
         <div class="section-title flex-c gap-2">
@@ -59,10 +55,7 @@
         </div>
       </section>
 
-      <VideoPlayer
-        class="area-video dashboard-card-base dashboard-fill"
-        src="http://devimages.apple.com/iphone/samples/bipbop/gear1/prog_index.m3u8"
-      />
+      <VideoPlayer class="area-video dashboard-card-base dashboard-fill" :sources="videoSources" />
 
       <AIDetectionResult
         :detection="latestDetection"
@@ -116,16 +109,25 @@
   import SensorCard from './components/SensorCard.vue'
   import AlertList from './components/AlertList.vue'
   import FeedingPanel from './components/FeedingPanel.vue'
-  import HealthOverview from './components/HealthOverview.vue'
+  import WeatherCard from './components/WeatherCard.vue'
   import VideoPlayer from './components/VideoPlayer.vue'
   import AIDetectionResult from './components/AIDetectionResult.vue'
 
-  import { getHealthOverview } from '@/api/fish-disease/detect'
   import { getDashboardFrame } from '@/api/water-quality'
   import type { Alert } from '@/types/alert'
   import type { DetectionResult } from '@/types/fish-disease'
   import type { SensorDevice } from '@/types/device'
   import type { DashboardFrameResponse } from '@/types/water-quality'
+
+  // 本地视频源列表
+  const videoSources = [
+    '/video/VID_20260330_161745.mp4',
+    '/video/VID_20260330_161836.mp4',
+    '/video/VID_20260330_161930.mp4',
+    '/video/VID_20260330_162428.mp4',
+    '/video/VID_20260330_163542.mp4',
+    '/video/VID_20260330_163804.mp4'
+  ]
 
   const lastUpdateTime = ref('--:--:--')
   const currentFrameIndex = ref(0)
@@ -133,18 +135,6 @@
   const dashboardFrame = ref<DashboardFrameResponse | null>(null)
   const sensorDevices = ref<SensorDevice[]>([])
   const dismissedAlertIds = ref<string[]>([])
-
-  const healthData = ref<{
-    score: number
-    risks: {
-      gillRot: 'low' | 'medium' | 'high'
-      redSkin: 'low' | 'medium' | 'high'
-      enteritis: 'low' | 'medium' | 'high'
-    }
-  }>({
-    score: 0,
-    risks: { gillRot: 'low', redSkin: 'low', enteritis: 'low' }
-  })
 
   const latestDetection = ref<DetectionResult>({
     id: 'd1',
@@ -175,14 +165,6 @@
     applyFrame(frame)
   }
 
-  const loadSideData = async () => {
-    try {
-      healthData.value = await getHealthOverview()
-    } catch (error) {
-      console.error('Failed to load dashboard side data:', error)
-    }
-  }
-
   const refreshData = async () => {
     try {
       await loadDashboardFrame(nextFrameIndex.value)
@@ -198,7 +180,7 @@
   }
 
   onMounted(() => {
-    Promise.all([loadDashboardFrame(0), loadSideData()]).catch((error) => {
+    loadDashboardFrame(0).catch((error) => {
       console.error('Failed to initialize dashboard:', error)
       ElMessage.error('监测大屏初始化失败')
     })

@@ -1,53 +1,65 @@
 <template>
   <div class="detect-action-buttons">
     <input
-      ref="fileInput"
+      ref="imageInputRef"
       type="file"
-      accept="image/jpeg,image/png"
+      accept="image/jpeg,image/png,image/webp"
       class="hidden-input"
-      @change="handleFileChange"
+      @change="handleImageChange"
     />
+    <input
+      ref="videoInputRef"
+      type="file"
+      accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,.mp4,.mov,.webm,.avi,.mkv"
+      class="hidden-input"
+      @change="handleVideoChange"
+    />
+
     <el-row :gutter="20">
       <el-col :span="8">
         <el-button
           type="primary"
           size="large"
           class="full-width"
-          :disabled="isCameraActive"
-          @click="triggerUpload"
+          :loading="processing"
+          :disabled="processing"
+          @click="triggerImageUpload"
         >
           <template #icon>
             <ArtSvgIcon icon="ri:upload-2-line" />
           </template>
-          上传图像
+          {{ hasImage ? '重新识别图片' : '上传图片' }}
         </el-button>
       </el-col>
+
       <el-col :span="8">
         <el-button
           type="success"
           size="large"
           class="full-width"
-          :disabled="isCameraActive"
-          @click="emit('start-camera')"
+          :loading="processing"
+          :disabled="processing"
+          @click="triggerVideoUpload"
         >
           <template #icon>
-            <ArtSvgIcon icon="ri:camera-line" />
+            <ArtSvgIcon icon="ri:video-upload-line" />
           </template>
-          开启摄像头
+          上传视频
         </el-button>
       </el-col>
+
       <el-col :span="8">
         <el-button
           type="danger"
           size="large"
           class="full-width"
-          :disabled="!isCameraActive"
-          @click="emit('stop-detection')"
+          :disabled="processing || !hasImage"
+          @click="emit('clear')"
         >
           <template #icon>
-            <ArtSvgIcon icon="ri:stop-circle-line" />
+            <ArtSvgIcon icon="ri:delete-bin-line" />
           </template>
-          停止检测
+          清空结果
         </el-button>
       </el-col>
     </el-row>
@@ -60,40 +72,78 @@
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
 
   defineProps<{
-    isCameraActive: boolean
+    processing: boolean
+    hasImage: boolean
   }>()
 
   const emit = defineEmits<{
-    upload: [imgData: string]
-    'start-camera': []
-    'stop-detection': []
+    uploadImage: [imgData: string]
+    uploadVideo: [file: File]
+    clear: []
   }>()
 
-  const fileInput = ref<HTMLInputElement>()
+  const imageInputRef = ref<HTMLInputElement>()
+  const videoInputRef = ref<HTMLInputElement>()
 
-  const triggerUpload = () => {
-    fileInput.value?.click()
+  const triggerImageUpload = () => {
+    imageInputRef.value?.click()
   }
 
-  const handleFileChange = (e: Event) => {
-    const target = e.target as HTMLInputElement
+  const triggerVideoUpload = () => {
+    videoInputRef.value?.click()
+  }
+
+  const handleImageChange = (event: Event) => {
+    const target = event.target as HTMLInputElement
     const file = target.files?.[0]
     if (!file) return
 
-    if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      ElMessage.warning('仅支持 JPG/PNG 格式的图片')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      ElMessage.warning('仅支持 JPG、PNG、WEBP 格式图片')
+      target.value = ''
       return
     }
+
     if (file.size > 10 * 1024 * 1024) {
-      ElMessage.warning('文件大小不能超过 10MB')
+      ElMessage.warning('图片大小不能超过 10MB')
+      target.value = ''
       return
     }
 
     const reader = new FileReader()
-    reader.onload = (event) => {
-      emit('upload', event.target?.result as string)
+    reader.onload = (loadEvent) => {
+      emit('uploadImage', loadEvent.target?.result as string)
     }
     reader.readAsDataURL(file)
+    target.value = ''
+  }
+
+  const handleVideoChange = (event: Event) => {
+    const target = event.target as HTMLInputElement
+    const file = target.files?.[0]
+    if (!file) return
+
+    const allowedTypes = [
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-matroska'
+    ]
+    const hasValidExtension = /\.(mp4|mov|webm|avi|mkv)$/i.test(file.name)
+    if ((file.type && !allowedTypes.includes(file.type)) || !hasValidExtension) {
+      ElMessage.warning('仅支持 MP4、MOV、WEBM、AVI、MKV 格式视频')
+      target.value = ''
+      return
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      ElMessage.warning('视频大小不能超过 50MB')
+      target.value = ''
+      return
+    }
+
+    emit('uploadVideo', file)
     target.value = ''
   }
 </script>
