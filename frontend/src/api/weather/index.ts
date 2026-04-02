@@ -1,9 +1,5 @@
-import type { WeatherData, OpenMeteoResponse } from '@/types/weather'
-
-// 广东阳江市阳西区坐标
-const YANGXI_LATITUDE = 21.75
-const YANGXI_LONGITUDE = 111.75
-const LOCATION_NAME = '广东阳西'
+import type { WeatherData, BackendWeatherData } from '@/types/weather'
+import request from '@/utils/http'
 
 /**
  * 天气代码映射为图标名称
@@ -73,37 +69,52 @@ function getWeatherDescription(code: number): string {
 }
 
 /**
- * 格式化时间为 HH:mm
- * @param dateStr - ISO 日期字符串
- * @returns 格式化后的时间
+ * 气压风险等级类型
  */
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
+export interface PressureRisk {
+  level: 'high' | 'medium' | 'low'
+  text: string
+  description: string
+  feedingSuggestion: string
+  pressure: number
 }
 
 /**
- * 格式化更新时间为 HH:mm
- * @param date - 日期对象
- * @returns 格式化后的时间
+ * 从后端获取天气数据（包含气压风险等级）
+ * @returns 天气数据
  */
-function formatUpdateTime(date: Date): string {
-  return date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+export async function getWeatherDataFromBackend(): Promise<
+  WeatherData & { pressureRisk: PressureRisk }
+> {
+  const response = await request.get<BackendWeatherData>({
+    url: '/api/weather/current'
   })
+
+  return {
+    current: {
+      temperature: response.current.temperature,
+      pressure: response.current.pressure,
+      windSpeed: response.current.windSpeed,
+      humidity: response.current.humidity,
+      weatherCode: response.current.weatherCode
+    },
+    forecast: [], // 后端暂不提供预报，保持兼容
+    location: response.location,
+    updateTime: response.updateTime,
+    pressureRisk: response.pressureRisk
+  }
 }
 
 /**
- * 获取当前天气和未来3小时预报
+ * 获取当前天气和未来3小时预报（直接调用Open-Meteo，用于dashboard）
  * @returns 天气数据
  */
 export async function getWeatherData(): Promise<WeatherData> {
+  // 广东阳江市阳西区坐标
+  const YANGXI_LATITUDE = 21.75
+  const YANGXI_LONGITUDE = 111.75
+  const LOCATION_NAME = '广东阳西'
+
   const url = new URL('https://api.open-meteo.com/v1/forecast')
   url.searchParams.append('latitude', YANGXI_LATITUDE.toString())
   url.searchParams.append('longitude', YANGXI_LONGITUDE.toString())
@@ -124,10 +135,20 @@ export async function getWeatherData(): Promise<WeatherData> {
     throw new Error(`天气API请求失败: ${response.status}`)
   }
 
-  const data: OpenMeteoResponse = await response.json()
+  const data = await response.json()
+
+  // 格式化时间
+  const formatTime = (dateStr: string): string => {
+    const date = new Date(dateStr)
+    return date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
+  }
 
   // 处理当前天气
-  const current: WeatherData['current'] = {
+  const current = {
     temperature: Math.round(data.current.temperature_2m),
     pressure: Math.round(data.current.surface_pressure),
     windSpeed: Math.round(data.current.wind_speed_10m * 10) / 10,
@@ -175,7 +196,11 @@ export async function getWeatherData(): Promise<WeatherData> {
     current,
     forecast,
     location: LOCATION_NAME,
-    updateTime: formatUpdateTime(new Date())
+    updateTime: new Date().toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
   }
 }
 

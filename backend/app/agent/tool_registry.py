@@ -6,6 +6,7 @@ from app.agent.mock_data import (
     get_mock_feeding_config,
     get_mock_water_quality,
 )
+from app.services.weather_service import weather_service
 
 
 def get_water_quality_summary(pond_id: str | None = None) -> Dict[str, Any]:
@@ -19,24 +20,58 @@ def get_water_quality_summary(pond_id: str | None = None) -> Dict[str, Any]:
     }
 
 
-def get_feeding_recommendation(pond_id: str | None = None) -> Dict[str, Any]:
+async def get_feeding_recommendation(pond_id: str | None = None) -> Dict[str, Any]:
+    """获取投喂建议，整合天气数据"""
     water = get_mock_water_quality(pond_id)
     config = get_mock_feeding_config()
+
+    # 获取天气数据（包括气压风险等级）
+    try:
+        weather_data = await weather_service.get_current_weather()
+        pressure_risk = weather_data.get("pressureRisk", {})
+    except Exception:
+        # 如果天气服务失败，使用默认低风险
+        pressure_risk = weather_service.get_pressure_risk_for_feeding(None)
+
+    # 根据气压风险调整建议
+    risk_level = pressure_risk.get("level", "low")
+    risk_text = pressure_risk.get("text", "低风险")
+    feeding_suggestion = pressure_risk.get("feedingSuggestion", "可按正常计划投喂")
+
+    # 基础建议
+    base_recommendation = "建议维持常规投喂频次，单次投喂量保守 500-600g，并先确认亚硝酸盐传感器状态。"
+
+    # 根据气压风险调整建议
+    if risk_level == "high":
+        recommendation = f"【气压{risk_text}】{feeding_suggestion}。鱼类可能产生应激反应，建议暂停或大幅减少投喂。"
+        confidence = 0.65
+    elif risk_level == "medium":
+        recommendation = f"【气压{risk_text}】{feeding_suggestion}。{base_recommendation}"
+        confidence = 0.70
+    else:
+        recommendation = f"【气压{risk_text}】{feeding_suggestion}。{base_recommendation}"
+        confidence = 0.73
+
     return {
-        "recommendation": "建议维持常规投喂频次，单次投喂量保守 500-600g，并先确认亚硝酸盐传感器状态。",
-        "confidence": 0.73,
+        "recommendation": recommendation,
+        "confidence": confidence,
         "factors": {
             "feedCoefficient": config["feedCoefficient"],
             "frequency": config["frequency"],
             "temperature": 25.5,
             "dissolvedOxygen": 6.8,
+            "pressure": pressure_risk.get("pressure", 1013),
+            "pressureRiskLevel": risk_level,
+            "pressureRiskText": risk_text,
         },
         "rationale": [
             "当前水温处于适宜区间。",
             "溶氧虽未触发停喂阈值，但处于保守区间。",
+            f"当前气压 {pressure_risk.get('pressure', 1013)}hPa，{pressure_risk.get('description', '气压正常')}。",
             "亚硝酸盐传感器离线，建议暂不激进加料。",
         ],
         "sourceMode": water["sourceMode"],
+        "pressureRisk": pressure_risk,
     }
 
 

@@ -36,6 +36,18 @@
           <li v-for="reason in card.rationale" :key="reason">{{ reason }}</li>
         </ul>
 
+        <!-- 建议投喂量显示和采纳按钮 -->
+        <div v-if="card.suggestedAmount" class="suggested-amount">
+          <div class="amount-display">
+            <span class="amount-label">建议投喂量</span>
+            <span class="amount-value">{{ card.suggestedAmount }}g</span>
+          </div>
+          <ElButton type="primary" size="small" class="adopt-btn" @click="adoptSuggestion(card)">
+            <ArtSvgIcon icon="ri:check-line" class="btn-icon" />
+            采纳建议
+          </ElButton>
+        </div>
+
         <div class="card-footer">
           <div class="metrics">
             <span>{{ card.updatedAt }}</span>
@@ -69,6 +81,11 @@
 
   const props = defineProps<{
     pondId?: string
+  }>()
+
+  const emit = defineEmits<{
+    /** 采纳建议事件，传递建议投喂量 */
+    (e: 'adopt-suggestion', amount: number): void
   }>()
 
   const aiStore = useAIStore()
@@ -121,6 +138,13 @@
     }
   }
 
+  // 采纳建议
+  const adoptSuggestion = (card: AISuggestionCard) => {
+    if (card.suggestedAmount && card.suggestedAmount > 0) {
+      emit('adopt-suggestion', card.suggestedAmount)
+    }
+  }
+
   const continueInAssistant = async (card: AISuggestionCard) => {
     await aiStore.openAssistant(
       {
@@ -130,7 +154,7 @@
       },
       {
         activeTab: 'chat',
-        initialPrompt: `请继续分析建议“${card.title}”，并结合当前页面数据给出处理建议：${card.summary}`
+        initialPrompt: `请继续分析建议"${card.title}"，并结合当前页面数据给出处理建议：${card.summary}`
       }
     )
   }
@@ -260,10 +284,48 @@
     padding-left: 18px;
     color: var(--el-text-color-secondary);
     line-height: 1.6;
+    font-size: 13px;
+  }
+
+  // 建议投喂量和采纳按钮
+  .suggested-amount {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--el-color-primary-light-9);
+    border-radius: 8px;
+    border: 1px solid var(--el-color-primary-light-7);
+
+    .amount-display {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      .amount-label {
+        font-size: 11px;
+        color: var(--el-text-color-secondary);
+      }
+
+      .amount-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--el-color-primary);
+      }
+    }
+
+    .adopt-btn {
+      .btn-icon {
+        margin-right: 4px;
+        font-size: 14px;
+      }
+    }
   }
 
   .card-footer {
     align-items: flex-end;
+    margin-top: 4px;
   }
 
   .metrics {

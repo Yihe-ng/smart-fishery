@@ -12,7 +12,7 @@
     customClass?: string
   }
 
-  const props = withDefaults(defineProps<Props>(), {
+  withDefaults(defineProps<Props>(), {
     type: 'card',
     animated: true,
     rows: 5,

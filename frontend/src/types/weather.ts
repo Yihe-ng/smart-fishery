@@ -31,6 +31,15 @@ export interface HourlyForecast {
   weatherCode: number
 }
 
+/** 气压风险等级 */
+export interface PressureRisk {
+  level: 'high' | 'medium' | 'low'
+  text: string
+  description: string
+  feedingSuggestion: string
+  pressure: number
+}
+
 /** 完整天气数据 */
 export interface WeatherData {
   /** 当前天气 */
@@ -40,6 +49,14 @@ export interface WeatherData {
   /** 位置名称 */
   location: string
   /** 数据更新时间 (HH:mm) */
+  updateTime: string
+}
+
+/** 后端天气API响应结构 */
+export interface BackendWeatherData {
+  current: CurrentWeather
+  pressureRisk: PressureRisk
+  location: string
   updateTime: string
 }
 

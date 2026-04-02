@@ -137,7 +137,7 @@ export const loadingService = {
       showLoading?: boolean
     } = {}
   ): Promise<T> {
-    const { skeletonType = 'dashboard', skeletonDuration = 300, showLoading = true } = options
+    const { skeletonType = 'dashboard', skeletonDuration = 300 } = options
 
     // 先显示骨架屏
     const closeSkeleton = this.showSkeleton({ type: skeletonType })

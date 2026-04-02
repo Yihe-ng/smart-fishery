@@ -109,6 +109,8 @@ export interface AISuggestionCard {
   suggestedAction: string
   confirmRequired: boolean
   suggestionId?: string | null
+  /** 建议投喂量（克） */
+  suggestedAmount?: number
 }
 
 export interface AISuggestionResponse {

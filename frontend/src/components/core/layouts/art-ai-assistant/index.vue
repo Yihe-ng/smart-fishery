@@ -163,7 +163,6 @@
     activeTab,
     currentContext,
     bootstrap,
-    messages,
     latestPreview,
     automationPresets,
     automationMessages,

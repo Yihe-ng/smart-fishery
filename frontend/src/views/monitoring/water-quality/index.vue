@@ -86,7 +86,6 @@
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import ArtSearchBar from '@/components/core/forms/art-search-bar/index.vue'
   import ArtChart from '@/components/core/charts/art-chart/index.vue'
-  import { WATER_QUALITY_THRESHOLDS } from '@/config/thresholds'
   import {
     WATER_QUALITY_METRIC_ORDER,
     WATER_QUALITY_METRICS,
@@ -238,22 +237,6 @@
       .sort((a: WaterQualityData, b: WaterQualityData) =>
         a.collectTime.localeCompare(b.collectTime)
       )
-  }
-
-  const getRowStatus = (item: WaterQualityData): WaterQualityData['status'] => {
-    for (const key of WATER_QUALITY_METRIC_ORDER) {
-      const rule = WATER_QUALITY_THRESHOLDS[key]
-      const value = item[key] as number
-
-      if (
-        (rule.max !== undefined && value > rule.max) ||
-        (rule.min !== undefined && value < rule.min)
-      ) {
-        return 'warning'
-      }
-    }
-
-    return 'normal'
   }
 
   const handleSearchQueryUpdate = (value: { dateRange: string[] }) => {

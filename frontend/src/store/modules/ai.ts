@@ -151,10 +151,8 @@ export const useAIStore = defineStore('aiStore', () => {
       intent: currentIntent
     }
 
-    let responseText: string
-
     const result = await runQA(runtimeContext, text)
-    responseText = result.data
+    const responseText = result.data
 
     const preview = currentIntent === 'automation' ? extractConfirmPreview(responseText) : null
     const displayText = preview
