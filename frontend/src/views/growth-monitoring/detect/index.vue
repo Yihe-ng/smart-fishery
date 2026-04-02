@@ -1,37 +1,61 @@
 <template>
   <div class="growth-monitoring-detect">
-    <!-- 页面标题 -->
     <div class="page-header">
       <div class="title-section">
         <ArtSvgIcon icon="ri:scales-3-line" style="font-size: 32px; color: #409eff" />
         <h2>智能鱼类生长识别系统</h2>
       </div>
-      <el-tag :type="isCameraActive ? 'success' : 'info'" size="large" effect="dark">
-        <ArtSvgIcon v-if="isCameraActive" icon="ri:loader-4-line" class="animate-spin mr-1" />
-        {{ isCameraActive ? '系统监控中' : '系统待命' }}
+      <el-tag :type="headerStatus.type" size="large" effect="dark">
+        {{ headerStatus.text }}
       </el-tag>
     </div>
 
     <el-row :gutter="20">
-      <!-- 左侧控制面板 -->
       <el-col :xs="24" :sm="24" :md="8" :lg="6">
-        <GrowthStatsSummary :stats="growthStats" />
-        <GrowthResultCard :result="latestDetection" />
+        <GrowthStatsSummary :stats="activeStats" />
+        <GrowthResultCard :result="activeDetection" :empty-text="resultEmptyText" />
+        <GrowthDetectionList
+          :detections="activeDetections"
+          :selected-id="activeSelectedDetectionId"
+          @select="handleSelectDetection"
+        />
       </el-col>
 
-      <!-- 右侧显示区域 -->
       <el-col :xs="24" :sm="24" :md="16" :lg="18">
         <GrowthImageDisplay
-          :src="currentImage"
-          :is-stream="isStream"
+          :image="activeImage"
+          :detections="activeDetections"
+          :selected-id="activeSelectedDetectionId"
+          :task-status="displayTaskStatus"
+          :error-message="activeErrorMessage"
           class="mb-4"
-          @delete="handleStopDetection"
+          @select="handleSelectDetection"
+          @clear="handleClear"
         />
+
+        <GrowthVideoTaskState
+          v-if="inputMode === 'growthVideo'"
+          :task-status="growthVideoTaskStatus"
+          :progress="growthVideoProgress"
+          :filename="growthVideoMeta?.filename"
+          :frame-count="growthVideoFrames.length"
+          :aggregate-stats="growthVideoAggregateStats"
+          :error-message="activeErrorMessage"
+        />
+
+        <GrowthVideoFrameStrip
+          v-if="inputMode === 'growthVideo' && growthVideoTaskStatus === 'success'"
+          :frames="growthVideoFrames"
+          :selected-frame-id="selectedGrowthFrameId"
+          @select="handleSelectFrame"
+        />
+
         <GrowthActionButtons
-          :is-camera-active="isCameraActive"
-          @upload="handleUpload"
-          @start-camera="handleStartCamera"
-          @stop-detection="handleStopDetection"
+          :processing="isProcessing"
+          :has-image="hasVisualResult"
+          @upload-image="handleImageUpload"
+          @upload-video="handleVideoUpload"
+          @clear="handleClear"
         />
       </el-col>
     </el-row>
@@ -39,137 +63,340 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, reactive, onUnmounted } from 'vue'
-  import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
+  import { computed, onUnmounted, ref, watch } from 'vue'
   import { ElMessage } from 'element-plus'
-  import type { GrowthDetectionItem, GrowthStats } from '@/types/growth-monitoring'
-  import { detectGrowth, getCameraStream } from '@/api/growth-monitoring/detect'
-  import GrowthStatsSummary from './components/GrowthStatsSummary.vue'
-  import GrowthImageDisplay from './components/GrowthImageDisplay.vue'
+  import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
+  import { detectGrowth } from '@/api/growth-monitoring/detect'
+  import { loadingService } from '@/utils/ui'
+  import type {
+    GrowthDetectErrorCode,
+    GrowthDetectResponse,
+    GrowthDetectionItem,
+    GrowthImageMeta,
+    GrowthStats,
+    GrowthTaskStatus,
+    GrowthVideoDetectErrorCode
+  } from '@/types/growth-monitoring'
   import GrowthActionButtons from './components/GrowthActionButtons.vue'
+  import GrowthDetectionList from './components/GrowthDetectionList.vue'
+  import GrowthImageDisplay from './components/GrowthImageDisplay.vue'
   import GrowthResultCard from './components/GrowthResultCard.vue'
+  import GrowthStatsSummary from './components/GrowthStatsSummary.vue'
+  import GrowthVideoFrameStrip from './components/GrowthVideoFrameStrip.vue'
+  import GrowthVideoTaskState from './components/GrowthVideoTaskState.vue'
+  import { useGrowthVideoTask } from './composables/useGrowthVideoTask'
 
   defineOptions({ name: 'GrowthMonitoringDetect' })
 
-  // 状态定义
-  const currentImage = ref<string | null>(null)
-  const isCameraActive = ref(false)
-  const isStream = ref(false)
-  const confidence = ref(0)
-  // 生长状态统计
-  const growthStats = reactive<GrowthStats>({
+  type InputMode = 'image' | 'growthVideo'
+
+  const EMPTY_STATS: GrowthStats = {
     small: 0,
     normal: 0,
-    large: 0
+    large: 0,
+    detectedCount: 0
+  }
+
+  const inputMode = ref<InputMode>('image')
+  const taskStatus = ref<GrowthTaskStatus>('idle')
+  const imageMeta = ref<GrowthImageMeta | null>(null)
+  const detections = ref<GrowthDetectionItem[]>([])
+  const selectedDetectionId = ref<string | null>(null)
+  const stats = ref<GrowthStats>({ ...EMPTY_STATS })
+  const errorCode = ref<GrowthDetectErrorCode | null>(null)
+  const errorMessage = ref('')
+
+  const {
+    growthVideoTaskStatus,
+    growthVideoFrames,
+    selectedGrowthFrameId,
+    growthVideoAggregateStats,
+    growthVideoMeta,
+    growthVideoProgress,
+    growthVideoErrorCode,
+    selectedGrowthFrame,
+    uploadVideo,
+    clearVideoTask,
+    markVideoTaskFailed,
+    selectGrowthFrame,
+    selectFrameDetection
+  } = useGrowthVideoTask()
+
+  const imageSelectedDetection = computed(
+    () => detections.value.find((item) => item.id === selectedDetectionId.value) ?? null
+  )
+
+  const activeImage = computed(() =>
+    inputMode.value === 'growthVideo' ? selectedGrowthFrame.value?.image ?? null : imageMeta.value
+  )
+
+  const activeDetections = computed(() =>
+    inputMode.value === 'growthVideo' ? selectedGrowthFrame.value?.detections ?? [] : detections.value
+  )
+
+  const activeSelectedDetectionId = computed(() =>
+    inputMode.value === 'growthVideo'
+      ? selectedGrowthFrame.value?.selectedDetectionId ?? null
+      : selectedDetectionId.value
+  )
+
+  const activeDetection = computed(() =>
+    inputMode.value === 'growthVideo'
+      ? selectedGrowthFrame.value?.detections.find(
+          (item) => item.id === selectedGrowthFrame.value?.selectedDetectionId
+        ) ?? null
+      : imageSelectedDetection.value
+  )
+
+  const activeStats = computed(() =>
+    inputMode.value === 'growthVideo' ? selectedGrowthFrame.value?.stats ?? EMPTY_STATS : stats.value
+  )
+
+  const displayTaskStatus = computed<GrowthTaskStatus>(() => {
+    if (inputMode.value === 'growthVideo') {
+      if (growthVideoTaskStatus.value === 'queued' || growthVideoTaskStatus.value === 'processing') {
+        return 'processing'
+      }
+      if (growthVideoTaskStatus.value === 'failed') {
+        return 'failed'
+      }
+      if (growthVideoTaskStatus.value === 'success') {
+        return 'success'
+      }
+      return 'idle'
+    }
+
+    return taskStatus.value === 'uploading' ? 'processing' : taskStatus.value
   })
 
-  // 最新检测结果
-  const latestDetection = ref<GrowthDetectionItem | null>(null)
+  const isProcessing = computed(
+    () =>
+      taskStatus.value === 'uploading' ||
+      taskStatus.value === 'processing' ||
+      growthVideoTaskStatus.value === 'queued' ||
+      growthVideoTaskStatus.value === 'processing'
+  )
 
-  // 重置统计
-  const resetStats = () => {
-    growthStats.small = 0
-    growthStats.normal = 0
-    growthStats.large = 0
-    latestDetection.value = null
+  const hasVisualResult = computed(
+    () =>
+      Boolean(activeImage.value?.src) ||
+      Boolean(imageMeta.value?.src) ||
+      Boolean(selectedGrowthFrame.value?.image.src) ||
+      inputMode.value === 'growthVideo'
+  )
+
+  const headerStatus = computed(() => {
+    switch (displayTaskStatus.value) {
+      case 'processing':
+        return { type: 'warning' as const, text: '识别处理中' }
+      case 'success':
+        return { type: 'success' as const, text: '识别完成' }
+      case 'failed':
+        return { type: 'danger' as const, text: '识别失败' }
+      default:
+        return { type: 'info' as const, text: '系统待命' }
+    }
+  })
+
+  const activeErrorMessage = computed(() => {
+    if (inputMode.value === 'growthVideo') {
+      return mapVideoErrorMessage(growthVideoErrorCode.value)
+    }
+    return errorMessage.value
+  })
+
+  const resultEmptyText = computed(() => {
+    if (displayTaskStatus.value === 'success' && activeImage.value && !activeDetections.value.length) {
+      return inputMode.value === 'growthVideo'
+        ? '当前关键帧未识别到石斑鱼'
+        : '未识别到石斑鱼'
+    }
+    if (displayTaskStatus.value === 'failed') {
+      return activeErrorMessage.value || '识别失败，请重新上传素材'
+    }
+    return inputMode.value === 'growthVideo'
+      ? '上传视频后可查看当前关键帧的识别详情'
+      : '上传图片后可查看识别详情'
+  })
+
+  const resetImageState = () => {
+    taskStatus.value = 'idle'
+    imageMeta.value = null
+    detections.value = []
+    selectedDetectionId.value = null
+    stats.value = { ...EMPTY_STATS }
+    errorCode.value = null
+    errorMessage.value = ''
   }
 
-  // 处理上传
-  const handleUpload = async (imgData: string) => {
-    currentImage.value = imgData
-    isStream.value = false
-    isCameraActive.value = false
-    resetStats()
+  const resetAllState = () => {
+    inputMode.value = 'image'
+    resetImageState()
+    clearVideoTask()
+  }
+
+  const mapImageErrorMessage = (code: GrowthDetectErrorCode | null) => {
+    switch (code) {
+      case 'INVALID_IMAGE':
+        return '图片格式无效，请重新上传。'
+      case 'IMAGE_TOO_LARGE':
+        return '图片过大，请压缩后重试。'
+      case 'IMAGE_DECODE_FAILED':
+        return '图片解析失败，请更换图片。'
+      case 'MODEL_INFERENCE_FAILED':
+        return '模型推理失败，请稍后重试。'
+      case 'INTERNAL_ERROR':
+        return '系统异常，请稍后重试。'
+      case 'NO_FISH_DETECTED':
+        return '未识别到石斑鱼'
+      default:
+        return '识别失败，请稍后重试。'
+    }
+  }
+
+  const mapVideoErrorMessage = (code: GrowthVideoDetectErrorCode | null) => {
+    switch (code) {
+      case 'INVALID_VIDEO':
+        return '视频格式无效，请重新上传。'
+      case 'VIDEO_TOO_LARGE':
+        return '视频过大，请压缩后重试。'
+      case 'VIDEO_DECODE_FAILED':
+        return '视频解析失败，请更换视频。'
+      case 'NO_VALID_FRAMES':
+        return '未提取到有效关键帧，请尝试更清晰的视频。'
+      case 'MODEL_INFERENCE_FAILED':
+        return '模型推理失败，请稍后重试。'
+      case 'INTERNAL_ERROR':
+        return '系统异常，请稍后重试。'
+      default:
+        return ''
+    }
+  }
+
+  const applyDetectResponse = (response: GrowthDetectResponse) => {
+    taskStatus.value = response.taskStatus
+    imageMeta.value = response.image
+    detections.value = response.detections
+    selectedDetectionId.value = response.selectedDetectionId
+    stats.value = response.stats
+    errorCode.value = response.errorCode
+    errorMessage.value = mapImageErrorMessage(response.errorCode)
+  }
+
+  const handleImageUpload = async (imgData: string) => {
+    clearVideoTask()
+    inputMode.value = 'image'
+    taskStatus.value = 'uploading'
+    imageMeta.value = {
+      src: imgData,
+      width: 0,
+      height: 0
+    }
+    detections.value = []
+    selectedDetectionId.value = null
+    stats.value = { ...EMPTY_STATS }
+    errorCode.value = null
+    errorMessage.value = ''
 
     try {
+      taskStatus.value = 'processing'
       const result = await detectGrowth(imgData)
-      updateStats(result.detections)
+      applyDetectResponse(result)
 
-      // 更新最新结果显示 (显示置信度最高的或者第一个)
-      if (result.detections.length > 0) {
-        // 按置信度排序
-        const sorted = [...result.detections].sort((a, b) => b.confidence - a.confidence)
-        latestDetection.value = sorted[0]
+      if (result.errorCode === 'NO_FISH_DETECTED') {
+        ElMessage.warning('未识别到石斑鱼')
+      } else {
+        ElMessage.success('图片识别完成')
       }
-    } catch (err) {
-      console.error('检测失败:', err)
-      ElMessage.error('检测失败，请重试')
+    } catch (error: any) {
+      taskStatus.value = 'failed'
+      detections.value = []
+      selectedDetectionId.value = null
+      stats.value = { ...EMPTY_STATS }
+
+      const rawMessage = String(error?.message || '')
+      const matchedCode = (
+        [
+          'INVALID_IMAGE',
+          'IMAGE_TOO_LARGE',
+          'IMAGE_DECODE_FAILED',
+          'MODEL_INFERENCE_FAILED',
+          'INTERNAL_ERROR'
+        ] as GrowthDetectErrorCode[]
+      ).find((code) => rawMessage.includes(code))
+
+      errorCode.value = matchedCode ?? 'INTERNAL_ERROR'
+      errorMessage.value = mapImageErrorMessage(errorCode.value)
+      ElMessage.error(errorMessage.value)
     }
   }
 
-  // 开启摄像头
-  const handleStartCamera = async () => {
+  const handleVideoUpload = async (file: File) => {
+    resetImageState()
+    inputMode.value = 'growthVideo'
+
     try {
-      const streamUrl = await getCameraStream()
-      if (!streamUrl) {
-        ElMessage.warning('暂未配置摄像头流')
-        return
-      }
-      currentImage.value = streamUrl
-      isStream.value = true
-      isCameraActive.value = true
-      resetStats()
-      ElMessage.success('摄像头已开启')
-      // 模拟实时检测 (每3秒更新一次数据)
-      startRealTimeSimulation()
-    } catch (err) {
-      console.error('无法获取视频流:', err)
-      ElMessage.error('无法连接到摄像头')
+      await uploadVideo(file)
+      ElMessage.success('视频已上传，正在识别关键帧')
+    } catch (error: any) {
+      const rawMessage = String(error?.message || '')
+      const matchedCode = (
+        [
+          'INVALID_VIDEO',
+          'VIDEO_TOO_LARGE',
+          'VIDEO_DECODE_FAILED',
+          'NO_VALID_FRAMES',
+          'MODEL_INFERENCE_FAILED',
+          'INTERNAL_ERROR'
+        ] as GrowthVideoDetectErrorCode[]
+      ).find((code) => rawMessage.includes(code))
+
+      markVideoTaskFailed(matchedCode ?? 'INTERNAL_ERROR')
+      ElMessage.error(mapVideoErrorMessage(matchedCode ?? 'INTERNAL_ERROR'))
     }
   }
 
-  let simulationTimer: number | null = null
-
-  const startRealTimeSimulation = () => {
-    if (simulationTimer) {
-      window.clearInterval(simulationTimer)
-      simulationTimer = null
+  const handleSelectDetection = (id: string) => {
+    if (inputMode.value === 'growthVideo') {
+      selectFrameDetection(id)
+      return
     }
-    simulationTimer = window.setInterval(async () => {
-      if (!isCameraActive.value) {
-        if (simulationTimer) window.clearInterval(simulationTimer)
-        simulationTimer = null
-        return
-      }
-      // 模拟检测
-      try {
-        const result = await detectGrowth('stream-frame')
-        updateStats(result.detections)
-        if (result.detections.length > 0) {
-          latestDetection.value = result.detections[0]
-        }
-      } catch (e) {
-        console.error(e)
-      }
-    }, 3000)
+
+    selectedDetectionId.value = id
   }
 
-  // 停止检测
-  const handleStopDetection = () => {
-    currentImage.value = null
-    isStream.value = false
-    isCameraActive.value = false
-    if (simulationTimer) window.clearInterval(simulationTimer)
-    simulationTimer = null
-    resetStats()
-    ElMessage.info('已停止检测')
+  const handleSelectFrame = (frameId: string) => {
+    selectGrowthFrame(frameId)
   }
 
-  // 更新统计
-  const updateStats = (detections: GrowthDetectionItem[]) => {
-    detections.forEach((det) => {
-      if (det.confidence * 100 >= confidence.value) {
-        const className = det.class as keyof GrowthStats
-        if (growthStats[className] !== undefined) {
-          growthStats[className]++
-        }
-      }
-    })
+  const handleClear = () => {
+    resetAllState()
+    ElMessage.info('已清空识别结果')
   }
+
+  watch(isProcessing, (value) => {
+    if (value) {
+      loadingService.showLoading()
+      return
+    }
+
+    loadingService.hideLoading()
+  })
+
+  watch(growthVideoTaskStatus, (value, previous) => {
+    if (!previous || previous === value) return
+
+    if (value === 'success') {
+      ElMessage.success('视频关键帧识别完成')
+    }
+
+    if (value === 'failed') {
+      ElMessage.error(activeErrorMessage.value || '视频识别失败，请稍后重试')
+    }
+  })
 
   onUnmounted(() => {
-    if (simulationTimer) window.clearInterval(simulationTimer)
-    simulationTimer = null
+    loadingService.hideLoading()
   })
 </script>
 
@@ -205,21 +432,6 @@
 
     .mb-4 {
       margin-bottom: 16px;
-    }
-  }
-
-  // 动画
-  .is-loading {
-    animation: rotating 2s linear infinite;
-  }
-
-  @keyframes rotating {
-    from {
-      transform: rotate(0deg);
-    }
-
-    to {
-      transform: rotate(360deg);
     }
   }
 </style>

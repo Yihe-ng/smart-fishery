@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ref, onMounted, onUnmounted } from 'vue'
+  import { ref, onMounted, onUnmounted, onActivated } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
 
   const videoRef = ref<HTMLVideoElement>()
@@ -39,9 +39,27 @@
     currentTime.value = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
   }
 
+  /**
+   * 恢复视频播放
+   * 在组件从 KeepAlive 缓存激活时调用
+   */
+  const resumePlayback = () => {
+    if (videoRef.value && videoRef.value.paused) {
+      videoRef.value.play().catch(() => {
+        // 浏览器自动播放策略阻止，静默处理
+        console.log('Auto-play blocked by browser policy')
+      })
+    }
+  }
+
   onMounted(() => {
     updateTime()
     timeTimer = setInterval(updateTime, 1000)
+  })
+
+  // 组件从 KeepAlive 缓存激活时恢复播放
+  onActivated(() => {
+    resumePlayback()
   })
 
   onUnmounted(() => {
