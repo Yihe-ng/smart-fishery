@@ -69,16 +69,6 @@ function getConfirmThreshold(level: AIRiskLevel): number {
   return 0
 }
 
-function extractConfirmPreview(text: string): AIConfirmPreview | null {
-  try {
-    const match = text.match(/\{[\s\S]*"confirmToken"[\s\S]*\}/)
-    if (match) return JSON.parse(match[0]) as AIConfirmPreview
-  } catch {
-    return null
-  }
-  return null
-}
-
 export const useAIStore = defineStore('aiStore', () => {
   const visible = ref(false)
   const loading = ref(false)
@@ -152,13 +142,9 @@ export const useAIStore = defineStore('aiStore', () => {
     }
 
     const result = await runQA(runtimeContext, text)
-    const responseText = result.data
-
-    const preview = currentIntent === 'automation' ? extractConfirmPreview(responseText) : null
-    const displayText = preview
-      ? responseText.replace(/\{[\s\S]*"confirmToken"[\s\S]*\}/, '').trim() || responseText
-      : responseText
-    const warnings = sanitizeWarnings([])
+    const preview = currentIntent === 'automation' ? result.data.confirmPreview ?? null : null
+    const displayText = result.data.assistantMessage
+    const warnings = sanitizeWarnings(result.data.warnings)
 
     if (preview) {
       latestPreview.value = preview
@@ -266,6 +252,10 @@ export const useAIStore = defineStore('aiStore', () => {
 
   const runAutomationPreset = async (preset: AIAutomationPreset) => {
     activeTab.value = 'automation'
+    if (preset.key === 'manual-feeding-preview') {
+      await requestManualFeedingPreview(600)
+      return
+    }
     await runAutomation(preset.prompt)
   }
 
@@ -312,9 +302,11 @@ export const useAIStore = defineStore('aiStore', () => {
     loading.value = true
     try {
       await executeManualFeeding({
-        feederId: 'feeder-001',
-        amount: Number(preview.previewText.match(/(\d+)\s*g/i)?.[1] ?? 600),
-        duration: 10
+        confirmToken: preview.confirmToken,
+        feederId: preview.feederId,
+        amount: preview.amount,
+        pondId: preview.pondId,
+        duration: preview.duration
       })
       appendAssistantMessage('操作已下发：手动投喂执行成功。')
       resetExecutionState()

@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 from hashlib import md5
 from typing import Literal
 
+from sqlalchemy.orm import Session
+
 from app.agent.config import get_ai_settings
-from app.agent.mock_data import get_mock_pond, get_mock_water_quality
+from app.agent.real_data import get_pond_summary
 from app.agent.schemas import (
     AlertSummary,
     BootstrapResponse,
@@ -20,6 +24,7 @@ from app.agent.tool_registry import (
     get_allowed_tools,
     get_device_status,
     get_tool_schemas,
+    get_water_quality_summary,
 )
 
 
@@ -32,19 +37,28 @@ PAGE_NAMES = {
 }
 
 
-def build_page_context(request: PageContextRequest) -> PageContextSummary:
-    mode = get_ai_settings().ai_mode
-    water = get_mock_water_quality(request.pondId)
-    pond = get_mock_pond(request.pondId)
-    alert_digest = get_alert_digest(request.pondId)
-    device_status = get_device_status(request.pondId)
+def build_page_context(
+    request: PageContextRequest, db: Session | None = None
+) -> PageContextSummary:
+    water = get_water_quality_summary(
+        request.pondId, current_index=request.currentIndex, db=db
+    )
+    pond = get_pond_summary(request.pondId, current_index=request.currentIndex, db=db)
+    alert_digest = get_alert_digest(
+        request.pondId, current_index=request.currentIndex, db=db
+    )
+    device_status = get_device_status(
+        request.pondId, current_index=request.currentIndex, db=db
+    )
     updated_at = water["updatedAt"]
-    context_seed = f"{request.pageId}:{request.routePath}:{pond['pondId']}:{updated_at}"
+    context_seed = (
+        f"{request.pageId}:{request.routePath}:{pond['pondId']}:{updated_at or 'empty'}"
+    )
     context_version = md5(context_seed.encode("utf-8")).hexdigest()[:12]
 
     return PageContextSummary(
         contextVersion=context_version,
-        sourceMode=mode,
+        sourceMode=water["sourceMode"],
         currentPage=CurrentPageSummary(
             pageId=request.pageId,
             routePath=request.routePath,
@@ -59,6 +73,7 @@ def build_page_context(request: PageContextRequest) -> PageContextSummary:
             latestTitles=[item["title"] for item in alert_digest["latest"]],
         ),
         deviceStatus=DeviceStatusSummary(**device_status),
+        currentIndex=request.currentIndex,
         updatedAt=updated_at,
     )
 
@@ -100,7 +115,7 @@ def build_page_instructions(page_context: PageContextSummary) -> str:
             f"当前池塘：{pond.name}（{pond.pondId}）。",
             f"当前路由：{page_context.currentPage.routePath}。",
             f"上下文版本：{page_context.contextVersion}。",
-            f"关键监测指标：{metrics_text}。",
+            f"关键监测指标：{metrics_text or '暂无数据'}。",
             (
                 f"告警汇总：总数 {page_context.alertDigest.total}，"
                 f"严重 {page_context.alertDigest.critical}，"
@@ -115,7 +130,6 @@ def build_page_instructions(page_context: PageContextSummary) -> str:
 
 
 def build_ui_capabilities(page_id: str) -> UICapabilities:
-    # 首期策略：仅精准投喂页面开放自动化执行能力，其他页面保持预览/建议能力。
     can_execute = page_id == "feeding"
     return UICapabilities(
         canExecute=can_execute,

@@ -179,6 +179,7 @@ def record_to_water_quality_payload(record: WaterQualityData | None) -> dict[str
 
     return {
         "id": str(record.id),
+        "pondId": record.pond_id,
         "temperature": record.temperature,
         "ph": record.ph_value,
         "dissolvedOxygen": record.dissolved_oxygen,
@@ -285,6 +286,7 @@ def get_dashboard_frame(db: Session, index: int) -> dict[str, Any]:
             "nextIndex": 0,
             "total": 0,
             "hasNext": False,
+            "pondId": None,
             "collectTime": None,
             "waterQuality": None,
             "previousWaterQuality": None,
@@ -301,6 +303,7 @@ def get_dashboard_frame(db: Session, index: int) -> dict[str, Any]:
         "nextIndex": (current_index + 1) % total,
         "total": total,
         "hasNext": total > 1,
+        "pondId": current_record.pond_id,
         "collectTime": format_collect_time(current_record.collect_time),
         "waterQuality": record_to_water_quality_payload(current_record),
         "previousWaterQuality": record_to_water_quality_payload(previous_record),

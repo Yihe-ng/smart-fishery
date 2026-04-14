@@ -4,6 +4,7 @@ import type { WaterQualityMetricKey } from '@/config/theme'
 
 export interface WaterQualityData {
   id: string
+  pondId?: string
   temperature: number
   ph: number
   dissolvedOxygen: number
@@ -45,6 +46,7 @@ export interface DashboardFrameResponse {
   nextIndex: number
   total: number
   hasNext: boolean
+  pondId?: string
   collectTime: string | null
   waterQuality: WaterQualityData | null
   previousWaterQuality: WaterQualityData | null

@@ -1,113 +1,90 @@
+from __future__ import annotations
+
 from typing import Any, Callable, Dict, List
 
-from app.agent.mock_data import (
-    get_mock_alerts,
-    get_mock_devices,
-    get_mock_feeding_config,
-    get_mock_water_quality,
+from sqlalchemy.orm import Session
+
+from app.agent.real_data import (
+    get_alert_digest_data,
+    get_device_status_data,
+    get_water_quality_snapshot,
+    get_water_quality_summary_data,
 )
+from app.services.smart_feeding import smart_feeding_service
 from app.services.weather_service import weather_service
 
 
-def get_water_quality_summary(pond_id: str | None = None) -> Dict[str, Any]:
-    water = get_mock_water_quality(pond_id)
+def get_water_quality_summary(
+    pond_id: str | None = None,
+    current_index: int | None = None,
+    db: Session | None = None,
+) -> Dict[str, Any]:
+    return get_water_quality_summary_data(pond_id, current_index=current_index, db=db)
+
+
+def get_feeding_recommendation(
+    pond_id: str | None = None,
+    current_index: int | None = None,
+    db: Session | None = None,
+) -> Dict[str, Any]:
+    water_snapshot = get_water_quality_snapshot(
+        pond_id, current_index=current_index, db=db
+    )
+    pressure_risk = weather_service.get_pressure_risk_for_feeding(None)
+    plan = smart_feeding_service.calculate_feeding_plan(
+        pond_id=pond_id or "pond-001",
+        current_index=current_index,
+        db=db,
+    )
+
+    if not plan["can_feed"]:
+        return {
+            "canFeed": False,
+            "recommendation": plan.get("reason") or plan.get("suggestion", "暂不建议投喂。"),
+            "confidence": 0.55,
+            "factors": {},
+            "rationale": [plan.get("reason", "缺少实时水质数据，无法给出投喂建议。")],
+            "sourceMode": "real",
+            "pressureRisk": pressure_risk,
+            "waterQuality": water_snapshot or {},
+        }
+
+    rationale = [
+        f"当前溶解氧 {plan['water_quality']['dissolved_oxygen']}mg/L。",
+        f"当前水温 {plan['water_quality']['temperature']}°C。",
+        f"推荐投喂量约 {plan['recommended_amount']}g，建议时段 {plan['optimal_time']}。",
+    ]
     return {
-        "overview": water["overview"],
-        "metrics": water["metrics"],
-        "riskLevel": water["riskLevel"],
-        "updatedAt": water["updatedAt"],
-        "sourceMode": water["sourceMode"],
-    }
-
-
-async def get_feeding_recommendation(pond_id: str | None = None) -> Dict[str, Any]:
-    """获取投喂建议，整合天气数据"""
-    water = get_mock_water_quality(pond_id)
-    config = get_mock_feeding_config()
-
-    # 获取天气数据（包括气压风险等级）
-    try:
-        weather_data = await weather_service.get_current_weather()
-        pressure_risk = weather_data.get("pressureRisk", {})
-    except Exception:
-        # 如果天气服务失败，使用默认低风险
-        pressure_risk = weather_service.get_pressure_risk_for_feeding(None)
-
-    # 根据气压风险调整建议
-    risk_level = pressure_risk.get("level", "low")
-    risk_text = pressure_risk.get("text", "低风险")
-    feeding_suggestion = pressure_risk.get("feedingSuggestion", "可按正常计划投喂")
-
-    # 基础建议
-    base_recommendation = "建议维持常规投喂频次，单次投喂量保守 500-600g，并先确认亚硝酸盐传感器状态。"
-
-    # 根据气压风险调整建议
-    if risk_level == "high":
-        recommendation = f"【气压{risk_text}】{feeding_suggestion}。鱼类可能产生应激反应，建议暂停或大幅减少投喂。"
-        confidence = 0.65
-    elif risk_level == "medium":
-        recommendation = f"【气压{risk_text}】{feeding_suggestion}。{base_recommendation}"
-        confidence = 0.70
-    else:
-        recommendation = f"【气压{risk_text}】{feeding_suggestion}。{base_recommendation}"
-        confidence = 0.73
-
-    return {
-        "recommendation": recommendation,
-        "confidence": confidence,
-        "factors": {
-            "feedCoefficient": config["feedCoefficient"],
-            "frequency": config["frequency"],
-            "temperature": 25.5,
-            "dissolvedOxygen": 6.8,
-            "pressure": pressure_risk.get("pressure", 1013),
-            "pressureRiskLevel": risk_level,
-            "pressureRiskText": risk_text,
-        },
-        "rationale": [
-            "当前水温处于适宜区间。",
-            "溶氧虽未触发停喂阈值，但处于保守区间。",
-            f"当前气压 {pressure_risk.get('pressure', 1013)}hPa，{pressure_risk.get('description', '气压正常')}。",
-            "亚硝酸盐传感器离线，建议暂不激进加料。",
-        ],
-        "sourceMode": water["sourceMode"],
+        "canFeed": True,
+        "recommendation": plan["suggestion"],
+        "confidence": plan["confidence"],
+        "factors": plan["factors"],
+        "rationale": rationale,
+        "sourceMode": "real",
         "pressureRisk": pressure_risk,
+        "waterQuality": plan["water_quality"],
+        "recommendedAmount": plan["recommended_amount"],
+        "estimatedDuration": plan["estimated_duration"],
     }
 
 
-def get_alert_digest(pond_id: str | None = None, limit: int = 3) -> Dict[str, Any]:
-    _ = pond_id
-    alerts = get_mock_alerts(limit)
-    critical = sum(1 for alert in alerts if alert["level"] == "critical")
-    warning = sum(1 for alert in alerts if alert["level"] == "warning")
-    return {
-        "total": len(alerts),
-        "critical": critical,
-        "warning": warning,
-        "latest": [
-            {
-                "id": alert["id"],
-                "title": alert["title"],
-                "level": alert["level"],
-                "status": alert["status"],
-                "createTime": alert["create_time"],
-            }
-            for alert in alerts
-        ],
-    }
+def get_alert_digest(
+    pond_id: str | None = None,
+    limit: int = 3,
+    current_index: int | None = None,
+    db: Session | None = None,
+) -> Dict[str, Any]:
+    return get_alert_digest_data(
+        pond_id, limit=limit, current_index=current_index, db=db
+    )
 
 
-def get_device_status(pond_id: str | None = None) -> Dict[str, Any]:
-    _ = pond_id
-    devices = get_mock_devices()
-    online = sum(1 for device in devices if device["status"] == "online")
-    offline = len(devices) - online
-    return {
-        "onlineCount": online,
-        "offlineCount": offline,
-        "feederStatus": "online" if online >= 3 else "warning",
-        "cameraStatus": "online",
-    }
+def get_device_status(
+    pond_id: str | None = None,
+    current_index: int | None = None,
+    db: Session | None = None,
+) -> Dict[str, Any]:
+    return get_device_status_data(pond_id, current_index=current_index, db=db)
 
 
 ToolHandler = Callable[..., Dict[str, Any]]
@@ -135,7 +112,7 @@ TOOL_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "get_feeding_recommendation": {
         "name": "get_feeding_recommendation",
-        "description": "基于 mock 水质和投喂配置生成当前投喂建议。",
+        "description": "基于实时水质和投喂规则生成当前投喂建议。",
         "inputSchema": {
             "type": "object",
             "properties": {"pondId": {"type": "string"}},
@@ -270,4 +247,8 @@ def run_tool(name: str, **kwargs: Any) -> Dict[str, Any]:
         raise ValueError(
             f"Tool {name} requires preview route and cannot be executed directly."
         )
+    if "pondId" in kwargs and "pond_id" not in kwargs:
+        kwargs["pond_id"] = kwargs.pop("pondId")
+    if "currentIndex" in kwargs and "current_index" not in kwargs:
+        kwargs["current_index"] = kwargs.pop("currentIndex")
     return handler(**kwargs)

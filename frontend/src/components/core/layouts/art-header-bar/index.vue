@@ -173,6 +173,7 @@
   import { themeAnimation } from '@/utils/ui/animation'
   import { useCommon } from '@/hooks/core/useCommon'
   import { useHeaderBar } from '@/hooks/core/useHeaderBar'
+  import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
   import ArtUserMenu from './widget/ArtUserMenu.vue'
 
   defineOptions({ name: 'ArtHeaderBar' })
@@ -186,6 +187,7 @@
   const { width } = useWindowSize()
 
   const aiStore = useAIStore()
+  const { snapshot } = useDemoFrameSnapshot()
   const settingStore = useSettingStore()
   const userStore = useUserStore()
   const menuStore = useMenuStore()
@@ -296,10 +298,21 @@
     mittBus.emit('openSearchDialog')
   }
 
+  const resolveAIPageId = () => {
+    if (route.fullPath.includes('/fishery/feeding')) return 'feeding'
+    if (route.fullPath.includes('/fishery/dashboard') || route.fullPath.includes('/fishery/console'))
+      return 'fishery-dashboard'
+    if (route.fullPath.includes('/fishery/water-quality')) return 'water-quality'
+    if (route.fullPath.includes('/fishery/growth')) return 'growth'
+    return 'global-chat'
+  }
+
   const openAIAssistant = async (): Promise<void> => {
     await aiStore.openAssistant({
-      pageId: 'global-chat',
-      routePath: route.fullPath
+      pageId: resolveAIPageId(),
+      routePath: route.fullPath,
+      pondId: snapshot.pondId,
+      currentIndex: snapshot.currentIndex
     })
   }
 </script>

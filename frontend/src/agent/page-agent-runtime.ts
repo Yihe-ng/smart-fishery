@@ -3,7 +3,12 @@ import { PageController } from '@page-agent/page-controller'
 
 import { fetchAIInvoke } from '@/api/agent'
 import { createProxyTools } from '@/agent/proxy-tools'
-import type { AIBootstrapPayload, AIConfirmPreview, AIPageId } from '@/types'
+import type {
+  AIAgentInvokeResponse,
+  AIBootstrapPayload,
+  AIConfirmPreview,
+  AIPageId
+} from '@/types'
 
 interface AgentRuntimeContext {
   pageId: AIPageId
@@ -12,7 +17,7 @@ interface AgentRuntimeContext {
 }
 
 export interface QAResult {
-  data: string
+  data: AIAgentInvokeResponse
   success: boolean
 }
 
@@ -30,24 +35,10 @@ export async function runQA(context: AgentRuntimeContext, text: string): Promise
     allowedTools
   })
 
-  const choice = response.choices?.[0] as Record<string, unknown> | undefined
-  const message = choice?.message as Record<string, unknown> | undefined
-  const toolCalls = message?.tool_calls as Array<Record<string, unknown>> | undefined
-  const args = toolCalls?.[0]?.function as Record<string, unknown> | undefined
-  const argsStr = args?.arguments
-  if (argsStr) {
-    try {
-      const parsed = JSON.parse(String(argsStr))
-      const doneText = parsed?.action?.done?.text
-      if (typeof doneText === 'string' && doneText.trim()) {
-        return { data: doneText.trim(), success: true }
-      }
-      return { data: String(argsStr), success: false }
-    } catch {
-      return { data: String(argsStr), success: false }
-    }
+  return {
+    data: response,
+    success: response.status !== 'degraded' && response.status !== 'failed'
   }
-  return { data: '当前暂无可返回结果。', success: false }
 }
 
 export async function createPageAgent(context: AgentRuntimeContext) {

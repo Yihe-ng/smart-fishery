@@ -72,7 +72,11 @@
       <el-col :span="11" class="right-column">
         <!-- AI投喂建议 - 移至最上方 -->
         <div class="suggestion-section">
-          <AISuggestionPanel :pond-id="pondId" @adopt-suggestion="handleAdoptSuggestion" />
+          <AISuggestionPanel
+            :pond-id="pondId"
+            :current-index="currentIndex"
+            @adopt-suggestion="handleAdoptSuggestion"
+          />
         </div>
 
         <!-- 投喂执行日志 - 中间位置 -->
@@ -132,6 +136,7 @@
   import VideoPlayer from '@/views/dashboard/fishery-console/components/VideoPlayer.vue'
   import AISuggestionPanel from './components/AISuggestionPanel.vue'
   import WeatherCard from './components/WeatherCard.vue'
+  import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
   import type { FeedingConfig, FeedingLog } from '@/types/feeding'
 
   defineOptions({ name: 'FeedingPage' })
@@ -146,7 +151,9 @@
     '/video/VID_20260330_163804.mp4'
   ]
 
-  const pondId = 'pond-001'
+  const { snapshot } = useDemoFrameSnapshot()
+  const pondId = computed(() => snapshot.pondId)
+  const currentIndex = computed(() => snapshot.currentIndex)
   const config = reactive<FeedingConfig>({
     feedCoefficient: 1.6,
     frequency: 3,

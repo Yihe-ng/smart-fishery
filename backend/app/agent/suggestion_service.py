@@ -1,80 +1,108 @@
 import asyncio
 
 from app.agent.config import get_ai_settings
-from app.agent.mock_data import get_mock_feeding_logs
 from app.agent.schemas import SuggestionCard, SuggestionPanelState, SuggestionResponse
 from app.agent.tool_registry import (
     get_alert_digest,
+    get_device_status,
     get_feeding_recommendation,
     get_water_quality_summary,
 )
 
 
-async def build_feeding_suggestions(pond_id: str | None = None) -> SuggestionResponse:
+def _normalize_severity(value: str | None) -> str:
+    return value if value in {"info", "warning", "critical"} else "info"
+
+
+def _build_risk_summary(alerts: dict, devices: dict) -> tuple[str, list[str], str]:
+    critical = alerts.get("critical", 0)
+    warning = alerts.get("warning", 0)
+    online = devices.get("onlineCount", 0)
+    offline = devices.get("offlineCount", 0)
+    latest = alerts.get("latest", [])
+    reasons = [
+        f"当前严重告警 {critical} 条，警告 {warning} 条。",
+        f"设备在线 {online} 台，离线 {offline} 台。",
+    ]
+    if latest:
+        reasons.append(f"最近告警：{latest[0].get('title', '暂无详情')}")
+    severity = "critical" if critical > 0 else "warning" if warning > 0 or offline > 0 else "info"
+    summary = (
+        "当前快照存在需要关注的风险。"
+        if severity != "info"
+        else "当前快照下未发现明显设备或告警风险。"
+    )
+    return summary, reasons, severity
+
+
+async def build_feeding_suggestions(
+    pond_id: str | None = None, current_index: int | None = None
+) -> SuggestionResponse:
     mode = get_ai_settings().ai_mode
-    water = get_water_quality_summary(pond_id)
-    recommendation = await get_feeding_recommendation(pond_id)
-    alerts = get_alert_digest(pond_id)
-    latest_log = get_mock_feeding_logs(1)[0]
+    water = get_water_quality_summary(pond_id, current_index=current_index)
+    recommendation = get_feeding_recommendation(pond_id, current_index=current_index)
+    alerts = get_alert_digest(pond_id, current_index=current_index)
+    devices = get_device_status(pond_id, current_index=current_index)
 
-    # 根据气压风险等级计算建议投喂量
-    pressure_risk = recommendation.get("pressureRisk", {})
-    risk_level = pressure_risk.get("level", "low")
-    base_amount = 550  # 基础建议投喂量
-
-    if risk_level == "high":
-        suggested_amount = int(base_amount * 0.5)  # 高风险减少50%
-    elif risk_level == "medium":
-        suggested_amount = int(base_amount * 0.8)  # 中风险减少20%
+    cards: list[SuggestionCard] = []
+    if recommendation.get("canFeed", False):
+        cards.append(
+            SuggestionCard(
+                id="feeding-recommendation",
+                title="当前投喂建议",
+                summary=recommendation.get("recommendation", "当前快照下暂无明确投喂建议。"),
+                rationale=recommendation.get("rationale", []),
+                confidence=float(recommendation.get("confidence", 0.6)),
+                severity=_normalize_severity(water.get("riskLevel")),
+                sourceMode=recommendation.get("sourceMode", mode),
+                updatedAt=water.get("updatedAt"),
+                suggestedAction="查看投喂预览",
+                confirmRequired=True,
+                suggestedAmount=recommendation.get("recommendedAmount"),
+            )
+        )
     else:
-        suggested_amount = base_amount  # 低风险正常投喂
+        cards.append(
+            SuggestionCard(
+                id="feeding-recommendation-unavailable",
+                title="当前投喂建议",
+                summary=recommendation.get("recommendation", "当前快照下暂不建议投喂。"),
+                rationale=recommendation.get("rationale", []),
+                confidence=float(recommendation.get("confidence", 0.55)),
+                severity=_normalize_severity(water.get("riskLevel") or "warning"),
+                sourceMode=recommendation.get("sourceMode", mode),
+                updatedAt=water.get("updatedAt"),
+                suggestedAction="继续查看 AI 助手",
+                confirmRequired=False,
+            )
+        )
 
-    cards = [
+    risk_summary, risk_rationale, risk_severity = _build_risk_summary(alerts, devices)
+    cards.append(
         SuggestionCard(
             id="feeding-risk-summary",
-            title="投喂建议保持保守",
-            summary=recommendation["recommendation"],
-            rationale=recommendation["rationale"],
-            confidence=recommendation["confidence"],
-            severity="warning" if risk_level != "low" else "info",
+            title="当前风险摘要",
+            summary=risk_summary,
+            rationale=risk_rationale,
+            confidence=0.7 if risk_severity != "info" else 0.8,
+            severity=risk_severity,
             sourceMode=mode,
-            updatedAt=water["updatedAt"],
-            suggestedAction="查看投喂预览",
-            confirmRequired=True,
-            suggestedAmount=suggested_amount,
-        ),
-        SuggestionCard(
-            id="feeding-alert-check",
-            title="先处理设备与告警风险",
-            summary=f"当前有 {alerts['critical']} 条严重告警、{alerts['warning']} 条警告，建议先确认传感器与设备状态。",
-            rationale=[
-                "亚硝酸盐传感器离线会降低建议可信度。",
-                f"最近一次投喂记录为 {latest_log['feedTime']}，投喂量 {latest_log['amount']}g。",
-            ],
-            confidence=0.69,
-            severity="warning" if alerts["critical"] == 0 else "critical",
-            sourceMode=mode,
-            updatedAt=water["updatedAt"],
-            suggestedAction="查看异常汇总",
+            updatedAt=water.get("updatedAt"),
+            suggestedAction="查看 AI 助手分析",
             confirmRequired=False,
-        ),
-    ]
+        )
+    )
+
     return SuggestionResponse(
         cards=cards,
-        panelState=SuggestionPanelState(hasNewRisk=True, hasNewSuggestion=True),
+        panelState=SuggestionPanelState(
+            hasNewRisk=risk_severity != "info",
+            hasNewSuggestion=bool(cards),
+        ),
     )
 
 
-# 为了保持向后兼容，提供同步版本
-def build_feeding_suggestions_sync(pond_id: str | None = None) -> SuggestionResponse:
-    """同步版本的投喂建议生成（用于兼容旧代码）"""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # 如果事件循环已经在运行，创建新任务
-            return asyncio.create_task(build_feeding_suggestions(pond_id))
-        else:
-            return loop.run_until_complete(build_feeding_suggestions(pond_id))
-    except RuntimeError:
-        # 没有事件循环时创建新的
-        return asyncio.run(build_feeding_suggestions(pond_id))
+def build_feeding_suggestions_sync(
+    pond_id: str | None = None, current_index: int | None = None
+) -> SuggestionResponse:
+    return asyncio.run(build_feeding_suggestions(pond_id, current_index))

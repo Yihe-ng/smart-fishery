@@ -114,6 +114,7 @@
   import AIDetectionResult from './components/AIDetectionResult.vue'
 
   import { getDashboardFrame } from '@/api/water-quality'
+  import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
   import type { Alert } from '@/types/alert'
   import type { DetectionResult } from '@/types/fish-disease'
   import type { SensorDevice } from '@/types/device'
@@ -135,6 +136,7 @@
   const dashboardFrame = ref<DashboardFrameResponse | null>(null)
   const sensorDevices = ref<SensorDevice[]>([])
   const dismissedAlertIds = ref<string[]>([])
+  const { setSnapshot } = useDemoFrameSnapshot()
 
   const latestDetection = ref<DetectionResult>({
     id: 'd1',
@@ -158,6 +160,11 @@
     lastUpdateTime.value = frame.collectTime ?? '--'
     sensorDevices.value = frame.devices
     dismissedAlertIds.value = []
+    setSnapshot({
+      currentIndex: frame.index,
+      pondId: frame.pondId ?? frame.waterQuality?.pondId,
+      collectTime: frame.collectTime ?? undefined
+    })
   }
 
   const loadDashboardFrame = async (index: number) => {
