@@ -72,6 +72,7 @@ class DashboardFrameMetric(BaseModel):
 
 class DashboardFrameWaterQuality(BaseModel):
     id: str
+    pondId: str
     temperature: float
     ph: float
     dissolvedOxygen: float
@@ -108,6 +109,7 @@ class DashboardFrameResponse(BaseModel):
     nextIndex: int
     total: int
     hasNext: bool
+    pondId: Optional[str] = None
     collectTime: Optional[str] = None
     waterQuality: Optional[DashboardFrameWaterQuality] = None
     previousWaterQuality: Optional[DashboardFrameWaterQuality] = None

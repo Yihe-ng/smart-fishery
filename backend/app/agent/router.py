@@ -5,8 +5,8 @@ from fastapi import APIRouter, HTTPException
 from app.agent.context_builder import build_bootstrap_payload, build_page_context
 from app.agent.llm_service import build_manual_feeding_preview, invoke_llm
 from app.agent.schemas import (
-    AgentInvokeResponse,
     BootstrapResponse,
+    InvokeResponse,
     InvokeRequest,
     ManualFeedingPreviewRequest,
     ManualFeedingPreviewResponse,
@@ -43,9 +43,9 @@ async def refresh_page_context(request: PageContextRequest):
     )
 
 
-@router.post("/agent/invoke", response_model=BaseResponse[AgentInvokeResponse])
+@router.post("/agent/invoke", response_model=BaseResponse[InvokeResponse])
 async def invoke_agent(request: InvokeRequest):
-    return BaseResponse[AgentInvokeResponse](
+    return BaseResponse[InvokeResponse](
         code=200,
         msg="AI invoke success",
         data=invoke_llm(request),
@@ -71,7 +71,7 @@ async def execute_tool(tool_name: str, request: ToolExecuteRequest):
 
 @router.post("/suggestions/feeding", response_model=BaseResponse[SuggestionResponse])
 async def get_feeding_suggestions(request: PageContextRequest):
-    response = await build_feeding_suggestions(request.pondId)
+    response = await build_feeding_suggestions(request.pondId, request.currentIndex)
     return BaseResponse[SuggestionResponse](
         code=200,
         msg="AI suggestions success",

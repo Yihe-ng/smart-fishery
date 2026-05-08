@@ -29,6 +29,7 @@ class PageContextRequest(BaseModel):
     pageId: PageId
     routePath: str
     pondId: Optional[str] = None
+    currentIndex: Optional[int] = None
     selection: Optional[Dict[str, Any]] = None
 
 
@@ -69,6 +70,7 @@ class DeviceStatusSummary(BaseModel):
 class PageContextSummary(BaseModel):
     contextVersion: str
     sourceMode: EnvironmentMode
+    currentIndex: Optional[int] = None
     currentPage: CurrentPageSummary
     pond: PondSummary
     keyMetrics: List[MetricSummary]
@@ -112,11 +114,16 @@ class ConfirmPreview(BaseModel):
     previewText: str
     riskLevel: RiskLevel
     confirmToken: str
+    pondId: Optional[str] = None
+    feederId: str
+    amount: float
+    duration: int
     expiresAt: str
     mode: EnvironmentMode
 
 
 class InvokeResponse(BaseModel):
+    status: str = "completed"
     assistantMessage: str
     toolCalls: List[ToolCall] = Field(default_factory=list)
     toolResults: Optional[List[Dict[str, Any]]] = None
@@ -161,9 +168,21 @@ class ManualFeedingPreviewResponse(BaseModel):
     previewText: str
     riskLevel: RiskLevel
     confirmToken: str
+    pondId: Optional[str] = None
+    feederId: str
+    amount: float
+    duration: int
     expiresAt: str
     mode: EnvironmentMode
     sessionId: Optional[str] = None
+
+
+class ManualFeedingExecuteRequest(BaseModel):
+    confirmToken: str
+    feederId: str
+    amount: float
+    duration: int = 10
+    pondId: Optional[str] = None
 
 
 class ToolExecuteRequest(BaseModel):

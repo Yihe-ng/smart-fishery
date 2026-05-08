@@ -30,6 +30,7 @@ export function fetchAIInvoke(payload: {
   contextVersion: string
   pageContextSummary: Record<string, unknown>
   allowedTools: string[]
+  currentIndex?: number
 }) {
   return request.post<AIAgentInvokeResponse>({
     url: '/api/agent/agent/invoke',
@@ -59,15 +60,19 @@ export function fetchManualFeedingPreview(payload: { pondId?: string; amount: nu
 }
 
 export function executeManualFeeding(payload: {
+  confirmToken: string
   feederId: string
   amount: number
+  pondId?: string
   duration?: number
 }) {
   return request.post<{ success: boolean; message?: string }>({
     url: '/api/feeding/execute',
-    params: {
-      feeder_id: payload.feederId,
+    data: {
+      confirmToken: payload.confirmToken,
+      feederId: payload.feederId,
       amount: payload.amount,
+      pondId: payload.pondId,
       duration: payload.duration ?? 10
     }
   })

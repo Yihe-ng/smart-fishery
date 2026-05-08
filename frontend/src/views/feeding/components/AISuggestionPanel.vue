@@ -81,6 +81,7 @@
 
   const props = defineProps<{
     pondId?: string
+    currentIndex?: number
   }>()
 
   const emit = defineEmits<{
@@ -129,7 +130,8 @@
       const response = await fetchFeedingSuggestions({
         pageId: 'feeding',
         routePath: '/fishery/feeding',
-        pondId: props.pondId
+        pondId: props.pondId,
+        currentIndex: props.currentIndex
       })
       cards.value = response.cards
       panelState.value = response.panelState
@@ -150,7 +152,8 @@
       {
         pageId: 'feeding',
         routePath: '/fishery/feeding',
-        pondId: props.pondId
+        pondId: props.pondId,
+        currentIndex: props.currentIndex
       },
       {
         activeTab: 'chat',
@@ -164,7 +167,8 @@
       {
         pageId: 'feeding',
         routePath: '/fishery/feeding',
-        pondId: props.pondId
+        pondId: props.pondId,
+        currentIndex: props.currentIndex
       },
       {
         activeTab: 'automation'
@@ -173,10 +177,13 @@
     await aiStore.requestManualFeedingPreview(600)
   }
 
-  onMounted(() => {
-    loadSuggestions()
-  })
-
+  watch(
+    () => [props.pondId, props.currentIndex],
+    () => {
+      loadSuggestions()
+    },
+    { immediate: true }
+  )
   defineExpose({ loadSuggestions })
 </script>
 

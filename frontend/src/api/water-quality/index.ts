@@ -35,6 +35,7 @@ interface DashboardFrameApiResponse {
   nextIndex: number
   total: number
   hasNext: boolean
+  pondId?: string
   collectTime: string | null
   waterQuality: DashboardFrameWaterQualityApi | null
   previousWaterQuality: DashboardFrameWaterQualityApi | null
@@ -45,6 +46,7 @@ interface DashboardFrameApiResponse {
 
 interface DashboardFrameWaterQualityApi {
   id: string
+  pondId?: string
   temperature: number
   ph: number
   dissolvedOxygen: number
@@ -87,6 +89,7 @@ function normalizeFrameWaterQuality(
 
   return {
     ...item,
+    pondId: item.pondId,
     status: statusMap[item.status] ?? 'warning'
   }
 }
@@ -134,6 +137,7 @@ export function getDashboardFrame(index: number): Promise<DashboardFrameResponse
     })
     .then((res) => ({
       ...res,
+      pondId: res.pondId,
       waterQuality: normalizeFrameWaterQuality(res.waterQuality),
       previousWaterQuality: normalizeFrameWaterQuality(res.previousWaterQuality)
     }))

@@ -12,12 +12,14 @@ export interface AIContextRequest {
   pageId: AIPageId
   routePath: string
   pondId?: string
+  currentIndex?: number
   selection?: Record<string, unknown>
 }
 
 export interface AIContextSummary {
   contextVersion: string
   sourceMode: AIEnvironmentMode
+  currentIndex?: number
   currentPage: {
     pageId: AIPageId
     routePath: string
@@ -75,18 +77,31 @@ export interface AIConfirmPreview {
   previewText: string
   riskLevel: AIRiskLevel
   confirmToken: string
+  pondId?: string
+  feederId: string
+  amount: number
+  duration: number
   expiresAt: string
   mode: AIEnvironmentMode
   sessionId?: string
 }
 
 export interface AIAgentInvokeResponse {
-  id: string
-  object: string
-  created: number
-  model: string
-  choices: Array<Record<string, unknown>>
-  usage: Record<string, number>
+  status: 'completed' | 'degraded' | 'requires_confirmation' | 'failed'
+  assistantMessage: string
+  toolCalls: Array<{
+    name: string
+    arguments: Record<string, unknown>
+  }>
+  toolResults?: Array<{
+    tool: string
+    arguments: Record<string, unknown>
+    output: Record<string, unknown>
+    ok: boolean
+  }> | null
+  confirmPreview?: AIConfirmPreview | null
+  warnings: string[]
+  messageId?: string | null
 }
 
 export interface AIToolExecuteRequest {
