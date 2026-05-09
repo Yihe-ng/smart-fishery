@@ -264,6 +264,8 @@
         return '视频解析失败，请更换视频。'
       case 'NO_VALID_FRAMES':
         return '未提取到有效关键帧，请尝试更清晰的视频。'
+      case 'PROCESS_TIMEOUT':
+        return '视频处理超时，请缩短视频或稍后重试。'
       case 'MODEL_INFERENCE_FAILED':
         return '模型推理失败，请稍后重试。'
       case 'INTERNAL_ERROR':
@@ -346,6 +348,7 @@
           'VIDEO_TOO_LARGE',
           'VIDEO_DECODE_FAILED',
           'NO_VALID_FRAMES',
+          'PROCESS_TIMEOUT',
           'MODEL_INFERENCE_FAILED',
           'INTERNAL_ERROR'
         ] as GrowthVideoDetectErrorCode[]

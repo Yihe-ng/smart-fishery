@@ -2,12 +2,14 @@ import base64
 import io
 from typing import Any, Dict, List
 
+import cv2
+import numpy as np
 from PIL import Image, UnidentifiedImageError
 from ultralytics import YOLO
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 12_000_000
-DEFAULT_CONFIDENCE = 0.1
+DEFAULT_CONFIDENCE = 0.25
 MIME_BY_FORMAT = {
     "JPEG": "image/jpeg",
     "JPG": "image/jpeg",
@@ -31,20 +33,40 @@ class YOLODetector:
         if image.mode != "RGB":
             image = image.convert("RGB")
 
-        results = self.model(image, conf=DEFAULT_CONFIDENCE)
+        try:
+            results = self.model(image, conf=self.model.conf)
+        except Exception as exc:
+            raise ValueError("MODEL_INFERENCE_FAILED") from exc
+
         detections: List[Dict[str, Any]] = []
 
         for result in results:
-            for box in result.boxes:
+            for i, box in enumerate(result.boxes):
                 x1, y1, x2, y2 = box.xyxy[0]
                 width = float(x2 - x1)
                 height = float(y2 - y1)
+
+                mask_polygons: Any = None
+                length = width
+
+                if result.masks is not None and i < len(result.masks):
+                    try:
+                        mask_polygons = result.masks.xyn[i].tolist()
+                        pixel_poly = result.masks.xy[i]
+                        mask_length = self._compute_mask_length(pixel_poly)
+                        if mask_length is not None:
+                            length = mask_length
+                    except Exception:
+                        mask_polygons = None
+                        length = width
+
                 detections.append(
                     {
                         "class_name": result.names[int(box.cls[0])],
                         "confidence": float(box.conf[0]),
                         "bbox": [float(x1), float(y1), width, height],
-                        "length": width,
+                        "length": length,
+                        "mask_polygons": mask_polygons,
                     }
                 )
 
@@ -87,3 +109,16 @@ class YOLODetector:
     def _build_data_url(self, image_base64: str, image_format: str | None) -> str:
         mime_type = MIME_BY_FORMAT.get((image_format or "").upper(), "image/png")
         return f"data:{mime_type};base64,{image_base64}"
+
+    @staticmethod
+    def _compute_mask_length(polygon: np.ndarray) -> float | None:
+        """Compute fish body length from mask polygon using minAreaRect.
+
+        Fits a minimum-area rotated rectangle to the mask contour and
+        returns the longer side as body length in pixels.
+        """
+        if len(polygon) < 5:
+            return None
+        rect = cv2.minAreaRect(polygon.astype(np.float32))
+        w, h = rect[1]
+        return float(max(w, h))

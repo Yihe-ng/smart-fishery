@@ -31,6 +31,7 @@ class GrowthDetectionItem(BaseModel):
     bodyLengthCm: float
     weightG: float
     labelText: str
+    maskPolygons: List[List[float]] = Field(default_factory=list)
 
 
 class GrowthStats(BaseModel):

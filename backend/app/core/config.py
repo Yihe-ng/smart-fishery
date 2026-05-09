@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     ai_model: str = "qwen3.5-flash"
     ai_base_url: str = ""
 
+    GROWTH_SMALL_THRESHOLD: float = 15.0
+    GROWTH_LARGE_THRESHOLD: float = 25.0
+
     model_config = SettingsConfigDict(env_file=".env")
 
 
