@@ -17,10 +17,16 @@ export const fisheryRoutes: AppRouteRecord = {
       meta: { title: 'menus.fishery.dashboard', icon: 'ri:dashboard-line', keepAlive: true }
     },
     {
-      path: 'water-quality',
-      name: 'WaterQuality',
-      component: '/monitoring/water-quality/index',
-      meta: { title: 'menus.fishery.waterQuality', icon: 'ri:temp-hot-line', keepAlive: true }
+      path: 'growth',
+      name: 'GrowthRecognition',
+      component: '/growth-monitoring/detect/index',
+      meta: { title: 'menus.fishery.growth', icon: 'ri:scales-3-line', keepAlive: true }
+    },
+    {
+      path: 'feeding',
+      name: 'Feeding',
+      component: '/feeding/index',
+      meta: { title: 'menus.fishery.feeding', icon: 'ri:hand-coin-line', keepAlive: true }
     },
     {
       path: 'fish-disease',
@@ -35,16 +41,10 @@ export const fisheryRoutes: AppRouteRecord = {
       }
     },
     {
-      path: 'growth',
-      name: 'GrowthRecognition',
-      component: '/growth-monitoring/detect/index',
-      meta: { title: 'menus.fishery.growth', icon: 'ri:scales-3-line', keepAlive: true }
-    },
-    {
-      path: 'feeding',
-      name: 'Feeding',
-      component: '/feeding/index',
-      meta: { title: 'menus.fishery.feeding', icon: 'ri:hand-coin-line', keepAlive: true }
+      path: 'water-quality',
+      name: 'WaterQuality',
+      component: '/monitoring/water-quality/index',
+      meta: { title: 'menus.fishery.waterQuality', icon: 'ri:temp-hot-line', keepAlive: true }
     },
     {
       path: 'production',

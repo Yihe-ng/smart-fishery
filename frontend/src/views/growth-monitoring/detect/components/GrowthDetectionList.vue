@@ -46,7 +46,18 @@
 
 <style scoped lang="scss">
   .growth-detection-list {
+    display: flex;
+    flex-direction: column;
     margin-top: 16px;
+    overflow: hidden;
+
+    :deep(.el-card__body) {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
 
     .card-header {
       display: flex;
@@ -57,8 +68,32 @@
 
     .list-body {
       display: flex;
+      flex: 1;
       flex-direction: column;
       gap: 10px;
+      min-height: 0;
+      padding-right: 4px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scrollbar-color: var(--art-card-border) transparent;
+      scrollbar-width: thin;
+    }
+
+    .list-body::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .list-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .list-body::-webkit-scrollbar-thumb {
+      background: var(--art-card-border);
+      border-radius: 999px;
+    }
+
+    .list-body::-webkit-scrollbar-thumb:hover {
+      background: var(--el-border-color);
     }
 
     .list-item {

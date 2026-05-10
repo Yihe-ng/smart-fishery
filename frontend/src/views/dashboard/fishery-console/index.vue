@@ -33,13 +33,13 @@
         </div>
       </section>
 
+      <WeatherCard class="area-health dashboard-card-base dashboard-fill" />
+
       <AlertList
         :alerts="visibleAlerts"
         class="area-alert dashboard-card-base dashboard-fill"
         @resolve="handleResolveAlert"
       />
-
-      <WeatherCard class="area-health dashboard-card-base dashboard-fill" />
 
       <section class="panel-section dashboard-panel area-sensor">
         <div class="section-title flex-c gap-2">
@@ -56,11 +56,6 @@
       </section>
 
       <VideoPlayer class="area-video dashboard-card-base dashboard-fill" :sources="videoSources" />
-
-      <AIDetectionResult
-        :detection="latestDetection"
-        class="area-detect dashboard-card-base dashboard-fill"
-      />
 
       <FeedingPanel class="area-feed dashboard-card-base dashboard-fill" />
 
@@ -111,12 +106,10 @@
   import FeedingPanel from './components/FeedingPanel.vue'
   import WeatherCard from './components/WeatherCard.vue'
   import VideoPlayer from './components/VideoPlayer.vue'
-  import AIDetectionResult from './components/AIDetectionResult.vue'
 
   import { getDashboardFrame } from '@/api/water-quality'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
   import type { Alert } from '@/types/alert'
-  import type { DetectionResult } from '@/types/fish-disease'
   import type { SensorDevice } from '@/types/device'
   import type { DashboardFrameResponse } from '@/types/water-quality'
 
@@ -137,16 +130,6 @@
   const sensorDevices = ref<SensorDevice[]>([])
   const dismissedAlertIds = ref<string[]>([])
   const { setSnapshot } = useDemoFrameSnapshot()
-
-  const latestDetection = ref<DetectionResult>({
-    id: 'd1',
-    imageUrl:
-      'https://images.unsplash.com/photo-1524704654690-b56c05c78a00?q=80&w=500&auto=format&fit=crop',
-    detectTime: new Date().toISOString(),
-    confidence: 94,
-    diseaseType: 'gill_rot',
-    bbox: { x: 30, y: 40, width: 25, height: 20 }
-  })
 
   const visibleAlerts = computed(() => {
     const sourceAlerts = dashboardFrame.value?.alerts ?? []
@@ -221,8 +204,8 @@
       grid-template-rows: 340px 360px auto;
       gap: 20px;
       grid-template-areas:
-        'water alert health'
-        'sensor video detect'
+        'water health alert'
+        'sensor video video'
         'feed kpi kpi';
       align-items: stretch;
     }
@@ -245,10 +228,6 @@
 
     .area-video {
       grid-area: video;
-    }
-
-    .area-detect {
-      grid-area: detect;
     }
 
     .area-feed {
@@ -364,10 +343,10 @@
         grid-template-columns: 1fr 1fr;
         grid-template-rows: auto;
         grid-template-areas:
-          'water alert'
-          'health health'
-          'sensor video'
-          'detect feed'
+          'water health'
+          'alert alert'
+          'video video'
+          'sensor feed'
           'kpi kpi';
       }
     }
@@ -377,10 +356,9 @@
         grid-template-columns: 1fr;
         grid-template-areas:
           'video'
-          'alert'
           'health'
+          'alert'
           'water'
-          'detect'
           'sensor'
           'feed'
           'kpi';
