@@ -21,9 +21,6 @@
           <span class="metric-value">{{ result.weightG }}</span>
           <span class="metric-unit">g</span>
         </el-descriptions-item>
-        <el-descriptions-item label="置信度">
-          {{ `${Math.round(result.confidence * 100)}%` }}
-        </el-descriptions-item>
       </el-descriptions>
     </template>
 

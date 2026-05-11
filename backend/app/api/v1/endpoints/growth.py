@@ -12,6 +12,7 @@ import cv2
 from fastapi import APIRouter, BackgroundTasks, File, UploadFile
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.models.ai.yolo_detector import YOLODetector
 from app.schemas.base import BaseResponse
 from app.schemas.growth import (
@@ -49,6 +50,7 @@ VIDEO_SAMPLE_INTERVAL_SECONDS = 1
 VIDEO_MAX_FRAMES = 12
 VIDEO_MAX_BYTES = 50 * 1024 * 1024
 VIDEO_PROCESS_TIMEOUT_SECONDS = 60
+VIDEO_TASK_TTL_SECONDS = 60 * 60
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".avi", ".mkv"}
 ALLOWED_VIDEO_CONTENT_TYPES = {
     "video/mp4",
@@ -82,15 +84,12 @@ def _detect_payload(image_base64: str) -> Dict[str, object]:
         return get_detector().detect(image_base64)
 
 
-def _map_status(class_name: str) -> Tuple[str, str]:
-    normalized = class_name.lower()
-    if normalized == "small":
+def _map_status(body_length_cm: float) -> Tuple[str, str]:
+    if body_length_cm < settings.GROWTH_SMALL_THRESHOLD:
         return "small", "偏小"
-    if normalized in {"medium", "normal"}:
+    if body_length_cm <= settings.GROWTH_LARGE_THRESHOLD:
         return "normal", "正常"
-    if normalized == "large":
-        return "large", "偏大"
-    return "normal", "正常"
+    return "large", "偏大"
 
 
 def _estimate_weight(length_cm: float) -> float:
@@ -129,8 +128,8 @@ def _build_detection_items(
             continue
 
         x, y, width, height = [float(value) for value in bbox]
-        status, status_text = _map_status(str(detection.get("class_name", "")))
         body_length_cm = round(float(detection.get("length", 0)) * CM_PER_PIXEL, 1)
+        status, status_text = _map_status(body_length_cm)
         weight_g = _estimate_weight(body_length_cm)
         bbox_center_x = x + (width / 2)
         bbox_center_y = y + (height / 2)
@@ -149,6 +148,7 @@ def _build_detection_items(
                 "area": width * height,
                 "center_distance": center_distance,
                 "label_text": f"{status_text} | {body_length_cm}cm",
+                "mask_polygons": detection.get("mask_polygons"),
             }
         )
 
@@ -171,6 +171,7 @@ def _build_detection_items(
             bodyLengthCm=item["body_length_cm"],
             weightG=item["weight_g"],
             labelText=item["label_text"],
+            maskPolygons=item.get("mask_polygons") or [],
         )
         for index, item in enumerate(sortable_items, start=1)
     ]
@@ -292,20 +293,33 @@ def _build_video_result(
 
 def _set_video_task(task_id: str, payload: GrowthVideoDetectResultResponse) -> None:
     with _video_task_lock:
+        _cleanup_expired_video_tasks_locked(time.time())
         _video_tasks[task_id] = payload
 
 
 def _get_video_task(task_id: str) -> Optional[GrowthVideoDetectResultResponse]:
     with _video_task_lock:
+        _cleanup_expired_video_tasks_locked(time.time())
         return _video_tasks.get(task_id)
 
 
 def _update_video_task(task_id: str, **updates) -> None:
     with _video_task_lock:
+        _cleanup_expired_video_tasks_locked(time.time())
         current = _video_tasks.get(task_id)
         if current is None:
             return
         _video_tasks[task_id] = current.model_copy(update=updates)
+
+
+def _cleanup_expired_video_tasks_locked(now: float) -> None:
+    expired_task_ids = [
+        task_id
+        for task_id, task in _video_tasks.items()
+        if task.startedAt is not None and now - task.startedAt > VIDEO_TASK_TTL_SECONDS
+    ]
+    for task_id in expired_task_ids:
+        del _video_tasks[task_id]
 
 
 def _cleanup_video_file(temp_path: str) -> None:
@@ -512,6 +526,7 @@ async def create_growth_video_task(
             frames=[],
             selected_frame_id=None,
             error_code=None,
+            started_at=time.time(),
         ),
     )
     background_tasks.add_task(_process_video_task, task_id, temp_path, filename)

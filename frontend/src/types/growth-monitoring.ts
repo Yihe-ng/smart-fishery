@@ -16,6 +16,7 @@ export type GrowthVideoDetectErrorCode =
   | 'VIDEO_TOO_LARGE'
   | 'VIDEO_DECODE_FAILED'
   | 'NO_VALID_FRAMES'
+  | 'PROCESS_TIMEOUT'
   | 'MODEL_INFERENCE_FAILED'
   | 'INTERNAL_ERROR'
 
@@ -54,6 +55,7 @@ export interface GrowthDetectionItem {
   bodyLengthCm: number
   weightG: number
   labelText: string
+  maskPolygons: number[][]
 }
 
 export interface GrowthDetectResponse {

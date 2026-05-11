@@ -64,6 +64,29 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
     gap: 12px;
+    max-height: 260px;
+    padding-right: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-color: var(--art-card-border) transparent;
+    scrollbar-width: thin;
+  }
+
+  .frame-list::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .frame-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .frame-list::-webkit-scrollbar-thumb {
+    background: var(--art-card-border);
+    border-radius: 999px;
+  }
+
+  .frame-list::-webkit-scrollbar-thumb:hover {
+    background: var(--el-border-color);
   }
 
   .frame-item {

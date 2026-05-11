@@ -10,60 +10,83 @@
       </el-tag>
     </div>
 
-    <el-row :gutter="20">
-      <el-col :xs="24" :sm="24" :md="8" :lg="6">
-        <GrowthStatsSummary :stats="activeStats" />
-        <GrowthResultCard :result="activeDetection" :empty-text="resultEmptyText" />
-        <GrowthDetectionList
-          :detections="activeDetections"
-          :selected-id="activeSelectedDetectionId"
-          @select="handleSelectDetection"
-        />
+    <el-row
+      :gutter="20"
+      class="growth-workspace-row"
+      :class="{
+        'is-image-mode': inputMode !== 'growthVideo',
+        'is-video-mode': inputMode === 'growthVideo'
+      }"
+    >
+      <el-col :xs="24" :sm="24" :md="8" :lg="6" class="growth-sidebar-col">
+        <div
+          class="growth-sidebar-stack"
+          :class="{
+            'is-image-mode': inputMode !== 'growthVideo',
+            'is-video-mode': inputMode === 'growthVideo'
+          }"
+          :style="sidebarStackStyle"
+        >
+          <GrowthStatsSummary :stats="activeStats" />
+          <GrowthResultCard :result="activeDetection" :empty-text="resultEmptyText" />
+          <GrowthDetectionList
+            class="growth-fish-list"
+            :class="{
+              'is-image-mode': inputMode !== 'growthVideo',
+              'is-video-mode': inputMode === 'growthVideo'
+            }"
+            :detections="activeDetections"
+            :selected-id="activeSelectedDetectionId"
+            @select="handleSelectDetection"
+          />
+        </div>
       </el-col>
 
-      <el-col :xs="24" :sm="24" :md="16" :lg="18">
-        <GrowthImageDisplay
-          :image="activeImage"
-          :detections="activeDetections"
-          :selected-id="activeSelectedDetectionId"
-          :task-status="displayTaskStatus"
-          :error-message="activeErrorMessage"
-          class="mb-4"
-          @select="handleSelectDetection"
-          @clear="handleClear"
-        />
+      <el-col :xs="24" :sm="24" :md="16" :lg="18" class="growth-main-col">
+        <div ref="mainStackRef" class="growth-main-stack">
+          <GrowthImageDisplay
+            :image="activeImage"
+            :detections="activeDetections"
+            :selected-id="activeSelectedDetectionId"
+            :task-status="displayTaskStatus"
+            :error-message="activeErrorMessage"
+            class="mb-4"
+            @select="handleSelectDetection"
+            @clear="handleClear"
+          />
 
-        <GrowthVideoTaskState
-          v-if="inputMode === 'growthVideo'"
-          :task-status="growthVideoTaskStatus"
-          :progress="growthVideoProgress"
-          :filename="growthVideoMeta?.filename"
-          :frame-count="growthVideoFrames.length"
-          :aggregate-stats="growthVideoAggregateStats"
-          :error-message="activeErrorMessage"
-        />
+          <GrowthVideoTaskState
+            v-if="inputMode === 'growthVideo'"
+            :task-status="growthVideoTaskStatus"
+            :progress="growthVideoProgress"
+            :filename="growthVideoMeta?.filename"
+            :frame-count="growthVideoFrames.length"
+            :aggregate-stats="growthVideoAggregateStats"
+            :error-message="activeErrorMessage"
+          />
 
-        <GrowthVideoFrameStrip
-          v-if="inputMode === 'growthVideo' && growthVideoTaskStatus === 'success'"
-          :frames="growthVideoFrames"
-          :selected-frame-id="selectedGrowthFrameId"
-          @select="handleSelectFrame"
-        />
+          <GrowthVideoFrameStrip
+            v-if="inputMode === 'growthVideo' && growthVideoTaskStatus === 'success'"
+            :frames="growthVideoFrames"
+            :selected-frame-id="selectedGrowthFrameId"
+            @select="handleSelectFrame"
+          />
 
-        <GrowthActionButtons
-          :processing="isProcessing"
-          :has-image="hasVisualResult"
-          @upload-image="handleImageUpload"
-          @upload-video="handleVideoUpload"
-          @clear="handleClear"
-        />
+          <GrowthActionButtons
+            :processing="isProcessing"
+            :has-image="hasVisualResult"
+            @upload-image="handleImageUpload"
+            @upload-video="handleVideoUpload"
+            @clear="handleClear"
+          />
+        </div>
       </el-col>
     </el-row>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { computed, onUnmounted, ref, watch } from 'vue'
+  import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
   import { ElMessage } from 'element-plus'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { detectGrowth } from '@/api/growth-monitoring/detect'
@@ -105,6 +128,9 @@
   const stats = ref<GrowthStats>({ ...EMPTY_STATS })
   const errorCode = ref<GrowthDetectErrorCode | null>(null)
   const errorMessage = ref('')
+  const mainStackRef = ref<HTMLElement>()
+  const mainStackHeight = ref(0)
+  let mainStackResizeObserver: ResizeObserver | null = null
 
   const {
     growthVideoTaskStatus,
@@ -198,6 +224,14 @@
     }
   })
 
+  const sidebarStackStyle = computed(() => {
+    if (inputMode.value !== 'growthVideo' || mainStackHeight.value <= 0) return undefined
+
+    return {
+      '--growth-sidebar-height': `${mainStackHeight.value}px`
+    }
+  })
+
   const activeErrorMessage = computed(() => {
     if (inputMode.value === 'growthVideo') {
       return mapVideoErrorMessage(growthVideoErrorCode.value)
@@ -264,6 +298,8 @@
         return '视频解析失败，请更换视频。'
       case 'NO_VALID_FRAMES':
         return '未提取到有效关键帧，请尝试更清晰的视频。'
+      case 'PROCESS_TIMEOUT':
+        return '视频处理超时，请缩短视频或稍后重试。'
       case 'MODEL_INFERENCE_FAILED':
         return '模型推理失败，请稍后重试。'
       case 'INTERNAL_ERROR':
@@ -346,6 +382,7 @@
           'VIDEO_TOO_LARGE',
           'VIDEO_DECODE_FAILED',
           'NO_VALID_FRAMES',
+          'PROCESS_TIMEOUT',
           'MODEL_INFERENCE_FAILED',
           'INTERNAL_ERROR'
         ] as GrowthVideoDetectErrorCode[]
@@ -395,7 +432,25 @@
     }
   })
 
+  const syncMainStackHeight = () => {
+    const target = mainStackRef.value
+    if (!target) return
+
+    mainStackHeight.value = target.getBoundingClientRect().height
+  }
+
+  onMounted(async () => {
+    await nextTick()
+    syncMainStackHeight()
+
+    if (mainStackRef.value) {
+      mainStackResizeObserver = new ResizeObserver(syncMainStackHeight)
+      mainStackResizeObserver.observe(mainStackRef.value)
+    }
+  })
+
   onUnmounted(() => {
+    mainStackResizeObserver?.disconnect()
     loadingService.hideLoading()
   })
 </script>
@@ -432,6 +487,73 @@
 
     .mb-4 {
       margin-bottom: 16px;
+    }
+
+    .growth-workspace-row {
+      align-items: stretch;
+    }
+
+    .growth-sidebar-col,
+    .growth-main-col {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .growth-sidebar-stack {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .growth-main-stack {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .growth-sidebar-stack :deep(.growth-detection-list) {
+      flex: 1;
+      min-height: 0;
+    }
+
+    @media (width <= 768px) {
+      .growth-workspace-row {
+        height: auto;
+        min-height: 0;
+      }
+
+      .growth-sidebar-col {
+        margin-bottom: 16px;
+      }
+
+      .growth-sidebar-stack :deep(.growth-detection-list) {
+        flex: initial;
+        min-height: 0;
+      }
+    }
+
+    @media (width > 768px) {
+      .growth-sidebar-stack.is-video-mode {
+        height: var(--growth-sidebar-height);
+        max-height: var(--growth-sidebar-height);
+      }
+
+      .growth-sidebar-stack.is-image-mode {
+        flex: initial;
+      }
+
+      .growth-sidebar-stack :deep(.growth-fish-list.is-image-mode) {
+        flex: initial;
+        height: clamp(320px, 36vh, 420px);
+      }
+
+      .growth-sidebar-stack :deep(.growth-fish-list.is-video-mode) {
+        flex: 1;
+        min-height: 0;
+      }
     }
   }
 </style>
