@@ -137,19 +137,13 @@
   import AISuggestionPanel from './components/AISuggestionPanel.vue'
   import WeatherCard from './components/WeatherCard.vue'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
+  import { getVideoList } from '@/api/video'
   import type { FeedingConfig, FeedingLog } from '@/types/feeding'
 
   defineOptions({ name: 'FeedingPage' })
 
-  // 本地视频源列表
-  const videoSources = [
-    '/video/VID_20260330_161745.mp4',
-    '/video/VID_20260330_161836.mp4',
-    '/video/VID_20260330_161930.mp4',
-    '/video/VID_20260330_162428.mp4',
-    '/video/VID_20260330_163542.mp4',
-    '/video/VID_20260330_163804.mp4'
-  ]
+  // 动态视频源列表（从后端 API 获取）
+  const videoSources = ref<string[]>([])
 
   const { snapshot } = useDemoFrameSnapshot()
   const pondId = computed(() => snapshot.pondId)
@@ -205,7 +199,18 @@
     ElMessage.success(`已采纳AI建议：建议投喂量 ${suggestedAmount}g`)
   }
 
+  const fetchVideoList = async () => {
+    try {
+      const sources = await getVideoList()
+      videoSources.value = sources
+    } catch {
+      // http 层已展示错误提示，此处仅降级为空列表
+      videoSources.value = []
+    }
+  }
+
   onMounted(async () => {
+    fetchVideoList()
     await loadData()
   })
 </script>

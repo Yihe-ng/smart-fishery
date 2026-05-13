@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     GROWTH_SMALL_THRESHOLD: float = 15.0
     GROWTH_LARGE_THRESHOLD: float = 25.0
 
+    # 视频文件扫描目录（相对 backend 目录）
+    VIDEO_DIR: str = "../frontend/public/video"
+
     model_config = SettingsConfigDict(env_file=".env")
 
 
