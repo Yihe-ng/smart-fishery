@@ -108,20 +108,14 @@
   import VideoPlayer from './components/VideoPlayer.vue'
 
   import { getDashboardFrame } from '@/api/water-quality'
+  import { getVideoList } from '@/api/video'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
   import type { Alert } from '@/types/alert'
   import type { SensorDevice } from '@/types/device'
   import type { DashboardFrameResponse } from '@/types/water-quality'
 
-  // 本地视频源列表
-  const videoSources = [
-    '/video/VID_20260330_161745.mp4',
-    '/video/VID_20260330_161836.mp4',
-    '/video/VID_20260330_161930.mp4',
-    '/video/VID_20260330_162428.mp4',
-    '/video/VID_20260330_163542.mp4',
-    '/video/VID_20260330_163804.mp4'
-  ]
+  // 动态视频源列表（从后端 API 获取）
+  const videoSources = ref<string[]>([])
 
   const lastUpdateTime = ref('--:--:--')
   const currentFrameIndex = ref(0)
@@ -169,7 +163,21 @@
     ElMessage.success('告警已忽略')
   }
 
+  const fetchVideoList = async () => {
+    try {
+      const sources = await getVideoList()
+      if (sources.length === 0) {
+        console.warn('视频列表为空')
+      }
+      videoSources.value = sources
+    } catch {
+      // http 层已展示错误提示，此处仅降级为空列表
+      videoSources.value = []
+    }
+  }
+
   onMounted(() => {
+    fetchVideoList()
     loadDashboardFrame(0).catch((error) => {
       console.error('Failed to initialize dashboard:', error)
       ElMessage.error('监测大屏初始化失败')

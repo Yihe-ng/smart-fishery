@@ -6,7 +6,7 @@
           <ArtSvgIcon icon="ri:video-line" class="text-lg text-blue-500" />
           <span class="font-bold">实时视频监控</span>
         </div>
-        <el-tag type="success" size="small" effect="dark">
+        <el-tag v-if="hasSources" type="success" size="small" effect="dark">
           <ArtSvgIcon icon="ri:record-circle-line" class="animate-pulse mr-1" />LIVE
         </el-tag>
       </div>
@@ -15,6 +15,7 @@
     <div class="video-container bg-black rounded overflow-hidden relative group">
       <!-- 视频元素 -->
       <video
+        v-show="hasSources"
         ref="videoRef"
         class="w-full aspect-video"
         :src="currentSource"
@@ -31,13 +32,19 @@
         :class="isTransitioning ? 'opacity-100' : 'opacity-0'"
       />
 
+      <!-- 无视频占位 -->
+      <div v-if="!hasSources" class="absolute inset-0 flex-center flex-col text-gray-400">
+        <ArtSvgIcon icon="ri:video-off-line" class="text-5xl mb-2" />
+        <span class="text-sm">暂无监控视频</span>
+      </div>
+
       <!-- 控制层 (模拟) -->
     </div>
   </el-card>
 </template>
 
 <script setup lang="ts">
-  import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
+  import { ref, computed, onUnmounted, onActivated } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
 
   // Props 定义
@@ -58,6 +65,9 @@
   const isTransitioning = ref(false)
   const shuffledSources = ref<string[]>([])
   let transitionTimer: ReturnType<typeof setTimeout> | null = null
+
+  // 是否有可用视频源
+  const hasSources = computed(() => shuffledSources.value.length > 0)
 
   // 当前播放的视频源
   const currentSource = computed(() => {
@@ -128,13 +138,28 @@
     }
   }
 
-  // 组件挂载时初始化
-  onMounted(() => {
-    if (props.sources.length > 0) {
-      shuffledSources.value = shuffleArray(props.sources)
+  /**
+   * 初始化视频播放列表
+   */
+  const initPlaylist = () => {
+    if (props.sources.length === 0) {
+      shuffledSources.value = []
       currentIndex.value = 0
+      return
     }
-  })
+    // 洗牌并从头开始
+    shuffledSources.value = shuffleArray(props.sources)
+    currentIndex.value = 0
+  }
+
+  // 监听 sources 变化，重新初始化播放列表
+  watch(
+    () => props.sources,
+    () => {
+      initPlaylist()
+    },
+    { immediate: true }
+  )
 
   // 组件从 KeepAlive 缓存激活时恢复播放
   onActivated(() => {
