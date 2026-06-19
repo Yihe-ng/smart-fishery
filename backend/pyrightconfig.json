@@ -1,0 +1,16 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "include": ["app"],
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    ".git",
+    "data",
+    "reports",
+    "tools"
+  ],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false
+}

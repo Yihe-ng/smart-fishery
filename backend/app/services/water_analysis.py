@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from app.schemas.water import WaterQualityCreate
 from app.crud.crud_water import create_water_quality_data, get_latest_water_quality, get_water_quality_history
-from algorithms.prediction import analyze_water_quality
+from app.services.prediction import analyze_water_quality
 
 
 def process_water_quality_data(db: Session, data: WaterQualityCreate):
