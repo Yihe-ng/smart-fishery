@@ -8,7 +8,7 @@ from app.models.ai.yolo_detector import YOLODetector
 
 MODEL_PATH = Path(__file__).resolve().parents[2] / "app" / "models" / "ai" / "best.pt"
 ANNOTATED_IMAGE_PATH = Path(
-    r"D:\文件\易找的文件\智慧渔业\图片标注\11~19标注完\00011.jpg"
+    r"D:\文件\易找的文件\智慧渔业\图片标注\41-80\00041.jpg"
 )
 
 

@@ -7,6 +7,8 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError
 from ultralytics import YOLO
 
+from app.services.fish_length_measurement import measure_fish_length
+
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_IMAGE_PIXELS = 12_000_000
 DEFAULT_CONFIDENCE = 0.25
@@ -48,14 +50,32 @@ class YOLODetector:
 
                 mask_polygons: Any = None
                 length = width
+                measurement_method: str | None = None
+                measurement_confidence: float | None = None
+                measurement_reasons: list | None = None
+                visible_mask_length_px: float | None = None
 
                 if result.masks is not None and i < len(result.masks):
                     try:
                         mask_polygons = result.masks.xyn[i].tolist()
                         pixel_poly = result.masks.xy[i]
-                        mask_length = self._compute_mask_length(pixel_poly)
-                        if mask_length is not None:
-                            length = mask_length
+                        try:
+                            measurement = measure_fish_length(pixel_poly, image.width, image.height)
+                            if measurement.primary_length_px > 0:
+                                length = measurement.primary_length_px
+                            measurement_method = measurement.measurement_method
+                            measurement_reasons = measurement.reasons if measurement.reasons else None
+                            visible_mask_length_px = measurement.visible_mask_length_px
+                            # Simple rule-based confidence (plan §置信度定义 formula)
+                            if measurement.is_measurable:
+                                measurement_confidence = 0.6 + 0.25 * measurement.main_path_ratio
+                            else:
+                                measurement_confidence = 0.3
+                        except Exception:
+                            # Fall back to legacy minAreaRect on any error
+                            mask_length = self._compute_mask_length(pixel_poly)
+                            if mask_length is not None:
+                                length = mask_length
                     except Exception:
                         mask_polygons = None
                         length = width
@@ -67,6 +87,10 @@ class YOLODetector:
                         "bbox": [float(x1), float(y1), width, height],
                         "length": length,
                         "mask_polygons": mask_polygons,
+                        "measurement_method": measurement_method,
+                        "measurement_confidence": measurement_confidence,
+                        "measurement_reasons": measurement_reasons,
+                        "visible_mask_length_px": visible_mask_length_px,
                     }
                 )
 

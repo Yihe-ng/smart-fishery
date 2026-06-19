@@ -99,6 +99,19 @@ def _estimate_weight(length_cm: float) -> float:
     return round(weight, 1)
 
 
+def _safe_cm(value: object) -> float | None:
+    """Convert pixel length to cm, returning None for invalid inputs."""
+    if value is None:
+        return None
+    try:
+        v = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if v <= 0:
+        return None
+    return round(v * CM_PER_PIXEL, 1)
+
+
 def _is_valid_detection(bbox: List[float], image_meta: Dict[str, int]) -> bool:
     if len(bbox) != 4:
         return False
@@ -149,6 +162,10 @@ def _build_detection_items(
                 "center_distance": center_distance,
                 "label_text": f"{status_text} | {body_length_cm}cm",
                 "mask_polygons": detection.get("mask_polygons"),
+                "measurement_method": detection.get("measurement_method"),
+                "measurement_confidence": detection.get("measurement_confidence"),
+                "measurement_reasons": detection.get("measurement_reasons"),
+                "visible_mask_length_px": detection.get("visible_mask_length_px"),
             }
         )
 
@@ -172,6 +189,10 @@ def _build_detection_items(
             weightG=item["weight_g"],
             labelText=item["label_text"],
             maskPolygons=item.get("mask_polygons") or [],
+            measurementMethod=item.get("measurement_method"),
+            measurementConfidence=item.get("measurement_confidence"),
+            visibleMaskLengthCm=_safe_cm(item.get("visible_mask_length_px")),
+            measurementReasons=item.get("measurement_reasons"),
         )
         for index, item in enumerate(sortable_items, start=1)
     ]

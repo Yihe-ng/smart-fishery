@@ -32,6 +32,11 @@ class GrowthDetectionItem(BaseModel):
     weightG: float
     labelText: str
     maskPolygons: List[List[float]] = Field(default_factory=list)
+    # New measurement metadata fields (backward-compatible — all optional)
+    measurementMethod: Optional[str] = None
+    measurementConfidence: Optional[float] = None
+    visibleMaskLengthCm: Optional[float] = None
+    measurementReasons: Optional[List[str]] = None
 
 
 class GrowthStats(BaseModel):

@@ -20,6 +20,9 @@ dependencies = [
     "ultralytics>=8.0.0",
     "opencv-python>=4.13.0.92",
     "python-multipart>=0.0.20",
+    "scikit-image>=0.26.0",
+    "scipy>=1.17.1",
+    "networkx>=3.6.1",
 ]
 
 [dependency-groups]
