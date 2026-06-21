@@ -1,6 +1,7 @@
 import base64
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from app.models.ai.yolo_detector import YOLODetector
@@ -38,3 +39,22 @@ def test_real_segmentation_model_returns_mask_polygons_for_annotated_image():
     )
     assert polygon
     assert all(0 <= point[0] <= 1 and 0 <= point[1] <= 1 for point in polygon)
+
+
+def test_clean_mask_polygon_keeps_largest_external_contour():
+    mask = np.zeros((24, 32), dtype=np.uint8)
+    mask[4:18, 5:24] = 1
+    mask[1:4, 27:30] = 1
+
+    normalized, pixel = YOLODetector._extract_clean_mask_polygon(mask, 32, 24)
+
+    assert normalized is not None
+    assert pixel is not None
+    assert len(normalized) >= 4
+    assert all(0 <= point[0] <= 1 and 0 <= point[1] <= 1 for point in normalized)
+    x_values = [point[0] for point in pixel]
+    y_values = [point[1] for point in pixel]
+    assert min(x_values) == 5
+    assert max(x_values) == 23
+    assert min(y_values) == 4
+    assert max(y_values) == 17

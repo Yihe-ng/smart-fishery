@@ -59,8 +59,13 @@ class YOLODetector:
 
                 if result.masks is not None and i < len(result.masks):
                     try:
-                        mask_polygons = result.masks.xyn[i].tolist()
-                        pixel_poly = result.masks.xy[i]
+                        clean_polygons, clean_pixel_poly = self._extract_clean_mask_polygon(
+                            result.masks.data[i],
+                            image.width,
+                            image.height,
+                        )
+                        mask_polygons = clean_polygons or result.masks.xyn[i].tolist()
+                        pixel_poly = clean_pixel_poly if clean_pixel_poly is not None else result.masks.xy[i]
                         if not is_measurable:
                             measurement_confidence = 0.0
                             measurement_reasons = ["model_unmeasurable"]
@@ -153,3 +158,59 @@ class YOLODetector:
         rect = cv2.minAreaRect(polygon.astype(np.float32))
         w, h = rect[1]
         return float(max(w, h))
+
+    @staticmethod
+    def _extract_clean_mask_polygon(
+        mask_data: Any,
+        image_width: int,
+        image_height: int,
+    ) -> tuple[list[list[float]] | None, np.ndarray | None]:
+        """Extract a display-safe largest external contour from a YOLO mask."""
+        if image_width <= 0 or image_height <= 0:
+            return None, None
+
+        try:
+            if hasattr(mask_data, "detach"):
+                mask = mask_data.detach().cpu().numpy()
+            else:
+                mask = np.asarray(mask_data)
+        except Exception:
+            return None, None
+
+        if mask.size == 0:
+            return None, None
+
+        mask = np.squeeze(mask)
+        if mask.ndim != 2:
+            return None, None
+
+        if mask.shape != (image_height, image_width):
+            mask = cv2.resize(
+                mask.astype(np.float32),
+                (image_width, image_height),
+                interpolation=cv2.INTER_NEAREST,
+            )
+
+        binary = (mask > 0.5).astype(np.uint8) * 255
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return None, None
+
+        largest = max(contours, key=cv2.contourArea)
+        if cv2.contourArea(largest) <= 0:
+            return None, None
+
+        perimeter = cv2.arcLength(largest, True)
+        epsilon = max(1.0, perimeter * 0.002)
+        approx = cv2.approxPolyDP(largest, epsilon, True).reshape(-1, 2).astype(np.float32)
+        if len(approx) < 3:
+            return None, None
+
+        normalized = [
+            [
+                float(np.clip(x / image_width, 0.0, 1.0)),
+                float(np.clip(y / image_height, 0.0, 1.0)),
+            ]
+            for x, y in approx
+        ]
+        return normalized, approx
