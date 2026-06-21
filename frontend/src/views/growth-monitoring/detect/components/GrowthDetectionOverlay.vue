@@ -10,7 +10,7 @@
         v-for="item in maskItems"
         :key="item.id"
         class="mask-polygon"
-        :class="{ active: item.id === selectedId }"
+        :class="{ active: item.id === selectedId, unmeasurable: !item.isMeasurable }"
         :points="item.points"
         @click="emit('select', item.id)"
       />
@@ -18,7 +18,7 @@
         v-for="item in fallbackBboxItems"
         :key="item.id"
         class="mask-fallback-rect"
-        :class="{ active: item.id === selectedId }"
+        :class="{ active: item.id === selectedId, unmeasurable: !item.isMeasurable }"
         :x="item.x"
         :y="item.y"
         :width="item.width"
@@ -33,7 +33,7 @@
       :key="item.id"
       type="button"
       class="detection-label"
-      :class="{ active: item.id === selectedId }"
+      :class="{ active: item.id === selectedId, unmeasurable: !item.isMeasurable }"
       :style="item.style"
       @click="emit('select', item.id)"
     >
@@ -95,6 +95,7 @@
       .filter((d) => d.maskPolygons?.length)
       .map((d) => ({
         id: d.id,
+        isMeasurable: d.isMeasurable,
         points: d.maskPolygons.map((pt) => `${pt[0]},${pt[1]}`).join(' '),
       }))
   )
@@ -108,6 +109,7 @@
       .filter((d) => !maskIds.value.has(d.id))
       .map((d) => ({
         id: d.id,
+        isMeasurable: d.isMeasurable,
         x: d.bbox.x / nw,
         y: d.bbox.y / nh,
         width: d.bbox.width / nw,
@@ -137,6 +139,7 @@
 
       return {
         id: detection.id,
+        isMeasurable: detection.isMeasurable,
         labelText: detection.labelText,
         style,
       }
@@ -168,9 +171,10 @@
     stroke-linejoin: round;
     cursor: pointer;
     transition:
-      stroke 0.2s ease,
-      fill 0.2s ease,
-      stroke-width 0.2s ease;
+      stroke 0.08s ease,
+      fill 0.08s ease,
+      stroke-width 0.08s ease,
+      stroke-opacity 0.08s ease;
   }
 
   .mask-polygon:hover {
@@ -179,10 +183,30 @@
     stroke-width: 0.004;
   }
 
+  .mask-polygon.unmeasurable {
+    stroke: #6ba6ff;
+    stroke-dasharray: 0.007 0.004;
+    stroke-opacity: 0.82;
+  }
+
+  .mask-polygon.unmeasurable:hover {
+    stroke: #8cc8ff;
+    fill: rgb(107 166 255 / 9%);
+    stroke-opacity: 1;
+  }
+
   .mask-polygon.active {
     stroke: #36cfc9;
     fill: rgb(54 207 201 / 20%);
     stroke-width: 0.005;
+    stroke-opacity: 1;
+  }
+
+  .mask-polygon.unmeasurable.active {
+    stroke: #36cfc9;
+    fill: rgb(54 207 201 / 20%);
+    stroke-width: 0.005;
+    stroke-opacity: 1;
   }
 
   .mask-fallback-rect {
@@ -202,7 +226,25 @@
     stroke-opacity: 0.8;
   }
 
+  .mask-fallback-rect.unmeasurable {
+    stroke: #6ba6ff;
+    stroke-dasharray: 0.007 0.004;
+    stroke-opacity: 0.72;
+  }
+
+  .mask-fallback-rect.unmeasurable:hover {
+    stroke: #8cc8ff;
+    stroke-opacity: 1;
+  }
+
   .mask-fallback-rect.active {
+    stroke: #36cfc9;
+    stroke-opacity: 1;
+    stroke-dasharray: none;
+    stroke-width: 0.003;
+  }
+
+  .mask-fallback-rect.unmeasurable.active {
     stroke: #36cfc9;
     stroke-opacity: 1;
     stroke-dasharray: none;
@@ -238,7 +280,7 @@
     background: linear-gradient(135deg, #1677ff 0%, #36cfc9 100%);
     border-radius: 4px;
     opacity: 0.82;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.08s ease;
   }
 
   .detection-label:hover .box-label,
@@ -246,7 +288,15 @@
     opacity: 1;
   }
 
+  .detection-label.unmeasurable .box-label {
+    background: linear-gradient(135deg, #4f8fe8 0%, #73c0de 100%);
+  }
+
   .detection-label.active .box-label {
+    background: linear-gradient(135deg, #13c2c2 0%, #08979c 100%);
+  }
+
+  .detection-label.unmeasurable.active .box-label {
     background: linear-gradient(135deg, #13c2c2 0%, #08979c 100%);
   }
 </style>

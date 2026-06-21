@@ -117,7 +117,9 @@
     small: 0,
     normal: 0,
     large: 0,
-    detectedCount: 0
+    detectedCount: 0,
+    measurableCount: 0,
+    unmeasurableCount: 0
   }
 
   const inputMode = ref<InputMode>('image')

@@ -1,7 +1,7 @@
 export type GrowthTaskStatus = 'idle' | 'uploading' | 'processing' | 'success' | 'failed'
 export type GrowthVideoTaskStatus = 'queued' | 'processing' | 'success' | 'failed'
 
-export type GrowthStatus = 'small' | 'normal' | 'large'
+export type GrowthStatus = 'small' | 'normal' | 'large' | 'unmeasurable'
 
 export type GrowthDetectErrorCode =
   | 'INVALID_IMAGE'
@@ -25,6 +25,8 @@ export interface GrowthStats {
   normal: number
   large: number
   detectedCount: number
+  measurableCount: number
+  unmeasurableCount: number
 }
 
 export interface GrowthSummary {
@@ -56,6 +58,13 @@ export interface GrowthDetectionItem {
   weightG: number
   labelText: string
   maskPolygons: number[][]
+  className?: string | null
+  isMeasurable: boolean
+  measurabilityLabel: string
+  measurementMethod?: string | null
+  measurementConfidence?: number | null
+  visibleMaskLengthCm?: number | null
+  measurementReasons?: string[] | null
 }
 
 export interface GrowthDetectResponse {
