@@ -92,6 +92,17 @@ def _map_status(body_length_cm: float) -> Tuple[str, str]:
     return "large", "偏大"
 
 
+def _is_measurable_detection(detection: Dict[str, object]) -> bool:
+    explicit = detection.get("is_measurable")
+    if explicit is not None:
+        return bool(explicit)
+
+    class_name = str(detection.get("class_name") or "")
+    if class_name == "fish_unmeasurable":
+        return False
+    return True
+
+
 def _estimate_weight(length_cm: float) -> float:
     if length_cm <= 0:
         return 0
@@ -141,9 +152,20 @@ def _build_detection_items(
             continue
 
         x, y, width, height = [float(value) for value in bbox]
-        body_length_cm = round(float(detection.get("length", 0)) * CM_PER_PIXEL, 1)
-        status, status_text = _map_status(body_length_cm)
-        weight_g = _estimate_weight(body_length_cm)
+        class_name = str(detection.get("class_name") or "")
+        is_measurable = _is_measurable_detection(detection)
+        if is_measurable:
+            body_length_cm = round(float(detection.get("length", 0)) * CM_PER_PIXEL, 1)
+            status, status_text = _map_status(body_length_cm)
+            weight_g = _estimate_weight(body_length_cm)
+            label_text = f"{status_text} | {body_length_cm}cm"
+            measurability_label = "可测"
+        else:
+            body_length_cm = 0
+            status, status_text = "unmeasurable", "不可测"
+            weight_g = 0
+            label_text = "不可测"
+            measurability_label = "不可测"
         bbox_center_x = x + (width / 2)
         bbox_center_y = y + (height / 2)
         center_distance = math.sqrt(
@@ -160,12 +182,15 @@ def _build_detection_items(
                 "weight_g": weight_g,
                 "area": width * height,
                 "center_distance": center_distance,
-                "label_text": f"{status_text} | {body_length_cm}cm",
+                "label_text": label_text,
                 "mask_polygons": detection.get("mask_polygons"),
                 "measurement_method": detection.get("measurement_method"),
                 "measurement_confidence": detection.get("measurement_confidence"),
                 "measurement_reasons": detection.get("measurement_reasons"),
                 "visible_mask_length_px": detection.get("visible_mask_length_px"),
+                "class_name": class_name,
+                "is_measurable": is_measurable,
+                "measurability_label": measurability_label,
             }
         )
 
@@ -193,6 +218,9 @@ def _build_detection_items(
             measurementConfidence=item.get("measurement_confidence"),
             visibleMaskLengthCm=_safe_cm(item.get("visible_mask_length_px")),
             measurementReasons=item.get("measurement_reasons"),
+            className=item.get("class_name"),
+            isMeasurable=bool(item.get("is_measurable")),
+            measurabilityLabel=str(item.get("measurability_label")),
         )
         for index, item in enumerate(sortable_items, start=1)
     ]
@@ -201,17 +229,30 @@ def _build_detection_items(
 def _build_stats(detections: List[GrowthDetectionItem]) -> GrowthStats:
     stats = GrowthStats(detectedCount=len(detections))
     for detection in detections:
-        setattr(stats, detection.status, getattr(stats, detection.status) + 1)
+        if detection.isMeasurable:
+            stats.measurableCount += 1
+            setattr(stats, detection.status, getattr(stats, detection.status) + 1)
+        else:
+            stats.unmeasurableCount += 1
     return stats
 
 
 def _build_summary(detections: List[GrowthDetectionItem]) -> GrowthSummary:
-    if not detections:
+    measurable_detections = [
+        detection for detection in detections if detection.isMeasurable
+    ]
+    if not measurable_detections:
         return GrowthSummary()
     avg_length = round(
-        sum(detection.bodyLengthCm for detection in detections) / len(detections), 1
+        sum(detection.bodyLengthCm for detection in measurable_detections)
+        / len(measurable_detections),
+        1,
     )
-    avg_weight = round(sum(detection.weightG for detection in detections) / len(detections), 1)
+    avg_weight = round(
+        sum(detection.weightG for detection in measurable_detections)
+        / len(measurable_detections),
+        1,
+    )
     return GrowthSummary(avgBodyLengthCm=avg_length, avgWeightG=avg_weight)
 
 

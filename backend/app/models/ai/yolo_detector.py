@@ -47,6 +47,8 @@ class YOLODetector:
                 x1, y1, x2, y2 = box.xyxy[0]
                 width = float(x2 - x1)
                 height = float(y2 - y1)
+                class_name = result.names[int(box.cls[0])]
+                is_measurable = class_name != "fish_unmeasurable"
 
                 mask_polygons: Any = None
                 length = width
@@ -59,30 +61,34 @@ class YOLODetector:
                     try:
                         mask_polygons = result.masks.xyn[i].tolist()
                         pixel_poly = result.masks.xy[i]
-                        try:
-                            measurement = measure_fish_length(pixel_poly, image.width, image.height)
-                            if measurement.primary_length_px > 0:
-                                length = measurement.primary_length_px
-                            measurement_method = measurement.measurement_method
-                            measurement_reasons = measurement.reasons if measurement.reasons else None
-                            visible_mask_length_px = measurement.visible_mask_length_px
-                            # Simple rule-based confidence (plan §置信度定义 formula)
-                            if measurement.is_measurable:
-                                measurement_confidence = 0.6 + 0.25 * measurement.main_path_ratio
-                            else:
-                                measurement_confidence = 0.3
-                        except Exception:
-                            # Fall back to legacy minAreaRect on any error
-                            mask_length = self._compute_mask_length(pixel_poly)
-                            if mask_length is not None:
-                                length = mask_length
+                        if not is_measurable:
+                            measurement_confidence = 0.0
+                            measurement_reasons = ["model_unmeasurable"]
+                        else:
+                            try:
+                                measurement = measure_fish_length(pixel_poly, image.width, image.height)
+                                if measurement.primary_length_px > 0:
+                                    length = measurement.primary_length_px
+                                measurement_method = measurement.measurement_method
+                                measurement_reasons = measurement.reasons if measurement.reasons else None
+                                visible_mask_length_px = measurement.visible_mask_length_px
+                                # Simple rule-based confidence (plan §置信度定义 formula)
+                                if measurement.is_measurable:
+                                    measurement_confidence = 0.6 + 0.25 * measurement.main_path_ratio
+                                else:
+                                    measurement_confidence = 0.3
+                            except Exception:
+                                # Fall back to legacy minAreaRect on any error
+                                mask_length = self._compute_mask_length(pixel_poly)
+                                if mask_length is not None:
+                                    length = mask_length
                     except Exception:
                         mask_polygons = None
                         length = width
 
                 detections.append(
                     {
-                        "class_name": result.names[int(box.cls[0])],
+                        "class_name": class_name,
                         "confidence": float(box.conf[0]),
                         "bbox": [float(x1), float(y1), width, height],
                         "length": length,
@@ -91,6 +97,7 @@ class YOLODetector:
                         "measurement_confidence": measurement_confidence,
                         "measurement_reasons": measurement_reasons,
                         "visible_mask_length_px": visible_mask_length_px,
+                        "is_measurable": is_measurable,
                     }
                 )
 
