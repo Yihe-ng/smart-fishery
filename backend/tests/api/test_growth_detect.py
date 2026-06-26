@@ -74,6 +74,52 @@ def test_detect_fish_returns_ranked_display_payload(monkeypatch):
     assert response.data.errorCode is None
 
 
+def test_unmeasurable_fish_is_counted_but_not_measured(monkeypatch):
+    image_base64 = _make_image_base64()
+    stub_detections = [
+        {
+            "class_name": "fish_measurable",
+            "confidence": 0.91,
+            "bbox": [2, 3, 18, 8],
+            "length": 200,
+            "mask_polygons": None,
+            "is_measurable": True,
+        },
+        {
+            "class_name": "fish_unmeasurable",
+            "confidence": 0.88,
+            "bbox": [10, 10, 9, 5],
+            "length": 450,
+            "mask_polygons": None,
+            "is_measurable": False,
+            "measurement_reasons": ["model_unmeasurable"],
+        },
+    ]
+    monkeypatch.setattr(growth, "get_detector", lambda: _StubDetector(stub_detections))
+
+    response = growth.detect_fish(growth.DetectionRequest(image=image_base64))
+
+    assert response.code == 200
+    assert len(response.data.detections) == 2
+    measured = response.data.detections[0]
+    unmeasured = response.data.detections[1]
+    assert measured.isMeasurable is True
+    assert measured.bodyLengthCm == 20.0
+    assert measured.weightG > 0
+    assert unmeasured.isMeasurable is False
+    assert unmeasured.status == "unmeasurable"
+    assert unmeasured.statusText == "不可测"
+    assert unmeasured.bodyLengthCm == 0
+    assert unmeasured.weightG == 0
+    assert unmeasured.labelText == "不可测"
+    assert response.data.stats.detectedCount == 2
+    assert response.data.stats.measurableCount == 1
+    assert response.data.stats.unmeasurableCount == 1
+    assert response.data.stats.normal == 1
+    assert response.data.stats.large == 0
+    assert response.data.summary.avgBodyLengthCm == 20.0
+
+
 def test_detect_fish_returns_success_for_no_fish(monkeypatch):
     image_base64 = _make_image_base64()
     monkeypatch.setattr(growth, "get_detector", lambda: _StubDetector([]))

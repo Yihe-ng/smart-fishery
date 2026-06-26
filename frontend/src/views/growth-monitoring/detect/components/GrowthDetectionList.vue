@@ -24,7 +24,7 @@
       >
         <span class="item-index">第 {{ item.index }} 条鱼</span>
         <span class="item-status">{{ item.statusText }}</span>
-        <span class="item-length">{{ item.bodyLengthCm }}cm</span>
+        <span class="item-length">{{ item.isMeasurable ? `${item.bodyLengthCm}cm` : '-' }}</span>
       </button>
     </div>
   </el-card>

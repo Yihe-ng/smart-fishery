@@ -4,7 +4,7 @@ import time
 
 
 GrowthTaskStatus = Literal["success", "failed"]
-GrowthStatus = Literal["small", "normal", "large"]
+GrowthStatus = Literal["small", "normal", "large", "unmeasurable"]
 GrowthVideoTaskStatus = Literal["queued", "processing", "success", "failed"]
 
 
@@ -32,6 +32,14 @@ class GrowthDetectionItem(BaseModel):
     weightG: float
     labelText: str
     maskPolygons: List[List[float]] = Field(default_factory=list)
+    # New measurement metadata fields (backward-compatible — all optional)
+    measurementMethod: Optional[str] = None
+    measurementConfidence: Optional[float] = None
+    visibleMaskLengthCm: Optional[float] = None
+    measurementReasons: Optional[List[str]] = None
+    className: Optional[str] = None
+    isMeasurable: bool = True
+    measurabilityLabel: str = "可测"
 
 
 class GrowthStats(BaseModel):
@@ -39,6 +47,8 @@ class GrowthStats(BaseModel):
     normal: int = 0
     large: int = 0
     detectedCount: int = 0
+    measurableCount: int = 0
+    unmeasurableCount: int = 0
 
 
 class GrowthSummary(BaseModel):

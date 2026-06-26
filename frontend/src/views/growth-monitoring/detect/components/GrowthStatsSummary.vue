@@ -22,6 +22,13 @@
       <span>识别总数</span>
       <el-tag type="info">{{ stats.detectedCount }}</el-tag>
     </div>
+    <div class="summary-footer compact">
+      <span>可测 / 不可测</span>
+      <span class="count-pair">
+        <el-tag type="success">{{ stats.measurableCount ?? measuredCount }}</el-tag>
+        <el-tag type="info">{{ stats.unmeasurableCount ?? 0 }}</el-tag>
+      </span>
+    </div>
   </el-card>
 </template>
 
@@ -39,6 +46,8 @@
     { type: '正常', count: props.stats.normal, tagType: 'success' },
     { type: '偏大', count: props.stats.large, tagType: 'primary' }
   ])
+
+  const measuredCount = computed(() => props.stats.small + props.stats.normal + props.stats.large)
 </script>
 
 <style scoped lang="scss">
@@ -58,6 +67,17 @@
       margin-top: 12px;
       color: var(--el-text-color-secondary);
       border-top: 1px solid var(--el-border-color-light);
+    }
+
+    .summary-footer.compact {
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+
+    .count-pair {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
     }
   }
 </style>

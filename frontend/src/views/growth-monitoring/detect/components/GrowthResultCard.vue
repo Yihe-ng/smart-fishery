@@ -14,12 +14,12 @@
           <el-tag :type="statusType">{{ result.statusText }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="体长">
-          <span class="metric-value">{{ result.bodyLengthCm }}</span>
-          <span class="metric-unit">cm</span>
+          <span class="metric-value">{{ result.isMeasurable ? result.bodyLengthCm : '-' }}</span>
+          <span v-if="result.isMeasurable" class="metric-unit">cm</span>
         </el-descriptions-item>
         <el-descriptions-item label="估重">
-          <span class="metric-value">{{ result.weightG }}</span>
-          <span class="metric-unit">g</span>
+          <span class="metric-value">{{ result.isMeasurable ? result.weightG : '-' }}</span>
+          <span v-if="result.isMeasurable" class="metric-unit">g</span>
         </el-descriptions-item>
       </el-descriptions>
     </template>
@@ -51,6 +51,8 @@
         return 'success'
       case 'large':
         return 'primary'
+      case 'unmeasurable':
+        return 'info'
       default:
         return 'info'
     }

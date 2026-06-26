@@ -23,7 +23,9 @@ export function useGrowthVideoTask() {
     small: 0,
     normal: 0,
     large: 0,
-    detectedCount: 0
+    detectedCount: 0,
+    measurableCount: 0,
+    unmeasurableCount: 0
   })
   const growthVideoAggregateSummary = ref({
     avgBodyLengthCm: 0,
@@ -99,7 +101,9 @@ export function useGrowthVideoTask() {
       small: 0,
       normal: 0,
       large: 0,
-      detectedCount: 0
+      detectedCount: 0,
+      measurableCount: 0,
+      unmeasurableCount: 0
     }
     growthVideoAggregateSummary.value = {
       avgBodyLengthCm: 0,
@@ -129,7 +133,9 @@ export function useGrowthVideoTask() {
       small: 0,
       normal: 0,
       large: 0,
-      detectedCount: 0
+      detectedCount: 0,
+      measurableCount: 0,
+      unmeasurableCount: 0
     }
     growthVideoAggregateSummary.value = {
       avgBodyLengthCm: 0,
@@ -149,7 +155,9 @@ export function useGrowthVideoTask() {
       small: 0,
       normal: 0,
       large: 0,
-      detectedCount: 0
+      detectedCount: 0,
+      measurableCount: 0,
+      unmeasurableCount: 0
     }
     growthVideoAggregateSummary.value = {
       avgBodyLengthCm: 0,
