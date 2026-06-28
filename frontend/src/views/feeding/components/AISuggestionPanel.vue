@@ -41,6 +41,7 @@
           <div class="amount-display">
             <span class="amount-label">建议投喂量</span>
             <span class="amount-value">{{ card.suggestedAmount }}g</span>
+            <span class="amount-hint">结合水质、设备、存塘和规则数据辅助判断</span>
           </div>
           <ElButton type="primary" size="small" class="adopt-btn" @click="adoptSuggestion(card)">
             <ArtSvgIcon icon="ri:check-line" class="btn-icon" />
@@ -204,9 +205,9 @@
   .metrics,
   .suggestion-head {
     display: flex;
+    gap: 10px;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
   }
 
   .title-wrap {
@@ -225,9 +226,9 @@
 
   .panel-body {
     display: flex;
-    height: 100%;
     flex-direction: column;
     gap: 12px;
+    height: 100%;
     overflow: auto;
   }
 
@@ -241,14 +242,14 @@
 
   .empty-state {
     display: flex;
-    min-height: 180px;
     flex-direction: column;
+    gap: 8px;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    min-height: 180px;
+    color: var(--el-text-color-secondary);
     border: 1px dashed var(--art-card-border);
     border-radius: 14px;
-    color: var(--el-text-color-secondary);
   }
 
   .suggestion-card {
@@ -256,19 +257,19 @@
     flex-direction: column;
     gap: 12px;
     padding: 14px;
+    background: var(--default-box-color);
     border: 1px solid var(--art-card-border);
     border-radius: 16px;
-    background: var(--default-box-color);
   }
 
   .suggestion-card.warning {
-    border-color: rgb(245 158 11 / 35%);
     background: color-mix(in srgb, var(--el-color-warning) 7%, var(--default-box-color));
+    border-color: rgb(245 158 11 / 35%);
   }
 
   .suggestion-card.critical {
-    border-color: rgb(239 68 68 / 35%);
     background: color-mix(in srgb, var(--el-color-danger) 7%, var(--default-box-color));
+    border-color: rgb(239 68 68 / 35%);
   }
 
   .suggestion-head {
@@ -282,28 +283,28 @@
 
   .suggestion-head p {
     margin: 0;
-    color: var(--el-text-color-regular);
     line-height: 1.6;
+    color: var(--el-text-color-regular);
   }
 
   .rationale-list {
-    margin: 0;
     padding-left: 18px;
-    color: var(--el-text-color-secondary);
-    line-height: 1.6;
+    margin: 0;
     font-size: 13px;
+    line-height: 1.6;
+    color: var(--el-text-color-secondary);
   }
 
   // 建议投喂量和采纳按钮
   .suggested-amount {
     display: flex;
+    gap: 12px;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
     padding: 10px 12px;
     background: var(--el-color-primary-light-9);
-    border-radius: 8px;
     border: 1px solid var(--el-color-primary-light-7);
+    border-radius: 8px;
 
     .amount-display {
       display: flex;
@@ -319,6 +320,12 @@
         font-size: 18px;
         font-weight: 700;
         color: var(--el-color-primary);
+      }
+
+      .amount-hint {
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--el-text-color-secondary);
       }
     }
 

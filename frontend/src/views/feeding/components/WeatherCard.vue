@@ -182,17 +182,17 @@
 
     :deep(.el-card__body) {
       display: flex;
-      flex-direction: column;
       flex: 1;
+      flex-direction: column;
       padding: 8px;
       overflow: hidden;
     }
 
     .risk-tag {
-      font-size: 9px;
       height: 18px;
-      line-height: 16px;
       padding: 0 4px;
+      font-size: 9px;
+      line-height: 16px;
     }
   }
 
@@ -206,8 +206,8 @@
   // 三行布局
   .weather-body {
     display: flex;
-    flex-direction: column;
     flex: 1;
+    flex-direction: column;
     gap: 8px;
 
     // 第一行：图标、温度、地点
@@ -218,8 +218,8 @@
 
       .weather-icon-temp {
         display: flex;
-        align-items: center;
         gap: 6px;
+        align-items: center;
 
         .weather-icon {
           font-size: 20px;
@@ -229,8 +229,8 @@
         .temperature {
           font-size: 20px;
           font-weight: 700;
-          color: var(--art-gray-900);
           line-height: 1;
+          color: var(--art-gray-900);
         }
       }
 
@@ -243,16 +243,16 @@
     // 第二行：三个指标小卡片
     .weather-metrics-row {
       display: flex;
+      flex: 1;
       gap: 6px;
       justify-content: space-between;
-      flex: 1;
 
       .metric-card {
         display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
         flex: 1;
+        flex-direction: column;
+        gap: 4px;
+        align-items: center;
         padding: 6px 4px;
         background: var(--art-gray-100);
         border-radius: 6px;
@@ -292,36 +292,36 @@
 
     // 第三行：更新时间
     .update-time-row {
+      flex-shrink: 0;
       font-size: 9px;
       color: var(--art-gray-400);
       text-align: center;
-      flex-shrink: 0;
     }
   }
 
   .risk-alert {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 6px;
-    padding: 4px 6px;
-    border-radius: 4px;
-    font-size: 10px;
     flex-shrink: 0;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 6px;
+    margin-top: 6px;
+    font-size: 10px;
+    border-radius: 4px;
 
     &.risk-high {
-      background: var(--el-color-danger-light-9);
       color: var(--el-color-danger);
+      background: var(--el-color-danger-light-9);
     }
 
     &.risk-medium {
-      background: var(--el-color-warning-light-9);
       color: var(--el-color-warning-dark);
+      background: var(--el-color-warning-light-9);
     }
 
     .alert-icon {
-      font-size: 12px;
       flex-shrink: 0;
+      font-size: 12px;
     }
 
     .alert-text {
