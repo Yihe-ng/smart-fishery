@@ -300,9 +300,11 @@
 
   const resolveAIPageId = () => {
     if (route.fullPath.includes('/fishery/feeding')) return 'feeding'
-    if (route.fullPath.includes('/fishery/dashboard') || route.fullPath.includes('/fishery/console'))
+    if (
+      route.fullPath.includes('/fishery/dashboard') ||
+      route.fullPath.includes('/fishery/console')
+    )
       return 'fishery-dashboard'
-    if (route.fullPath.includes('/fishery/water-quality')) return 'water-quality'
     if (route.fullPath.includes('/fishery/growth')) return 'growth'
     return 'global-chat'
   }

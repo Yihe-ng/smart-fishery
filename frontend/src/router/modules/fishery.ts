@@ -39,18 +39,7 @@ export const fisheryRoutes: AppRouteRecord = {
         keepAlive: true,
         isHide: true
       }
-    },
-    {
-      path: 'water-quality',
-      name: 'WaterQuality',
-      component: '/monitoring/water-quality/index',
-      meta: { title: 'menus.fishery.waterQuality', icon: 'ri:temp-hot-line', keepAlive: true }
-    },
-    {
-      path: 'production',
-      name: 'Production',
-      component: '/production/index',
-      meta: { title: 'menus.fishery.production', icon: 'ri:bar-chart-box-line', keepAlive: true }
     }
+    // 水质监测和生产数据页面暂不注册到渔业菜单；源码保留，后续可按需要恢复。
   ]
 }
