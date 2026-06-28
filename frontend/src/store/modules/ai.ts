@@ -142,7 +142,7 @@ export const useAIStore = defineStore('aiStore', () => {
     }
 
     const result = await runQA(runtimeContext, text)
-    const preview = currentIntent === 'automation' ? result.data.confirmPreview ?? null : null
+    const preview = currentIntent === 'automation' ? (result.data.confirmPreview ?? null) : null
     const displayText = result.data.assistantMessage
     const warnings = sanitizeWarnings(result.data.warnings)
 

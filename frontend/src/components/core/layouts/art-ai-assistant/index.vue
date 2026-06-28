@@ -231,8 +231,8 @@
 <style scoped lang="scss">
   .dialog-title {
     display: inline-flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
     font-size: 18px;
     font-weight: 600;
     color: var(--el-text-color-primary);
@@ -246,22 +246,22 @@
 
   .assistant-shell {
     display: flex;
-    height: 600px;
     flex-direction: column;
     gap: 14px;
+    height: 600px;
     overflow: hidden;
   }
 
   .assistant-header {
     display: flex;
     flex-wrap: wrap;
+    gap: 10px;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
     padding: 10px 12px;
+    background: var(--default-box-color);
     border: 1px solid var(--art-card-border);
     border-radius: 12px;
-    background: var(--default-box-color);
   }
 
   .context-main,
@@ -271,8 +271,8 @@
   .preview-meta,
   .message-head {
     display: flex;
-    align-items: center;
     gap: 10px;
+    align-items: center;
   }
 
   .context-sub {
@@ -306,11 +306,11 @@
   }
 
   .assistant-tabs {
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
   }
 
   :deep(.el-tabs__content) {
@@ -320,31 +320,31 @@
   }
 
   :deep(.el-tab-pane) {
-    height: 100%;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
+    height: 100%;
+    overflow: hidden;
   }
 
   .messages-panel,
   .automation-panel {
     display: flex;
     flex: 1;
-    min-height: 0;
     flex-direction: column;
     gap: 12px;
+    min-height: 0;
   }
 
   .messages-panel {
-    overflow-y: auto;
     padding-right: 6px;
+    overflow-y: auto;
   }
 
   .message-card {
     padding: 14px;
+    background: var(--default-box-color);
     border: 1px solid var(--art-card-border);
     border-radius: 14px;
-    background: var(--default-box-color);
   }
 
   .message-card.user {
@@ -359,8 +359,8 @@
 
   .message-content {
     margin: 8px 0 0;
-    white-space: pre-wrap;
     line-height: 1.65;
+    white-space: pre-wrap;
   }
 
   .preset-grid {
@@ -371,15 +371,15 @@
 
   .preset-card {
     display: flex;
-    min-height: 116px;
     flex-direction: column;
     gap: 8px;
+    min-height: 116px;
     padding: 14px;
     text-align: left;
     cursor: pointer;
+    background: var(--default-box-color);
     border: 1px solid var(--art-card-border);
     border-radius: 14px;
-    background: var(--default-box-color);
     transition:
       transform 0.18s ease,
       box-shadow 0.18s ease,
@@ -387,14 +387,14 @@
   }
 
   .preset-card:hover {
-    transform: translateY(-1px);
     border-color: color-mix(in srgb, var(--el-color-primary) 30%, var(--art-card-border));
     box-shadow: 0 8px 22px rgb(15 23 42 / 8%);
+    transform: translateY(-1px);
   }
 
   .preset-title {
-    color: var(--el-text-color-primary);
     font-weight: 700;
+    color: var(--el-text-color-primary);
   }
 
   .preset-desc {
@@ -408,9 +408,9 @@
     flex-direction: column;
     gap: 10px;
     padding: 12px;
+    background: color-mix(in srgb, var(--el-color-warning) 9%, var(--default-box-color));
     border: 1px solid color-mix(in srgb, var(--el-color-warning) 20%, transparent);
     border-radius: 12px;
-    background: color-mix(in srgb, var(--el-color-warning) 9%, var(--default-box-color));
   }
 
   .preview-meta {
@@ -421,8 +421,8 @@
 
   .preview-actions {
     display: flex;
-    align-items: center;
     gap: 8px;
+    align-items: center;
   }
 
   .assistant-input {
@@ -456,8 +456,8 @@
   :global(.dark) .assistant-header,
   :global(.dark) .message-card,
   :global(.dark) .preset-card {
-    border-color: color-mix(in oklch, var(--el-color-primary) 18%, var(--art-card-border));
     background: var(--art-nested-card-bg);
+    border-color: color-mix(in oklch, var(--el-color-primary) 18%, var(--art-card-border));
   }
 
   :global(.dark) .message-card.user {
@@ -473,7 +473,7 @@
   }
 
   :global(.dark) .latest-preview {
-    border-color: color-mix(in oklch, var(--el-color-warning) 32%, transparent);
     background: color-mix(in oklch, var(--el-color-warning) 14%, var(--art-nested-card-bg));
+    border-color: color-mix(in oklch, var(--el-color-warning) 32%, transparent);
   }
 </style>

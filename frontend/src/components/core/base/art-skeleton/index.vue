@@ -221,6 +221,7 @@
     0% {
       background-position: 200% 0;
     }
+
     100% {
       background-position: -200% 0;
     }
@@ -238,8 +239,8 @@
   .art-skeleton--card .skeleton-avatar {
     width: 60px;
     height: 60px;
-    border-radius: 50%;
     margin-right: 16px;
+    border-radius: 50%;
   }
 
   .art-skeleton--card .skeleton-title-wrapper {
@@ -273,8 +274,8 @@
   }
 
   .art-skeleton--card .skeleton-footer {
-    justify-content: flex-end;
     gap: 12px;
+    justify-content: flex-end;
   }
 
   .art-skeleton--card .skeleton-button {
@@ -305,8 +306,8 @@
   .skeleton-list-item .skeleton-icon {
     width: 40px;
     height: 40px;
-    border-radius: 8px;
     margin-right: 16px;
+    border-radius: 8px;
   }
 
   .skeleton-list-item .skeleton-text-wrapper {
@@ -382,14 +383,14 @@
   }
 
   .skeleton-stats-row {
+    gap: 16px;
     justify-content: space-between;
     margin-bottom: 24px;
-    gap: 16px;
   }
 
   .skeleton-stat-card {
-    flex: 1;
     display: flex;
+    flex: 1;
     align-items: center;
     padding: 20px;
     background: var(--skeleton-card-bg, #f8fafc);
@@ -403,8 +404,8 @@
   .skeleton-stat-icon {
     width: 48px;
     height: 48px;
-    border-radius: 12px;
     margin-right: 16px;
+    border-radius: 12px;
   }
 
   .skeleton-stat-content {
@@ -455,8 +456,8 @@
   .skeleton-chart-line {
     position: absolute;
     top: 50%;
-    left: 0;
     right: 0;
+    left: 0;
     height: 2px;
     background: var(--skeleton-block-bg, #e2e8f0);
     transform: translateY(-50%);
@@ -478,21 +479,27 @@
   .skeleton-bar:nth-child(1) {
     height: 60%;
   }
+
   .skeleton-bar:nth-child(2) {
     height: 80%;
   }
+
   .skeleton-bar:nth-child(3) {
     height: 45%;
   }
+
   .skeleton-bar:nth-child(4) {
     height: 90%;
   }
+
   .skeleton-bar:nth-child(5) {
     height: 70%;
   }
+
   .skeleton-bar:nth-child(6) {
     height: 55%;
   }
+
   .skeleton-bar:nth-child(7) {
     height: 85%;
   }
@@ -514,11 +521,11 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
     width: 60%;
     height: 60%;
     background: var(--skeleton-card-bg, #f8fafc);
     border-radius: 50%;
+    transform: translate(-50%, -50%);
   }
 
   :global(html.dark) .skeleton-donut-center {
@@ -526,7 +533,7 @@
   }
 
   /* 响应式适配 */
-  @media (max-width: 768px) {
+  @media (width <= 768px) {
     .skeleton-stats-row {
       flex-wrap: wrap;
     }
