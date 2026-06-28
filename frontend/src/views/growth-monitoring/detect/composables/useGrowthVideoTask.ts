@@ -1,8 +1,5 @@
 import { computed, onUnmounted, ref } from 'vue'
-import {
-  getGrowthVideoTask,
-  uploadGrowthVideo
-} from '@/api/growth-monitoring/detect'
+import { getGrowthVideoTask, uploadGrowthVideo } from '@/api/growth-monitoring/detect'
 import type {
   GrowthVideoDetectErrorCode,
   GrowthVideoDetectResultResponse,

@@ -7,11 +7,7 @@
       </div>
     </template>
 
-    <el-empty
-      v-if="!detections.length"
-      description="当前没有可切换的识别目标"
-      :image-size="72"
-    />
+    <el-empty v-if="!detections.length" description="当前没有可切换的识别目标" :image-size="72" />
 
     <div v-else class="list-body">
       <button
@@ -73,8 +69,7 @@
       gap: 10px;
       min-height: 0;
       padding-right: 4px;
-      overflow-x: hidden;
-      overflow-y: auto;
+      overflow: hidden auto;
       scrollbar-color: var(--art-card-border) transparent;
       scrollbar-width: thin;
     }
@@ -103,8 +98,8 @@
       align-items: center;
       width: 100%;
       padding: 10px 12px;
-      cursor: pointer;
       color: var(--el-text-color-primary);
+      cursor: pointer;
       background: var(--el-fill-color-light);
       border: 1px solid transparent;
       border-radius: 10px;
@@ -123,8 +118,8 @@
 
     .item-status,
     .item-length {
-      text-align: right;
       color: var(--el-text-color-secondary);
+      text-align: right;
     }
   }
 </style>

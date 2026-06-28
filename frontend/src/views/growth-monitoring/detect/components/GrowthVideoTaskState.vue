@@ -54,7 +54,9 @@
   const description = computed(() => {
     switch (props.taskStatus) {
       case 'queued':
-        return props.filename ? `已接收 ${props.filename}，正在排队处理。` : '视频已接收，正在排队处理。'
+        return props.filename
+          ? `已接收 ${props.filename}，正在排队处理。`
+          : '视频已接收，正在排队处理。'
       case 'processing':
         return `当前进度 ${props.progress}% ，系统会按时间顺序提取关键帧。`
       case 'failed':
@@ -101,7 +103,7 @@
     min-width: 180px;
   }
 
-  @media (max-width: 768px) {
+  @media (width <= 768px) {
     .state-content {
       flex-direction: column;
       align-items: stretch;
