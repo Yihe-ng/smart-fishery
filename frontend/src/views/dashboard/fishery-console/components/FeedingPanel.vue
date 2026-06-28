@@ -93,21 +93,25 @@
 
 <style scoped lang="scss">
   .feeding-panel {
+    display: flex;
+    flex-direction: column;
     height: 100%;
+    min-height: 0;
 
     :deep(.el-card__body) {
+      flex: 1;
+      min-height: 0;
       padding: 0;
+      overflow: auto;
     }
 
     :deep(.el-card__header) {
+      flex-shrink: 0;
       padding: 16px;
     }
 
     :deep(.el-card) {
       height: 100%;
     }
-  }
-
-  :global(.dark) .feeding-panel {
   }
 </style>

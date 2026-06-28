@@ -306,8 +306,8 @@
 
       &:hover,
       &:focus-visible {
-        transform: translateY(-2px);
         box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+        transform: translateY(-2px);
       }
 
       // 左侧光条
@@ -315,8 +315,8 @@
         position: relative;
         flex-shrink: 0;
         width: 4px;
-        border-radius: 12px 0 0 12px;
         overflow: hidden;
+        border-radius: 12px 0 0 12px;
 
         .glow-inner {
           position: absolute;
@@ -329,6 +329,7 @@
       &.level-critical {
         .alert-glow-bar {
           background: var(--el-color-danger);
+
           .glow-inner {
             background: linear-gradient(
               180deg,
@@ -339,6 +340,7 @@
             animation: pulse-glow 2s ease-in-out infinite;
           }
         }
+
         .level-icon {
           color: var(--el-color-danger);
         }
@@ -347,10 +349,12 @@
       &.level-warning {
         .alert-glow-bar {
           background: var(--el-color-warning);
+
           .glow-inner {
             background: var(--el-color-warning);
           }
         }
+
         .level-icon {
           color: var(--el-color-warning);
         }
@@ -359,10 +363,12 @@
       &.level-info {
         .alert-glow-bar {
           background: var(--el-color-primary);
+
           .glow-inner {
             background: var(--el-color-primary);
           }
         }
+
         .level-icon {
           color: var(--el-color-primary);
         }
@@ -370,8 +376,8 @@
 
       .alert-card-body {
         flex: 1;
-        padding: 14px 16px;
         min-width: 0;
+        padding: 14px 16px;
       }
 
       .alert-top-row {
@@ -438,26 +444,26 @@
   :global(.dark) .alert-list-card {
     .alert-toolbar {
       background: var(--default-box-color);
-      border-bottom: 1px solid rgba(255 255 255 / 0.06);
+      border-bottom: 1px solid rgba(255 255 255 / 6%);
     }
 
     .alert-card {
       background: #1a2d45;
-      border-color: rgba(99, 179, 237, 0.18);
+      border-color: rgb(99 179 237 / 18%);
       box-shadow:
         0 2px 8px rgb(0 0 0 / 30%),
-        inset 0 1px 0 rgba(99, 179, 237, 0.06);
+        inset 0 1px 0 rgb(99 179 237 / 6%);
 
       &:hover,
       &:focus-visible {
         background: #223a5a;
         box-shadow:
           0 8px 24px rgb(0 0 0 / 40%),
-          0 0 0 1px rgba(99, 179, 237, 0.25);
+          0 0 0 1px rgb(99 179 237 / 25%);
       }
 
       .alert-actions {
-        border-top-color: rgba(255 255 255 / 0.06);
+        border-top-color: rgba(255 255 255 / 6%);
       }
     }
 
@@ -473,6 +479,7 @@
       opacity: 0.4;
       transform: scaleY(1);
     }
+
     50% {
       opacity: 0.8;
       transform: scaleY(1.2);
@@ -484,21 +491,25 @@
     &.list-hidden {
       animation: list-fade-out 0.15s ease-in forwards;
     }
+
     &:not(.list-hidden) {
       animation: list-fade-in 0.2s ease-out forwards;
     }
   }
+
   @keyframes list-fade-out {
     to {
       opacity: 0;
       transform: translateY(4px);
     }
   }
+
   @keyframes list-fade-in {
     from {
       opacity: 0;
       transform: translateY(4px);
     }
+
     to {
       opacity: 1;
       transform: none;
@@ -509,11 +520,13 @@
     animation: card-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
     animation-delay: calc(min(var(--stagger-index), 3) * 40ms);
   }
+
   @keyframes card-enter {
     from {
       opacity: 0;
       transform: translateY(16px) scale(0.97);
     }
+
     to {
       opacity: 1;
       transform: none;

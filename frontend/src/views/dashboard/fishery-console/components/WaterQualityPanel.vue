@@ -340,50 +340,50 @@
 
 <style scoped lang="scss">
   .water-quality-panel {
+    box-sizing: border-box;
     height: 100%;
     min-height: 0;
-    box-sizing: border-box;
     padding-bottom: 10px;
 
     .metric-grid {
       display: flex;
-      height: 100%;
-      min-height: 0;
       flex-direction: column;
       gap: 8px;
+      height: 100%;
+      min-height: 0;
     }
 
     .metric-row {
       display: grid;
-      width: 100%;
-      min-height: 0;
       gap: 12px;
       align-items: start;
+      width: 100%;
+      min-height: 0;
     }
 
     .metric-row-top {
       flex: 1 1 0;
-      min-height: 0;
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      min-height: 0;
     }
 
     .metric-row-bottom {
       flex: 1 1 0;
-      min-height: 0;
-      width: 96%;
-      margin-inline: auto;
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 96%;
+      min-height: 0;
+      margin-inline: auto;
     }
 
     .metric-card {
       display: grid;
+      grid-template-rows: auto auto auto;
+      row-gap: 8px;
+      align-content: center;
+      min-width: 0;
       height: 100%;
       min-height: 0;
-      grid-template-rows: auto auto auto;
-      align-content: center;
-      row-gap: 8px;
-      min-width: 0;
-      padding: 12px 12px;
+      padding: 12px;
       cursor: pointer;
       background: var(--metric-card-bg, var(--default-box-color));
       border: 1px solid var(--art-card-border);
@@ -405,27 +405,27 @@
 
     .metric-head {
       display: flex;
+      gap: 8px;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
     }
 
     .metric-title {
       display: flex;
-      min-width: 0;
       flex: 1;
-      align-items: center;
       gap: 8px;
+      align-items: center;
+      min-width: 0;
       overflow: hidden;
     }
 
     .icon-box {
       display: flex;
-      width: 30px;
-      height: 30px;
       flex-shrink: 0;
       align-items: center;
       justify-content: center;
+      width: 30px;
+      height: 30px;
       font-size: 15px;
       color: var(--metric-accent);
       background-color: color-mix(in oklch, var(--metric-accent) 14%, transparent);
@@ -439,7 +439,6 @@
       font-weight: 700;
       line-height: 1.2;
       color: var(--el-text-color-primary);
-      overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -455,18 +454,18 @@
 
     .metric-main {
       display: flex;
-      align-items: baseline;
       gap: 4px;
+      align-items: baseline;
       line-height: 1;
     }
 
     .value {
       font-size: 30px;
       font-weight: 800;
-      line-height: 1;
-      letter-spacing: -0.03em;
-      color: var(--el-text-color-primary);
       font-variant-numeric: tabular-nums;
+      line-height: 1;
+      color: var(--el-text-color-primary);
+      letter-spacing: -0.03em;
     }
 
     .unit {
@@ -482,35 +481,35 @@
 
     .metric-meta-inline {
       display: flex;
-      min-height: 20px;
       align-items: center;
       justify-content: flex-start;
       width: fit-content;
       max-width: 100%;
+      min-height: 20px;
     }
 
     .trend-text {
       display: inline-flex;
-      min-height: 18px;
       align-items: center;
       justify-content: center;
       min-width: 64px;
+      min-height: 18px;
       padding: 0 7px;
       font-size: 10px;
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
       line-height: 1;
       color: var(--metric-accent);
       white-space: nowrap;
       background-color: color-mix(in oklch, var(--metric-accent) 10%, transparent);
       border-radius: 999px;
-      font-variant-numeric: tabular-nums;
     }
 
     :deep(.el-tag.status-tag) {
       height: 18px;
       padding: 0 5px;
-      border-color: color-mix(in oklch, currentColor 14%, transparent);
-      background-color: color-mix(in oklch, currentColor 7%, transparent);
+      background-color: color-mix(in oklch, currentcolor 7%, transparent);
+      border-color: color-mix(in oklch, currentcolor 14%, transparent);
     }
   }
 
@@ -541,8 +540,8 @@
     }
 
     :deep(.el-tag.status-tag) {
-      background-color: color-mix(in oklch, currentColor 10%, transparent);
-      border-color: color-mix(in oklch, currentColor 18%, transparent);
+      background-color: color-mix(in oklch, currentcolor 10%, transparent);
+      border-color: color-mix(in oklch, currentcolor 18%, transparent);
     }
   }
 </style>

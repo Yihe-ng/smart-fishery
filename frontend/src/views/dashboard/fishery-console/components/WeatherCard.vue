@@ -113,8 +113,8 @@
 
     :deep(.el-card__body) {
       display: flex;
-      flex-direction: column;
       flex: 1;
+      flex-direction: column;
       padding: 16px;
       overflow: hidden;
     }
@@ -128,13 +128,13 @@
 
   .divider {
     height: 1px;
-    background: var(--default-border);
     margin: 12px 0;
+    background: var(--default-border);
   }
 
   .update-time {
-    margin-top: auto;
     padding-top: 10px;
+    margin-top: auto;
     font-size: 11px;
     color: var(--art-gray-500);
     text-align: center;
