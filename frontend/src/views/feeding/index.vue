@@ -70,6 +70,10 @@
 
       <!-- 右侧：45% -->
       <el-col :span="11" class="right-column">
+        <div class="growth-reference-section">
+          <GrowthRecognitionSummaryCard :pond-id="pondId" compact />
+        </div>
+
         <!-- AI投喂建议 - 移至最上方 -->
         <div class="suggestion-section">
           <AISuggestionPanel
@@ -136,6 +140,7 @@
   import VideoPlayer from '@/views/dashboard/fishery-console/components/VideoPlayer.vue'
   import AISuggestionPanel from './components/AISuggestionPanel.vue'
   import WeatherCard from './components/WeatherCard.vue'
+  import GrowthRecognitionSummaryCard from '@/components/business/GrowthRecognitionSummaryCard.vue'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
   import { getVideoList } from '@/api/video'
   import type { FeedingConfig, FeedingLog } from '@/types/feeding'
@@ -241,8 +246,8 @@
 
     .video-section {
       flex: 0 0 auto;
-      max-height: 45vh;
       min-height: 240px;
+      max-height: 45vh;
       overflow: hidden;
 
       :deep(.video-player-card) {
@@ -263,8 +268,8 @@
 
     // 底部区域：天气 + 参数配置
     .bottom-section {
-      flex: 0 0 auto;
       display: flex;
+      flex: 0 0 auto;
       gap: 10px;
       min-height: 180px;
       max-height: 200px;
@@ -283,23 +288,23 @@
 
       // 投喂参数配置 - 右侧 60%
       .config-card {
-        flex: 0 0 60%;
-        min-height: 0;
-        height: 100%;
         display: flex;
+        flex: 0 0 60%;
         flex-direction: column;
+        height: 100%;
+        min-height: 0;
 
         :deep(.el-card__header) {
+          flex-shrink: 0;
           padding: 6px 10px;
           border-bottom: 1px solid var(--default-border);
-          flex-shrink: 0;
         }
 
         :deep(.el-card__body) {
-          padding: 8px 10px;
-          flex: 1;
           display: flex;
+          flex: 1;
           flex-direction: column;
+          padding: 8px 10px;
           overflow: visible;
         }
 
@@ -320,15 +325,15 @@
 
             .form-label {
               font-size: 11px;
-              color: var(--el-text-color-regular);
               line-height: 1.2;
+              color: var(--el-text-color-regular);
             }
 
             // 滑块样式
             :deep(.el-slider) {
               display: flex;
-              align-items: center;
               gap: 8px;
+              align-items: center;
 
               .el-slider__runway {
                 flex: 1;
@@ -336,8 +341,8 @@
               }
 
               .el-slider__input {
-                width: 80px;
                 flex-shrink: 0;
+                width: 80px;
 
                 .el-input__inner {
                   padding: 0 8px;
@@ -359,8 +364,8 @@
             align-items: center;
             justify-content: space-between;
             padding-top: 6px;
-            border-top: 1px solid var(--default-border);
             margin-top: auto;
+            border-top: 1px solid var(--default-border);
 
             :deep(.el-switch__label) {
               font-size: 11px;
@@ -379,10 +384,19 @@
     height: 100%;
     min-height: 0;
 
+    .growth-reference-section {
+      flex: 0 0 clamp(310px, 30vh, 340px);
+      min-height: 0;
+
+      :deep(.growth-summary-card) {
+        height: 100%;
+      }
+    }
+
     // AI投喂建议 - 最上方，向下拉长
     .suggestion-section {
       flex: 1;
-      min-height: 280px;
+      min-height: 230px;
       max-height: none;
       overflow: hidden;
 
@@ -397,31 +411,31 @@
 
     // 投喂执行日志 - 固定高度
     .logs-card {
-      flex: 0 0 auto;
-      min-height: 0;
-      max-height: 35vh;
       display: flex;
+      flex: 0 0 auto;
       flex-direction: column;
+      min-height: 0;
+      max-height: 30vh;
 
       :deep(.el-card__header) {
+        flex-shrink: 0;
         padding: 8px 12px;
         border-bottom: 1px solid var(--default-border);
-        flex-shrink: 0;
       }
 
       :deep(.el-card__body) {
-        padding: 10px 12px;
-        flex: 1;
         display: flex;
+        flex: 1;
         flex-direction: column;
         min-height: 0;
+        padding: 10px 12px;
       }
 
       .logs-content {
-        max-height: none;
         flex: 1;
-        overflow: auto;
         min-height: 0;
+        max-height: none;
+        overflow: auto;
 
         .compact-table {
           font-size: 12px;
@@ -434,13 +448,13 @@
 
       .quick-feed {
         display: flex;
+        flex-shrink: 0;
+        gap: 10px;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
-        margin-top: 10px;
         padding-top: 10px;
+        margin-top: 10px;
         border-top: 1px solid var(--default-border);
-        flex-shrink: 0;
 
         .quick-label {
           font-size: 13px;
@@ -451,8 +465,8 @@
 
         .quick-actions {
           display: flex;
-          align-items: center;
           gap: 8px;
+          align-items: center;
         }
       }
     }
@@ -460,9 +474,9 @@
 
   .card-header {
     display: flex;
+    gap: 12px;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
   }
 
   // 响应式适配
@@ -482,6 +496,15 @@
     .left-column,
     .right-column {
       height: auto;
+    }
+
+    .right-column {
+      .growth-reference-section,
+      .suggestion-section,
+      .logs-card {
+        flex: initial;
+        max-height: none;
+      }
     }
   }
 </style>

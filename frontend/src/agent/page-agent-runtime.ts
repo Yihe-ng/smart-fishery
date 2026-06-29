@@ -3,12 +3,7 @@ import { PageController } from '@page-agent/page-controller'
 
 import { fetchAIInvoke } from '@/api/agent'
 import { createProxyTools } from '@/agent/proxy-tools'
-import type {
-  AIAgentInvokeResponse,
-  AIBootstrapPayload,
-  AIConfirmPreview,
-  AIPageId
-} from '@/types'
+import type { AIAgentInvokeResponse, AIBootstrapPayload, AIConfirmPreview, AIPageId } from '@/types'
 
 interface AgentRuntimeContext {
   pageId: AIPageId

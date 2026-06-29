@@ -74,14 +74,14 @@
     justify-content: center;
 
     /* 高斯模糊背景 - 直接应用，现代浏览器都支持 */
-    background: rgba(250, 251, 252, 0.55);
+    background: rgb(250 251 252 / 55%);
     -webkit-backdrop-filter: blur(12px) saturate(180%);
     backdrop-filter: blur(12px) saturate(180%);
   }
 
   /* 暗色模式适配 */
   :global(html.dark) .fish-loading-mask {
-    background: rgba(15, 23, 42, 0.6);
+    background: rgb(15 23 42 / 60%);
     -webkit-backdrop-filter: blur(12px) saturate(180%);
     backdrop-filter: blur(12px) saturate(180%);
   }
@@ -92,13 +92,13 @@
    */
   @media (prefers-reduced-transparency: reduce) {
     .fish-loading-mask {
-      background: rgba(250, 251, 252, 0.98);
+      background: rgb(250 251 252 / 98%);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
 
     :global(html.dark) .fish-loading-mask {
-      background: rgba(15, 23, 42, 0.98);
+      background: rgb(15 23 42 / 98%);
     }
   }
 

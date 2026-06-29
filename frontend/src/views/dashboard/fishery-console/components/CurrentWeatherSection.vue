@@ -44,15 +44,15 @@
 <style scoped lang="scss">
   .current-weather {
     display: flex;
+    gap: 12px;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
 
     .weather-left {
       display: flex;
-      align-items: center;
-      gap: 8px;
       flex-shrink: 0;
+      gap: 8px;
+      align-items: center;
 
       .weather-icon {
         font-size: 36px;
@@ -62,21 +62,21 @@
       .temperature {
         font-size: 28px;
         font-weight: 700;
-        color: var(--art-gray-900);
         line-height: 1;
+        color: var(--art-gray-900);
       }
     }
 
     .weather-metrics {
       display: flex;
-      gap: 4px;
       flex: 1;
+      gap: 4px;
       justify-content: flex-end;
 
       .metric-item {
         display: flex;
-        align-items: center;
         gap: 4px;
+        align-items: center;
         padding: 4px 8px;
         background: var(--art-gray-100);
         border-radius: 4px;
@@ -87,9 +87,9 @@
         }
 
         .metric-icon {
+          flex-shrink: 0;
           font-size: 14px;
           color: var(--art-gray-500);
-          flex-shrink: 0;
         }
 
         .metric-value {
@@ -99,9 +99,9 @@
           white-space: nowrap;
 
           .metric-unit {
+            margin-left: 2px;
             font-size: 10px;
             color: var(--art-gray-500);
-            margin-left: 2px;
           }
         }
       }

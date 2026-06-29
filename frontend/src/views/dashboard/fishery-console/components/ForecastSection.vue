@@ -49,11 +49,11 @@
       gap: 8px;
 
       .forecast-item {
-        flex: 1;
         display: flex;
+        flex: 1;
         flex-direction: column;
-        align-items: center;
         gap: 6px;
+        align-items: center;
         padding: 12px 4px;
         background: var(--art-gray-100);
         border-radius: 8px;
@@ -82,8 +82,8 @@
 
         .forecast-humidity {
           display: flex;
-          align-items: center;
           gap: 2px;
+          align-items: center;
           font-size: 11px;
           color: var(--art-gray-500);
 

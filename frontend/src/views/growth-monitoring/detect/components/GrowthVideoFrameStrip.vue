@@ -7,7 +7,11 @@
       </div>
     </template>
 
-    <el-empty v-if="!frames.length" description="视频处理完成后将在这里展示关键帧" :image-size="72" />
+    <el-empty
+      v-if="!frames.length"
+      description="视频处理完成后将在这里展示关键帧"
+      :image-size="72"
+    />
 
     <div v-else class="frame-list">
       <button
@@ -66,8 +70,7 @@
     gap: 12px;
     max-height: 260px;
     padding-right: 4px;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden auto;
     scrollbar-color: var(--art-card-border) transparent;
     scrollbar-width: thin;
   }
@@ -120,9 +123,9 @@
 
   .frame-meta {
     display: flex;
+    gap: 8px;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
     font-size: 12px;
     color: var(--el-text-color-secondary);
   }

@@ -44,13 +44,23 @@ export const fisheryRoutes: AppRouteRecord = {
       path: 'water-quality',
       name: 'WaterQuality',
       component: '/monitoring/water-quality/index',
-      meta: { title: 'menus.fishery.waterQuality', icon: 'ri:temp-hot-line', keepAlive: true }
+      meta: {
+        title: 'menus.fishery.waterQuality',
+        icon: 'ri:temp-hot-line',
+        keepAlive: true,
+        isHide: true
+      }
     },
     {
       path: 'production',
       name: 'Production',
       component: '/production/index',
-      meta: { title: 'menus.fishery.production', icon: 'ri:bar-chart-box-line', keepAlive: true }
+      meta: {
+        title: 'menus.fishery.production',
+        icon: 'ri:bar-chart-box-line',
+        keepAlive: true,
+        isHide: true
+      }
     }
   ]
 }

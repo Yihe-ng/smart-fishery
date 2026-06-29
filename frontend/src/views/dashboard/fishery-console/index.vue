@@ -23,73 +23,42 @@
     </div>
 
     <div class="dashboard-grid">
-      <section class="panel-section dashboard-panel area-water">
-        <div class="section-title flex-c gap-2">
-          <ArtSvgIcon icon="ri:temp-hot-line" />
-          <span>水质监测指标</span>
-        </div>
-        <div class="panel-content">
-          <WaterQualityPanel :metrics="dashboardFrame?.metrics ?? null" />
-        </div>
-      </section>
-
-      <WeatherCard class="area-health dashboard-card-base dashboard-fill" />
-
-      <AlertList
-        :alerts="visibleAlerts"
-        class="area-alert dashboard-card-base dashboard-fill"
-        @resolve="handleResolveAlert"
-      />
-
-      <section class="panel-section dashboard-panel area-sensor">
-        <div class="section-title flex-c gap-2">
-          <ArtSvgIcon icon="ri:cpu-line" />
-          <span>传感器设备状态</span>
-        </div>
-        <div class="panel-content sensor-scroll">
-          <el-row :gutter="10">
-            <el-col v-for="device in sensorDevices" :key="device.id" :span="12">
-              <SensorCard :device="device" />
-            </el-col>
-          </el-row>
-        </div>
-      </section>
-
       <VideoPlayer class="area-video dashboard-card-base dashboard-fill" :sources="videoSources" />
+
+      <GrowthRecognitionSummaryCard
+        class="area-growth dashboard-card-base dashboard-fill"
+        :pond-id="currentPondId"
+      />
 
       <FeedingPanel class="area-feed dashboard-card-base dashboard-fill" />
 
-      <el-card shadow="never" class="production-card area-kpi dashboard-card-base dashboard-fill">
+      <el-card shadow="never" class="decision-card area-status dashboard-card-base dashboard-fill">
         <template #header>
           <div class="flex-cb">
-            <div class="flex-c gap-2">
-              <ArtSvgIcon icon="ri:bar-chart-box-line" class="text-blue-500" />
-              <span class="font-bold">生产关键指标 (KPI) (模拟)</span>
+            <div class="decision-title">
+              <ArtSvgIcon icon="ri:file-list-3-line" class="decision-title-icon" />
+              <span class="font-bold">投喂决策输入摘要</span>
             </div>
-            <el-button link type="primary" icon="ri:file-list-3-line">查看报表</el-button>
+            <el-tag type="info" effect="plain" size="small">辅助判断</el-tag>
           </div>
         </template>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <div class="kpi-item">
-              <div class="kpi-label">当前估重 (Avg)</div>
-              <div class="kpi-value">450<span class="kpi-unit">g</span></div>
-              <div class="kpi-trend up"><ArtSvgIcon icon="ri:arrow-right-up-line" /> 5.2%</div>
+
+        <div class="decision-list">
+          <div v-for="item in decisionInputs" :key="item.label" class="decision-item">
+            <div class="decision-icon" :class="item.status">
+              <ArtSvgIcon :icon="item.icon" />
             </div>
-          </el-col>
-          <el-col :span="8">
-            <div class="kpi-item">
-              <div class="kpi-label">存栏预计</div>
-              <div class="kpi-value">12,500<span class="kpi-unit">尾</span></div>
+            <div class="decision-copy">
+              <div class="decision-label">{{ item.label }}</div>
+              <div class="decision-value">{{ item.value }}</div>
             </div>
-          </el-col>
-          <el-col :span="8">
-            <div class="kpi-item">
-              <div class="kpi-label">投喂量 (今日)</div>
-              <div class="kpi-value">1,600<span class="kpi-unit">g</span></div>
-            </div>
-          </el-col>
-        </el-row>
+            <el-tag :type="item.tagType" effect="plain" size="small">{{ item.tag }}</el-tag>
+          </div>
+        </div>
+
+        <p class="decision-note">
+          投喂辅助建议仍结合水质、告警、设备状态和规则数据判断，最近生长识别仅作为鱼体规格参考。
+        </p>
       </el-card>
     </div>
   </div>
@@ -100,18 +69,17 @@
   import { ElMessage } from 'element-plus'
 
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
-  import WaterQualityPanel from './components/WaterQualityPanel.vue'
-  import SensorCard from './components/SensorCard.vue'
-  import AlertList from './components/AlertList.vue'
   import FeedingPanel from './components/FeedingPanel.vue'
-  import WeatherCard from './components/WeatherCard.vue'
   import VideoPlayer from './components/VideoPlayer.vue'
+  import GrowthRecognitionSummaryCard from '@/components/business/GrowthRecognitionSummaryCard.vue'
 
   import { getDashboardFrame } from '@/api/water-quality'
   import { getVideoList } from '@/api/video'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
-  import type { Alert } from '@/types/alert'
-  import type { SensorDevice } from '@/types/device'
+  import {
+    DEFAULT_GROWTH_POND_ID,
+    useGrowthRecognitionStore
+  } from '@/store/modules/growth-recognition'
   import type { DashboardFrameResponse } from '@/types/water-quality'
 
   // 动态视频源列表（从后端 API 获取）
@@ -121,13 +89,79 @@
   const currentFrameIndex = ref(0)
   const nextFrameIndex = ref(0)
   const dashboardFrame = ref<DashboardFrameResponse | null>(null)
-  const sensorDevices = ref<SensorDevice[]>([])
-  const dismissedAlertIds = ref<string[]>([])
   const { setSnapshot } = useDemoFrameSnapshot()
+  const growthRecognitionStore = useGrowthRecognitionStore()
 
-  const visibleAlerts = computed(() => {
-    const sourceAlerts = dashboardFrame.value?.alerts ?? []
-    return sourceAlerts.filter((alert) => !dismissedAlertIds.value.includes(alert.id))
+  const currentPondId = computed(
+    () =>
+      dashboardFrame.value?.pondId ??
+      dashboardFrame.value?.waterQuality?.pondId ??
+      DEFAULT_GROWTH_POND_ID
+  )
+
+  const latestGrowthSummary = computed(() =>
+    growthRecognitionStore.getLatestSummary(currentPondId.value)
+  )
+
+  const growthReferenceState = computed(() => {
+    if (!latestGrowthSummary.value) return { tag: '暂无结果', tagType: 'info' as const }
+    if (growthRecognitionStore.isSummaryExpired(latestGrowthSummary.value)) {
+      return { tag: '可能过期', tagType: 'warning' as const }
+    }
+    return { tag: '已更新', tagType: 'success' as const }
+  })
+
+  const decisionInputs = computed(() => {
+    const waterStatus = dashboardFrame.value?.waterQuality?.status
+    const alerts = dashboardFrame.value?.alerts ?? []
+    const devices = dashboardFrame.value?.devices ?? []
+    const offlineDevices = devices.filter((device) => device.status !== 'online')
+    const hasHighRiskAlert = alerts.some(
+      (alert) => alert.level === 'critical' && alert.status === 'pending'
+    )
+
+    return [
+      {
+        label: '水质状态',
+        value:
+          waterStatus === 'normal' ? '当前水质正常' : waterStatus ? '存在水质异常' : '暂无水质快照',
+        tag: waterStatus === 'normal' ? '正常' : waterStatus ? '异常' : '待更新',
+        tagType:
+          waterStatus === 'normal'
+            ? ('success' as const)
+            : waterStatus
+              ? ('warning' as const)
+              : ('info' as const),
+        icon: 'ri:drop-line',
+        status: waterStatus === 'normal' ? 'normal' : 'warning'
+      },
+      {
+        label: '告警状态',
+        value: hasHighRiskAlert ? '存在高风险告警' : '无高风险告警',
+        tag: hasHighRiskAlert ? '需关注' : '稳定',
+        tagType: hasHighRiskAlert ? ('danger' as const) : ('success' as const),
+        icon: 'ri:alarm-warning-line',
+        status: hasHighRiskAlert ? 'danger' : 'normal'
+      },
+      {
+        label: '设备状态',
+        value: offlineDevices.length ? `${offlineDevices.length} 台设备异常` : '关键设备在线',
+        tag: offlineDevices.length ? '异常' : '在线',
+        tagType: offlineDevices.length ? ('warning' as const) : ('success' as const),
+        icon: 'ri:router-line',
+        status: offlineDevices.length ? 'warning' : 'normal'
+      },
+      {
+        label: '最近生长识别',
+        value: latestGrowthSummary.value
+          ? `${latestGrowthSummary.value.detectedCount} 尾样本，平均 ${latestGrowthSummary.value.avgWeightG.toFixed(1)}g`
+          : '暂无最近识别结果',
+        tag: growthReferenceState.value.tag,
+        tagType: growthReferenceState.value.tagType,
+        icon: 'ri:scales-3-line',
+        status: growthReferenceState.value.tagType === 'success' ? 'normal' : 'warning'
+      }
+    ]
   })
 
   const applyFrame = (frame: DashboardFrameResponse) => {
@@ -135,8 +169,6 @@
     currentFrameIndex.value = frame.index
     nextFrameIndex.value = frame.nextIndex
     lastUpdateTime.value = frame.collectTime ?? '--'
-    sensorDevices.value = frame.devices
-    dismissedAlertIds.value = []
     setSnapshot({
       currentIndex: frame.index,
       pondId: frame.pondId ?? frame.waterQuality?.pondId,
@@ -156,11 +188,6 @@
       console.error('Failed to refresh dashboard frame:', error)
       ElMessage.error('刷新失败，请稍后重试')
     }
-  }
-
-  const handleResolveAlert = async (alert: Alert) => {
-    dismissedAlertIds.value = [...dismissedAlertIds.value, alert.id]
-    ElMessage.success('告警已忽略')
   }
 
   const fetchVideoList = async () => {
@@ -189,7 +216,6 @@
   .fishery-dashboard {
     padding: 20px;
     background-color: var(--art-bg-color);
-    background-color: var(--art-bg-color);
 
     .dashboard-header {
       .title-icon {
@@ -208,42 +234,31 @@
 
     .dashboard-grid {
       display: grid;
-      grid-template-columns: 1.1fr 1.25fr 1fr;
-      grid-template-rows: 340px 360px auto;
-      gap: 20px;
+      /* stylelint-disable declaration-block-no-redundant-longhand-properties */
       grid-template-areas:
-        'water health alert'
-        'sensor video video'
-        'feed kpi kpi';
+        'video video growth'
+        'feed feed status';
+      grid-template-rows: clamp(300px, 37vh, 360px) clamp(360px, 36vh, 420px);
+      grid-template-columns: 1.12fr 0.84fr minmax(380px, 1.08fr);
+      /* stylelint-enable declaration-block-no-redundant-longhand-properties */
+      gap: 20px;
       align-items: stretch;
-    }
-
-    .area-water {
-      grid-area: water;
-    }
-
-    .area-alert {
-      grid-area: alert;
-    }
-
-    .area-health {
-      grid-area: health;
-    }
-
-    .area-sensor {
-      grid-area: sensor;
     }
 
     .area-video {
       grid-area: video;
     }
 
+    .area-growth {
+      grid-area: growth;
+    }
+
     .area-feed {
       grid-area: feed;
     }
 
-    .area-kpi {
-      grid-area: kpi;
+    .area-status {
+      grid-area: status;
     }
 
     .dashboard-fill {
@@ -272,11 +287,6 @@
       min-height: 0;
     }
 
-    .sensor-scroll {
-      overflow: auto;
-      padding-right: 4px;
-    }
-
     .section-title {
       padding-left: 10px;
       margin-bottom: 12px;
@@ -286,113 +296,153 @@
       border-left: 4px solid var(--el-color-primary);
     }
 
-    .production-card {
+    .decision-card {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+
       :deep(.el-card__header) {
+        flex-shrink: 0;
         border-bottom: 1px solid var(--art-card-border);
       }
 
       :deep(.el-card__body) {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 12px;
         height: calc(100% - 57px);
+        min-height: 0;
+        padding: 16px;
+        overflow: hidden;
       }
 
-      .kpi-item {
-        padding: 10px 0;
-        text-align: center;
+      .decision-title {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        min-width: 0;
+      }
 
-        .kpi-label {
-          margin-bottom: 10px;
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--art-gray-600);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
+      .decision-title-icon {
+        flex-shrink: 0;
+        font-size: 18px;
+        color: var(--el-color-primary);
+      }
+
+      .decision-list {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 0;
+        padding-right: 4px;
+        overflow-y: auto;
+      }
+
+      .decision-item {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px;
+        background: var(--art-hover-color);
+        border-radius: 8px;
+      }
+
+      .decision-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+
+        &.normal {
+          color: var(--el-color-success);
+          background: color-mix(in srgb, var(--el-color-success) 10%, transparent);
         }
 
-        .kpi-value {
-          font-size: 32px;
-          font-weight: 800;
-          line-height: 1.1;
-          color: var(--el-text-color-primary);
-          font-variant-numeric: tabular-nums;
-          letter-spacing: -0.02em;
-
-          .kpi-unit {
-            margin-left: 3px;
-            font-size: 11px;
-            font-weight: 500;
-            color: var(--art-gray-500);
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-          }
+        &.warning {
+          color: var(--el-color-warning);
+          background: color-mix(in srgb, var(--el-color-warning) 10%, transparent);
         }
 
-        .kpi-trend {
-          margin-top: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 2px;
-
-          &.up {
-            color: var(--el-color-success);
-          }
-
-          &.down {
-            color: var(--el-color-danger);
-          }
+        &.danger {
+          color: var(--el-color-danger);
+          background: color-mix(in srgb, var(--el-color-danger) 10%, transparent);
         }
+      }
+
+      .decision-copy {
+        min-width: 0;
+      }
+
+      .decision-label {
+        margin-bottom: 2px;
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+      }
+
+      .decision-value {
+        overflow: hidden;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--el-text-color-primary);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .decision-note {
+        flex-shrink: 0;
+        padding: 10px 12px;
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--el-text-color-secondary);
+        background: var(--default-bg-color);
+        border: 1px dashed var(--art-card-border);
+        border-radius: 8px;
       }
     }
 
     @media (width <= 1200px) {
       .dashboard-grid {
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto;
-        grid-template-areas:
-          'water health'
-          'alert alert'
-          'video video'
-          'sensor feed'
-          'kpi kpi';
+        grid-template:
+          'video video' auto
+          'growth status' auto
+          'feed feed' auto
+          / 1fr 1fr;
       }
     }
 
     @media (width <= 768px) {
       .dashboard-grid {
-        grid-template-columns: 1fr;
-        grid-template-areas:
-          'video'
-          'health'
-          'alert'
-          'water'
-          'sensor'
-          'feed'
-          'kpi';
+        grid-template:
+          'video' auto
+          'growth' auto
+          'feed' auto
+          'status' auto
+          / 1fr;
       }
     }
   }
 
   :global(.dark) .fishery-dashboard {
     .dashboard-panel {
-      border-color: rgba(99, 179, 237, 0.1);
+      border-color: rgb(99 179 237 / 10%);
       box-shadow: 0 2px 12px rgb(0 0 0 / 50%);
 
       &:hover {
-        border-color: rgba(99, 179, 237, 0.2);
+        border-color: rgb(99 179 237 / 20%);
         box-shadow: 0 4px 20px rgb(14 165 233 / 12%);
       }
     }
 
-    .production-card {
+    .decision-card {
       :deep(.el-card__header) {
-        border-bottom: 1px solid rgba(99, 179, 237, 0.1);
+        border-bottom: 1px solid rgb(99 179 237 / 10%);
       }
-    }
-
-    .area-water.dashboard-panel {
-      background: var(--art-deep-surface-bg);
     }
   }
 </style>
@@ -414,11 +464,11 @@
 
   :global(.dark) .fishery-dashboard {
     .dashboard-card-base {
-      border-color: rgba(99, 179, 237, 0.1);
+      border-color: rgb(99 179 237 / 10%);
       box-shadow: 0 2px 12px rgb(0 0 0 / 50%);
 
       &:hover {
-        border-color: rgba(99, 179, 237, 0.2);
+        border-color: rgb(99 179 237 / 20%);
         box-shadow: 0 4px 20px rgb(14 165 233 / 12%);
       }
     }

@@ -14,7 +14,7 @@
       <video
         ref="videoRef"
         class="w-full h-full object-cover"
-        src="/video/识别示例视频.mp4"
+        src="/video/VID_20260330_161745.mp4"
         autoplay
         muted
         loop

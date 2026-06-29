@@ -90,6 +90,10 @@
   import { ElMessage } from 'element-plus'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { detectGrowth } from '@/api/growth-monitoring/detect'
+  import {
+    DEFAULT_GROWTH_POND_ID,
+    useGrowthRecognitionStore
+  } from '@/store/modules/growth-recognition'
   import { loadingService } from '@/utils/ui'
   import type {
     GrowthDetectErrorCode,
@@ -136,9 +140,11 @@
 
   const {
     growthVideoTaskStatus,
+    growthVideoTaskId,
     growthVideoFrames,
     selectedGrowthFrameId,
     growthVideoAggregateStats,
+    growthVideoAggregateSummary,
     growthVideoMeta,
     growthVideoProgress,
     growthVideoErrorCode,
@@ -150,39 +156,48 @@
     selectFrameDetection
   } = useGrowthVideoTask()
 
+  const growthRecognitionStore = useGrowthRecognitionStore()
+
   const imageSelectedDetection = computed(
     () => detections.value.find((item) => item.id === selectedDetectionId.value) ?? null
   )
 
   const activeImage = computed(() =>
-    inputMode.value === 'growthVideo' ? selectedGrowthFrame.value?.image ?? null : imageMeta.value
+    inputMode.value === 'growthVideo' ? (selectedGrowthFrame.value?.image ?? null) : imageMeta.value
   )
 
   const activeDetections = computed(() =>
-    inputMode.value === 'growthVideo' ? selectedGrowthFrame.value?.detections ?? [] : detections.value
+    inputMode.value === 'growthVideo'
+      ? (selectedGrowthFrame.value?.detections ?? [])
+      : detections.value
   )
 
   const activeSelectedDetectionId = computed(() =>
     inputMode.value === 'growthVideo'
-      ? selectedGrowthFrame.value?.selectedDetectionId ?? null
+      ? (selectedGrowthFrame.value?.selectedDetectionId ?? null)
       : selectedDetectionId.value
   )
 
   const activeDetection = computed(() =>
     inputMode.value === 'growthVideo'
-      ? selectedGrowthFrame.value?.detections.find(
+      ? (selectedGrowthFrame.value?.detections.find(
           (item) => item.id === selectedGrowthFrame.value?.selectedDetectionId
-        ) ?? null
+        ) ?? null)
       : imageSelectedDetection.value
   )
 
   const activeStats = computed(() =>
-    inputMode.value === 'growthVideo' ? selectedGrowthFrame.value?.stats ?? EMPTY_STATS : stats.value
+    inputMode.value === 'growthVideo'
+      ? (selectedGrowthFrame.value?.stats ?? EMPTY_STATS)
+      : stats.value
   )
 
   const displayTaskStatus = computed<GrowthTaskStatus>(() => {
     if (inputMode.value === 'growthVideo') {
-      if (growthVideoTaskStatus.value === 'queued' || growthVideoTaskStatus.value === 'processing') {
+      if (
+        growthVideoTaskStatus.value === 'queued' ||
+        growthVideoTaskStatus.value === 'processing'
+      ) {
         return 'processing'
       }
       if (growthVideoTaskStatus.value === 'failed') {
@@ -242,10 +257,12 @@
   })
 
   const resultEmptyText = computed(() => {
-    if (displayTaskStatus.value === 'success' && activeImage.value && !activeDetections.value.length) {
-      return inputMode.value === 'growthVideo'
-        ? '当前关键帧未识别到石斑鱼'
-        : '未识别到石斑鱼'
+    if (
+      displayTaskStatus.value === 'success' &&
+      activeImage.value &&
+      !activeDetections.value.length
+    ) {
+      return inputMode.value === 'growthVideo' ? '当前关键帧未识别到石斑鱼' : '未识别到石斑鱼'
     }
     if (displayTaskStatus.value === 'failed') {
       return activeErrorMessage.value || '识别失败，请重新上传素材'
@@ -321,6 +338,76 @@
     errorMessage.value = mapImageErrorMessage(response.errorCode)
   }
 
+  const getAverageConfidence = (items: GrowthDetectionItem[]) => {
+    const validConfidences = items
+      .map((item) => item.confidence)
+      .filter((value) => Number.isFinite(value))
+
+    if (!validConfidences.length) return undefined
+
+    const total = validConfidences.reduce((sum, value) => sum + value, 0)
+    return Number((total / validConfidences.length).toFixed(3))
+  }
+
+  const writeImageRecognitionSummary = (response: GrowthDetectResponse) => {
+    if (
+      response.taskStatus !== 'success' ||
+      response.errorCode ||
+      response.stats.detectedCount <= 0
+    ) {
+      return
+    }
+
+    // 第一阶段生长识别页没有池塘选择，先写入默认池塘，避免跨页摘要缺少业务归属。
+    const pondId = DEFAULT_GROWTH_POND_ID
+
+    growthRecognitionStore.setLatestSummary({
+      pondId,
+      sourceType: 'image',
+      sampleSource: 'user-upload',
+      detectedCount: response.stats.detectedCount,
+      measurableCount: response.stats.measurableCount,
+      unmeasurableCount: response.stats.unmeasurableCount,
+      small: response.stats.small,
+      normal: response.stats.normal,
+      large: response.stats.large,
+      avgBodyLengthCm: response.summary.avgBodyLengthCm,
+      avgWeightG: response.summary.avgWeightG,
+      avgConfidence: getAverageConfidence(response.detections),
+      isDemoData: false
+    })
+  }
+
+  const writeVideoRecognitionSummary = () => {
+    if (
+      growthVideoTaskStatus.value !== 'success' ||
+      growthVideoAggregateStats.value.detectedCount <= 0
+    ) {
+      return
+    }
+
+    // 第一阶段生长识别页没有池塘选择，先写入默认池塘，避免跨页摘要缺少业务归属。
+    const pondId = DEFAULT_GROWTH_POND_ID
+    const allDetections = growthVideoFrames.value.flatMap((frame) => frame.detections)
+
+    growthRecognitionStore.setLatestSummary({
+      pondId,
+      sourceType: 'video',
+      sampleSource: 'video-task',
+      taskId: growthVideoTaskId.value ?? undefined,
+      detectedCount: growthVideoAggregateStats.value.detectedCount,
+      measurableCount: growthVideoAggregateStats.value.measurableCount,
+      unmeasurableCount: growthVideoAggregateStats.value.unmeasurableCount,
+      small: growthVideoAggregateStats.value.small,
+      normal: growthVideoAggregateStats.value.normal,
+      large: growthVideoAggregateStats.value.large,
+      avgBodyLengthCm: growthVideoAggregateSummary.value.avgBodyLengthCm,
+      avgWeightG: growthVideoAggregateSummary.value.avgWeightG,
+      avgConfidence: getAverageConfidence(allDetections),
+      isDemoData: false
+    })
+  }
+
   const handleImageUpload = async (imgData: string) => {
     clearVideoTask()
     inputMode.value = 'image'
@@ -340,6 +427,7 @@
       taskStatus.value = 'processing'
       const result = await detectGrowth(imgData)
       applyDetectResponse(result)
+      writeImageRecognitionSummary(result)
 
       if (result.errorCode === 'NO_FISH_DETECTED') {
         ElMessage.warning('未识别到石斑鱼')
@@ -426,6 +514,7 @@
     if (!previous || previous === value) return
 
     if (value === 'success') {
+      writeVideoRecognitionSummary()
       ElMessage.success('视频关键帧识别完成')
     }
 

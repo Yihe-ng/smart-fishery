@@ -134,28 +134,28 @@
 
     .content-wrapper {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
       flex: 1;
       gap: 16px;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .score-container {
-      flex-shrink: 0;
       display: flex;
+      flex-shrink: 0;
       align-items: center;
     }
 
     .risks-container {
-      flex: 1;
       display: flex;
+      flex: 1;
       flex-direction: column;
       justify-content: space-around;
       min-width: 0;
 
       .risk-item {
-        flex: 1;
         display: flex;
+        flex: 1;
         flex-direction: column;
         justify-content: center;
 
