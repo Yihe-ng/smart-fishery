@@ -40,6 +40,15 @@ class GrowthDetectionItem(BaseModel):
     className: Optional[str] = None
     isMeasurable: bool = True
     measurabilityLabel: str = "可测"
+    # ---- 可选 debug 字段（仅 two_stage 管线填充；legacy 为 None）----
+    instanceId: Optional[str] = None
+    segmentationConfidence: Optional[float] = None
+    singleMeasurableProbability: Optional[float] = None
+    finalMeasurableProbability: Optional[float] = None
+    temporalApplied: Optional[bool] = None
+    temporalPolicy: Optional[str] = None
+    temporalFallbackReason: Optional[str] = None
+    temporalHistoryCount: Optional[int] = None
 
 
 class GrowthStats(BaseModel):

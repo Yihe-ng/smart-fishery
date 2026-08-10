@@ -63,6 +63,10 @@ ALLOWED_VIDEO_CONTENT_TYPES = {
 
 _detector: Optional[YOLODetector] = None
 _detector_lock = threading.Lock()
+_pipeline = None
+_pipeline_lock = threading.Lock()
+_growth_manifest = None
+_growth_manifest_lock = threading.Lock()
 _video_task_lock = threading.Lock()
 _video_tasks: Dict[str, GrowthVideoDetectResultResponse] = {}
 
@@ -79,15 +83,117 @@ def get_detector() -> YOLODetector:
     return _detector
 
 
-def _detect_payload(image_base64: str) -> Dict[str, object]:
+def _default_manifest_path() -> str:
+    """新管线默认 manifest 路径（growth_final.json，正式冻结清单）。"""
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "..",
+        "..",
+        "..",
+        "models",
+        "ai",
+        "pipeline",
+        "manifests",
+        "growth_final.json",
+    )
+
+
+def get_pipeline():
+    """懒加载 FishAnalysisPipeline 单例（feature flag=two_stage 时使用）。"""
+    global _pipeline
+    if _pipeline is None:
+        with _pipeline_lock:
+            if _pipeline is None:
+                from app.models.ai.pipeline.manifest import load_manifest
+                from app.models.ai.pipeline.pipeline import FishAnalysisPipeline
+
+                manifest_path = settings.GROWTH_MANIFEST_PATH or _default_manifest_path()
+                print(f"[Growth] Loading two_stage pipeline manifest: {manifest_path}")
+                manifest = load_manifest(manifest_path)
+                _pipeline = FishAnalysisPipeline.from_manifest(
+                    manifest,
+                    device=settings.GROWTH_PIPELINE_DEVICE,
+                )
+    return _pipeline
+
+
+def get_growth_manifest():
+    """读取当前正式 manifest，统一提供换算、分档和估重业务参数。"""
+    global _growth_manifest
+    if _pipeline is not None:
+        return _pipeline.manifest
+    if _growth_manifest is None:
+        with _growth_manifest_lock:
+            if _growth_manifest is None:
+                from app.models.ai.pipeline.manifest import load_manifest
+
+                _growth_manifest = load_manifest(
+                    settings.GROWTH_MANIFEST_PATH or _default_manifest_path()
+                )
+    return _growth_manifest
+
+
+def _detect_payload_two_stage(
+    image_base64: str,
+    *,
+    stream_id: Optional[str] = None,
+    frame_index: Optional[int] = None,
+    timestamp_sec: Optional[float] = None,
+    temporal_enabled: Optional[bool] = None,
+) -> Dict[str, object]:
+    """新管线推理入口：图片（时序强制关闭）或视频帧（由 manifest 决定）。"""
+    from app.models.ai.pipeline.image_io import decode_base64_to_rgb
+
+    pipeline = get_pipeline()
+    image_rgb, image_meta = decode_base64_to_rgb(image_base64)
+    if stream_id is None:
+        output = pipeline.analyze_image(image_rgb, image_meta)
+    else:
+        output = pipeline.analyze_frame(
+            image_rgb,
+            image_meta,
+            stream_id=stream_id,
+            frame_index=int(frame_index or 0),
+            timestamp_sec=timestamp_sec,
+            temporal_enabled_override=temporal_enabled,
+        )
+    return {
+        "image": {
+            "src": image_meta["src"],
+            "width": image_meta["width"],
+            "height": image_meta["height"],
+        },
+        "detections": pipeline.to_legacy_detections(output),
+        "debug": output.debug,
+    }
+
+
+def _detect_payload(
+    image_base64: str,
+    *,
+    stream_id: Optional[str] = None,
+    frame_index: Optional[int] = None,
+    timestamp_sec: Optional[float] = None,
+    temporal_enabled: Optional[bool] = None,
+) -> Dict[str, object]:
+    """按 feature flag 分发推理路径：legacy（默认）| two_stage。"""
+    if settings.GROWTH_PIPELINE == "two_stage":
+        return _detect_payload_two_stage(
+            image_base64,
+            stream_id=stream_id,
+            frame_index=frame_index,
+            timestamp_sec=timestamp_sec,
+            temporal_enabled=temporal_enabled,
+        )
     with _detector_lock:
         return get_detector().detect(image_base64)
 
 
 def _map_status(body_length_cm: float) -> Tuple[str, str]:
-    if body_length_cm < settings.GROWTH_SMALL_THRESHOLD:
+    business = get_growth_manifest().business
+    if body_length_cm < business.small_threshold_cm:
         return "small", "偏小"
-    if body_length_cm <= settings.GROWTH_LARGE_THRESHOLD:
+    if body_length_cm <= business.large_threshold_cm:
         return "normal", "正常"
     return "large", "偏大"
 
@@ -106,12 +212,13 @@ def _is_measurable_detection(detection: Dict[str, object]) -> bool:
 def _estimate_weight(length_cm: float) -> float:
     if length_cm <= 0:
         return 0
-    weight = GROUPER_WEIGHT_COEF_A * math.pow(length_cm, GROUPER_WEIGHT_COEF_B)
+    business = get_growth_manifest().business
+    weight = business.weight_coefficient_a * math.pow(length_cm, business.weight_exponent_b)
     return round(weight, 1)
 
 
-def _safe_cm(value: object) -> float | None:
-    """Convert pixel length to cm, returning None for invalid inputs."""
+def _safe_cm(value: object, cm_per_pixel: Optional[float] = None) -> float | None:
+    """按 manifest 场景先验把像素长度转为估算厘米，拒绝无效输入。"""
     if value is None:
         return None
     try:
@@ -120,7 +227,8 @@ def _safe_cm(value: object) -> float | None:
         return None
     if v <= 0:
         return None
-    return round(v * CM_PER_PIXEL, 1)
+    scale = cm_per_pixel if cm_per_pixel is not None else get_growth_manifest().measurement.cm_per_pixel
+    return round(v * scale, 1)
 
 
 def _is_valid_detection(bbox: List[float], image_meta: Dict[str, int]) -> bool:
@@ -144,6 +252,7 @@ def _build_detection_items(
 ) -> List[GrowthDetectionItem]:
     center_x = image_meta["width"] / 2
     center_y = image_meta["height"] / 2
+    cm_per_pixel = get_growth_manifest().measurement.cm_per_pixel
     sortable_items = []
 
     for detection in raw_detections:
@@ -155,7 +264,7 @@ def _build_detection_items(
         class_name = str(detection.get("class_name") or "")
         is_measurable = _is_measurable_detection(detection)
         if is_measurable:
-            body_length_cm = round(float(detection.get("length", 0)) * CM_PER_PIXEL, 1)
+            body_length_cm = _safe_cm(detection.get("length", 0), cm_per_pixel) or 0.0
             status, status_text = _map_status(body_length_cm)
             weight_g = _estimate_weight(body_length_cm)
             label_text = f"{status_text} | {body_length_cm}cm"
@@ -191,6 +300,19 @@ def _build_detection_items(
                 "class_name": class_name,
                 "is_measurable": is_measurable,
                 "measurability_label": measurability_label,
+                # two_stage 可选 debug 字段（legacy 恒为 None，API 兼容）
+                "instance_id": detection.get("instance_id"),
+                "seg_confidence": detection.get("seg_confidence"),
+                "single_measurable_probability": detection.get(
+                    "single_measurable_probability"
+                ),
+                "final_measurable_probability": detection.get(
+                    "final_measurable_probability"
+                ),
+                "temporal_applied": detection.get("temporal_applied"),
+                "temporal_policy": detection.get("temporal_policy"),
+                "temporal_fallback_reason": detection.get("temporal_fallback_reason"),
+                "temporal_history_count": detection.get("temporal_history_count"),
             }
         )
 
@@ -216,11 +338,19 @@ def _build_detection_items(
             maskPolygons=item.get("mask_polygons") or [],
             measurementMethod=item.get("measurement_method"),
             measurementConfidence=item.get("measurement_confidence"),
-            visibleMaskLengthCm=_safe_cm(item.get("visible_mask_length_px")),
+            visibleMaskLengthCm=_safe_cm(item.get("visible_mask_length_px"), cm_per_pixel),
             measurementReasons=item.get("measurement_reasons"),
             className=item.get("class_name"),
             isMeasurable=bool(item.get("is_measurable")),
             measurabilityLabel=str(item.get("measurability_label")),
+            instanceId=item.get("instance_id"),
+            segmentationConfidence=item.get("seg_confidence"),
+            singleMeasurableProbability=item.get("single_measurable_probability"),
+            finalMeasurableProbability=item.get("final_measurable_probability"),
+            temporalApplied=item.get("temporal_applied"),
+            temporalPolicy=item.get("temporal_policy"),
+            temporalFallbackReason=item.get("temporal_fallback_reason"),
+            temporalHistoryCount=item.get("temporal_history_count"),
         )
         for index, item in enumerate(sortable_items, start=1)
     ]
@@ -396,6 +526,9 @@ def _process_video_task(task_id: str, temp_path: str, filename: str) -> None:
     capture = None
     started_at = time.time()
     try:
+        # 两阶段管线：每个视频任务独立 stream_id，重置时序状态防止串线
+        if settings.GROWTH_PIPELINE == "two_stage":
+            get_pipeline().reset_temporal_state(task_id)
         _update_video_task(task_id, taskStatus="processing", progress=5, startedAt=started_at)
 
         capture = cv2.VideoCapture(temp_path)
@@ -431,7 +564,13 @@ def _process_video_task(task_id: str, temp_path: str, filename: str) -> None:
                 continue
 
             frame_base64 = _encode_frame_to_base64(frame)
-            frame_detection_result = _detect_payload(frame_base64)
+            frame_detection_result = _detect_payload(
+                frame_base64,
+                stream_id=task_id,
+                frame_index=timestamp_sec,
+                timestamp_sec=float(timestamp_sec),
+                temporal_enabled=settings.GROWTH_VIDEO_TEMPORAL_ENABLED,
+            )
             frames.append(
                 _build_frame_item(
                     frame_id=f"frame-{len(frames) + 1}",
