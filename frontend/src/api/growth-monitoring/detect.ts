@@ -26,7 +26,9 @@ export async function detectGrowth(img: string | Blob): Promise<GrowthDetectResp
 
   return api.post<GrowthDetectResponse>({
     url: '/api/growth/detect',
-    params: { image: base64Data }
+    params: { image: base64Data },
+    // 图片识别包含分割、分类和几何测长，按方案单独放宽到 60 秒；其他请求仍为 15 秒。
+    timeout: 60_000
   })
 }
 
