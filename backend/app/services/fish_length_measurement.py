@@ -47,6 +47,10 @@ class MeasurementConfig:
     min_path_score_gap: float = 0.06
     max_turn_rate: float = 0.55
     max_core_component_count: int = 2
+    # gap 竞争者判定：次佳路径与最佳路径重合度 >= 该值且长度偏离 <= 容差时，
+    # 视为同一条路径的分叉变体（伪竞争者），跳过不参与 gap 比较。
+    gap_competitor_max_iou: float = 0.7
+    gap_competitor_length_tolerance: float = 0.15
 
 
 DEFAULT_MEASUREMENT_CONFIG = MeasurementConfig()
@@ -518,7 +522,14 @@ def _compute_scored_centerline(
         "path_points": [],
     }
     try:
-        skeleton = skeletonize(mask > 0)
+        ys, xs = np.where(mask > 0)
+        if not len(xs):
+            return 0.0, info
+        y0, y1 = int(ys.min()), int(ys.max()) + 1
+        x0, x1 = int(xs.min()), int(xs.max()) + 1
+        sub = skeletonize(mask[y0:y1, x0:x1] > 0)
+        skeleton = np.zeros_like(mask, dtype=bool)
+        skeleton[y0:y1, x0:x1] = sub
     except Exception:
         return 0.0, info
     pixels = [tuple(int(value) for value in point) for point in np.column_stack(np.where(skeleton))]
@@ -564,17 +575,41 @@ def _compute_scored_centerline(
         return 0.0, info
     candidates.sort(key=lambda item: item["score"], reverse=True)
     best = candidates[0]
-    second_score = float(candidates[1]["score"]) if len(candidates) > 1 else 0.0
+    
+    best_pixels = set(best["path"])
+    best_length = float(best["arc_length"])
+    competitor_score = 0.0
+    competitor_index = None
+    
+    for index, cand in enumerate(candidates[1:], start=1):
+        cand_pixels = set(cand["path"])
+        intersection = len(best_pixels & cand_pixels)
+        union = len(best_pixels | cand_pixels)
+        iou = intersection / max(union, 1)
+        length_ratio = float(cand["arc_length"]) / max(best_length, 1e-6)
+        length_deviation = abs(1.0 - length_ratio)
+        
+        if (
+            iou < config.gap_competitor_max_iou
+            or length_deviation > config.gap_competitor_length_tolerance
+        ):
+            competitor_score = float(cand["score"])
+            competitor_index = index
+            break
+    
+    gap = float(best["score"]) - competitor_score
+    
     info.update(
         {
-            "main_path_ratio": min(1.0, float(best["arc_length"]) / max(total_length, 1.0)),
+            "main_path_ratio": min(1.0, best_length / max(total_length, 1.0)),
             "path_score": float(best["score"]),
-            "path_score_gap": float(best["score"] - second_score),
+            "path_score_gap": gap,
             "path_turn_rate": float(best["turn_rate"]),
             "path_points": [[float(col), float(row)] for row, col in best["path"]],
+            "gap_competitor_index": competitor_index,
         }
     )
-    return float(best["arc_length"]), info
+    return best_length, info
 
 
 def _neighbors(row: int, col: int, pixel_set: set[Tuple[int, int]]) -> List[Tuple[int, int]]:
