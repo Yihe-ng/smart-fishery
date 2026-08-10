@@ -13,11 +13,11 @@
         <el-descriptions-item label="生长状态">
           <el-tag :type="statusType">{{ result.statusText }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="体长">
+        <el-descriptions-item label="估算体长">
           <span class="metric-value">{{ result.isMeasurable ? result.bodyLengthCm : '-' }}</span>
           <span v-if="result.isMeasurable" class="metric-unit">cm</span>
         </el-descriptions-item>
-        <el-descriptions-item label="估重">
+        <el-descriptions-item label="估算重量">
           <span class="metric-value">{{ result.isMeasurable ? result.weightG : '-' }}</span>
           <span v-if="result.isMeasurable" class="metric-unit">g</span>
         </el-descriptions-item>
