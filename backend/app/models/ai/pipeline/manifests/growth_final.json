@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "manifest_id": "growth-pipeline-final-20260809-v3-scale-prior",
+  "profile_revision": "measurement-quality-v3-scale-prior-20260809",
+  "derived_from_manifest_id": "growth-pipeline-final-20260809-v3",
+  "release_status": "final",
+  "description": "正式冻结清单（2026-08-09）：沿用 v8 single-fish 分割、B0 分类和视频 S1 时序；测长采用人工审阅确认的 v3 quality guard。0.11 cm/px 为基于外部石斑鱼体长资料推导并经用户确认的演示场景先验，不是真实标定；位置修正关闭。 A5 准入策略：mode=strict、geometry_rescue_enabled=false（影子救援仅计算不生效）。",
+  "fixture": null,
+  "segmentation": {
+    "backend": "ultralytics_seg",
+    "path": "app/models/ai/releases/growth_20260808_v1/segmentation.pt",
+    "imgsz": 800,
+    "conf": 0.35,
+    "nms_iou": 0.7,
+    "retina_masks": true,
+    "mask_policy": "largest_connected_component",
+    "class_names": [
+      "fish"
+    ],
+    "min_confidence_for_measurement": 0.5,
+    "secondary_review_area_ratio": 0.05,
+    "sha256": "71920dc1e8a0b472857dc6f7479001bfb761dfbb58638a128630d0aeccca233c"
+  },
+  "classifier": {
+    "backend": "ultralytics_yolo_cls_t1",
+    "path": "app/models/ai/releases/growth_20260808_v1/measurability_classifier.pt",
+    "pretrained_path": "app/models/ai/releases/growth_20260808_v1/classifier_backbone.pt",
+    "input_size": 224,
+    "positive_semantic": "fish_measurable",
+    "class_names": [
+      "fish_measurable",
+      "fish_unmeasurable"
+    ],
+    "threshold": 0.5,
+    "batch_size": 16,
+    "temperature": null,
+    "sha256": "67140db301b622bee8291bee2f7215118c9ffcc59bcd6708244e7ccebd918ded"
+  },
+  "crop": {
+    "margin_fraction_each_side": 0.15,
+    "bbox_scale": 1.3,
+    "tile_size": 224,
+    "padding_value": 127,
+    "mask_focus_outside_brightness": null
+  },
+  "temporal": {
+    "enabled_for_image": false,
+    "enabled_for_video": true,
+    "policy": "causal_mean",
+    "window": 3,
+    "max_frame_gap": 10,
+    "fallback": "single",
+    "association": {
+      "a0_iou_threshold": 0.25,
+      "a1_score_weights": {
+        "mask_iou": 0.45,
+        "bbox_iou": 0.25,
+        "centroid": 0.2,
+        "area_ratio": 0.1
+      },
+      "a1_gates": {
+        "mask_iou_min": 0.25,
+        "centroid_distance_norm_max": 0.75,
+        "area_ratio_min": 0.5,
+        "area_ratio_max": 2.0,
+        "composite_score_min": 0.45,
+        "best_minus_second_best_min": 0.1,
+        "mutual_best": true
+      }
+    }
+  },
+  "measurement": {
+    "cm_per_pixel": 0.11,
+    "algorithm": "visible_centerline_hybrid",
+    "quality": {
+      "min_area_px": 60,
+      "min_solidity": 0.75,
+      "core_distance_fraction": 0.35,
+      "min_core_pixels": 20,
+      "min_axis_stability": 10.0,
+      "straight_max_curvature_ratio": 1.18,
+      "max_curvature_ratio": 1.68,
+      "max_secondary_area_ratio": 0.25,
+      "max_hole_area_ratio": 0.12,
+      "small_hole_fill_ratio": 0.02,
+      "max_highlight_ratio": 0.4,
+      "max_endpoint_count": 8,
+      "max_branch_count": 24,
+      "min_path_ratio": 0.45,
+      "min_path_score": 0.45,
+      "min_path_score_gap": 0.02,
+      "max_turn_rate": 0.55,
+      "max_core_component_count": 2
+    },
+    "scale": {
+      "cm_per_pixel": 0.11,
+      "position_correction_enabled": false,
+      "beta_x": 0.0,
+      "beta_y": 0.0,
+      "applicable_min_px": null,
+      "applicable_max_px": null
+    }
+  },
+  "business": {
+    "small_threshold_cm": 15.0,
+    "large_threshold_cm": 25.0,
+    "weight_coefficient_a": 0.0285,
+    "weight_exponent_b": 2.937
+  },
+  "admission_policy": {
+    "mode": "strict",
+    "geometry_rescue_enabled": false
+  }
+}

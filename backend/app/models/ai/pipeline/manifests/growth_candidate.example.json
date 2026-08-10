@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "manifest_id": "growth-pipeline-candidate-example",
+  "release_status": "candidate",
+  "description": "候选清单示例（2026-08-10 整理）：不含任何开发者本机绝对路径。权重路径指向仓库内正式冻结权重，仅作为可运行的占位示例；真实候选接入时替换本清单中的路径即可。禁止视为正式 release。",
+  "fixture": {
+    "type": "candidate_fixture",
+    "note": "示例清单：路径指向仓库内正式权重（releases/growth_20260808_v1/），仅为保证 smoke/回归可运行；替换候选时只改本 manifest，且候选权重应放入仓库 releases 目录或使用仓库相对路径。"
+  },
+  "segmentation": {
+    "backend": "ultralytics_seg",
+    "path": "app/models/ai/releases/growth_20260808_v1/segmentation.pt",
+    "imgsz": 800,
+    "conf": 0.35,
+    "nms_iou": 0.7,
+    "retina_masks": true,
+    "mask_policy": "largest_connected_component",
+    "class_names": ["fish"],
+    "secondary_review_area_ratio": 0.05
+  },
+  "classifier": {
+    "backend": "ultralytics_yolo_cls_t1",
+    "path": "app/models/ai/releases/growth_20260808_v1/measurability_classifier.pt",
+    "pretrained_path": "app/models/ai/releases/growth_20260808_v1/classifier_backbone.pt",
+    "input_size": 224,
+    "positive_semantic": "fish_measurable",
+    "class_names": ["fish_measurable", "fish_unmeasurable"],
+    "threshold": 0.5,
+    "batch_size": 16,
+    "temperature": null
+  },
+  "crop": {
+    "margin_fraction_each_side": 0.15,
+    "bbox_scale": 1.3,
+    "tile_size": 224,
+    "padding_value": 127,
+    "mask_focus_outside_brightness": null
+  },
+  "temporal": {
+    "enabled_for_image": false,
+    "enabled_for_video": false,
+    "policy": "causal_mean",
+    "window": 3,
+    "max_frame_gap": 10,
+    "fallback": "single",
+    "association": {
+      "a0_iou_threshold": 0.25,
+      "a1_score_weights": {
+        "mask_iou": 0.45,
+        "bbox_iou": 0.25,
+        "centroid": 0.2,
+        "area_ratio": 0.1
+      },
+      "a1_gates": {
+        "mask_iou_min": 0.25,
+        "centroid_distance_norm_max": 0.75,
+        "area_ratio_min": 0.5,
+        "area_ratio_max": 2.0,
+        "composite_score_min": 0.45,
+        "best_minus_second_best_min": 0.1,
+        "mutual_best": true
+      }
+    }
+  },
+  "measurement": {
+    "cm_per_pixel": 0.11
+  }
+}
