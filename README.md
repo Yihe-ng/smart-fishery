@@ -3,7 +3,7 @@
 ## 1. 项目简介
 智渔精养·石斑鱼智慧养殖一体化系统是一个前后端分离的渔业管理应用，后端基于 FastAPI 提供统一 API 与 WebSocket 能力，前端基于 Vue 3 + Vite 构建交互界面。仓库内已包含水质监测、智能投喂、设备/告警管理、用户与权限管理、天气查询，以及“生长识别”相关的图片和视频识别能力。
 
-系统主要用于渔业日常管理与识别分析：既可记录和查看水质数据、设备状态与告警，也可通过唯一的 YOLO 模型对鱼类生长状态进行图片识别和视频关键帧识别，并在前端页面中展示识别结果、统计信息和视频任务状态。适用场景包括鱼塘监控、养殖生产管理、生长辅助识别、投喂建议查看与管理后台操作。
+系统主要用于渔业日常管理与识别分析：既可记录和查看水质数据、设备状态与告警，也可通过两阶段生长识别管线（分割 → 可测性分类 → 几何测长）对鱼类生长状态进行图片识别和视频关键帧识别，并在前端页面中展示识别结果、统计信息和视频任务状态。适用场景包括鱼塘监控、养殖生产管理、生长辅助识别、投喂建议查看与管理后台操作。
 
 ## 2. 技术栈
 
@@ -28,7 +28,7 @@
 | 数据库 | SQLite、SQLAlchemy、sqlalchemy-utils | 持久化水质、用户、告警等数据 |
 | 数据校验 | Pydantic、pydantic-settings | 配置与接口数据模型 |
 | 鉴权/密码 | passlib[bcrypt] | 密码处理与认证相关能力 |
-| AI / 模型 | torch、torchvision、ultralytics、Pillow、opencv-python | 图片/视频识别与 YOLO 推理 |
+| AI / 模型 | torch、torchvision、ultralytics、Pillow、opencv-python | 两阶段生长识别管线（分割 + 可测性分类 + 几何测长），YOLO 用于分割与分类推理 |
 | 外部接口 | httpx、Open-Meteo API | 获取天气数据 |
 | 环境配置 | python-dotenv | 读取后端 `.env` |
 | 工程化工具 | uv、pnpm | 后端与前端依赖管理 |
@@ -46,9 +46,12 @@ flowchart LR
     A --> G[生长识别接口]
     A --> AG[AI Gateway / Agent 路由]
 
-    G --> M[YOLODetector]
-    M --> P[YOLO 模型 best.pt]
-    G --> S[图片预处理 / 视频抽帧 / 结果整理]
+    G --> P2[两阶段管线 FishAnalysisPipeline]
+    P2 --> SEG[分割模型 segmentation.pt]
+    P2 --> CLS[可测性分类器 measurability_classifier.pt]
+    P2 --> LEN[几何测长 / 体长换算]
+    P2 --> MF[正式清单 growth_final.json 驱动]
+    SEG -->|legacy 回退| YD[YOLODetector + best.pt]
 
     WQ --> SV[业务服务层]
     SV --> D[SQLAlchemy ORM]
@@ -77,7 +80,19 @@ flowchart LR
 │   │   ├── crud
 │   │   ├── db
 │   │   ├── models
-│   │   │   └── ai/best.pt
+│   │   │   ├── ai
+│   │   │   │   ├── best.pt                       # legacy 单模型（回退路径）
+│   │   │   │   ├── pipeline/                     # 两阶段生长识别管线
+│   │   │   │   │   ├── pipeline.py               # 管线编排
+│   │   │   │   │   ├── manifest.py               # manifest 解析与校验
+│   │   │   │   │   ├── admission_policy.py       # A5 准入策略模块
+│   │   │   │   │   ├── segmenter.py / classifier_*.py / crop_builder.py / temporal.py
+│   │   │   │   │   └── manifests/
+│   │   │   │   │       ├── growth_final.json     # 正式冻结清单（参数唯一真源）
+│   │   │   │   │       └── growth_candidate.example.json
+│   │   │   │   └── releases/
+│   │   │   │       └── growth_20260808_v1/       # 冻结权重（分割/分类器/骨干）
+│   │   │   └── yolo_detector.py
 │   │   ├── routers
 │   │   ├── schemas
 │   │   ├── services
@@ -86,6 +101,8 @@ flowchart LR
 │   ├── data
 │   │   └── smart_fishery_db.db
 │   ├── seed_data.py
+│   ├── tests/                                    # 单元/接口测试
+│   ├── tools/                                    # 审计/评估/复审工具（离线）
 │   ├── pyproject.toml
 │   └── uv.lock
 ├── frontend
@@ -109,6 +126,7 @@ flowchart LR
 │   ├── index.html
 │   ├── package.json
 │   └── vite.config.ts
+├── demo_assets/                                 # 演示素材（比赛图/增强图等）
 ├── dev.py
 └── README.md
 ```
@@ -120,8 +138,11 @@ flowchart LR
 | `backend/app/main.py` | 后端服务入口，创建 FastAPI 应用，注册 CORS、API 路由和 WebSocket 路由，并在启动时初始化数据库表 |
 | `backend/app/api/v1/api.py` | API 汇总入口，统一挂载各业务路由 |
 | `backend/app/api/v1/endpoints/` | 后端业务接口实现目录，包含认证、水质、用户、权限、鱼塘、投喂、设备、告警、健康、天气、生长识别等接口 |
-| `backend/app/models/` | ORM 模型目录，包含用户、水质数据、告警记录，以及 `models/ai/best.pt` 模型文件 |
-| `backend/app/models/ai/yolo_detector.py` | YOLO 推理封装，负责图片解码、模型推理和结果整理 |
+| `backend/app/models/` | ORM 模型目录，包含用户、水质数据、告警记录，以及 AI 推理相关代码与权重 |
+| `backend/app/models/ai/pipeline/` | 两阶段生长识别管线：分割/裁剪/可测性分类/时序/测长编排，manifest 驱动 |
+| `backend/app/models/ai/pipeline/manifests/growth_final.json` | 正式冻结清单：算法参数唯一真源（分类阈值/厘米换算/质量门槛/体长分档/估重/准入策略） |
+| `backend/app/models/ai/releases/` | 管线冻结权重（segmentation.pt / measurability_classifier.pt / classifier_backbone.pt），随仓库分发 |
+| `backend/app/models/ai/yolo_detector.py` | legacy YOLO 推理封装（回退路径，`GROWTH_PIPELINE=legacy` 时使用） |
 | `backend/algorithms/prediction.py` | 水质规则分析逻辑，根据传入指标输出分析结果和告警等级 |
 | `backend/app/services/` | 业务服务层，包含水质分析、智能投喂、天气服务和仪表盘帧组装逻辑 |
 | `backend/app/db/` | 数据库连接、会话和基础表定义 |
@@ -145,7 +166,7 @@ flowchart LR
 
 | 功能模块 | 功能作用 | 输入 | 处理逻辑 | 输出 |
 |---|---|---|---|---|
-| 生长图片识别 | 对单张图片中的鱼类进行识别 | Base64 图片数据 | `backend/app/api/v1/endpoints/growth.py` 调用 `YOLODetector`，完成图片解码、YOLO 推理、检测框过滤、排序与统计 | 识别结果、检测列表、统计信息、平均体长/体重、错误码 |
+| 生长图片识别 | 对单张图片中的鱼类进行识别 | Base64 图片数据 | `backend/app/api/v1/endpoints/growth.py` 调用两阶段管线 `FishAnalysisPipeline`（分割 → 可测性分类 → 几何测长），参数由 `growth_final.json` 驱动，完成检测、体长/重量估算与统计 | 识别结果、检测列表、统计信息、平均体长/体重、错误码 |
 | 生长视频识别 | 对上传视频的关键帧进行识别 | 视频文件 | 后端接收上传文件后按时间采样抽帧，逐帧调用图片识别逻辑，异步生成任务结果 | 任务 ID、任务状态、视频元信息、关键帧识别结果、聚合统计 |
 | 摄像头流地址获取 | 提供摄像头流播放地址 | 无 | `growth.py` 直接返回一个流地址字符串 | 流地址 |
 | 水质数据上报与分析 | 记录并分析水质指标 | 溶解氧、pH、温度、氨氮、亚硝酸盐等 | `algorithms/prediction.py` 根据阈值生成分析结论和告警等级，`services/water_analysis.py` 写入数据库 | 水质分析结果、告警等级、历史记录 |
@@ -169,12 +190,13 @@ flowchart TD
     D --> F[POST /api/growth/detect/video]
 
     E --> G[后端图片解码与校验]
-    G --> H[YOLODetector 加载 best.pt]
-    H --> I[YOLO 模型推理]
-    I --> J[结果过滤与排序]
-    J --> K[体长换算与重量估算]
-    K --> L[组装检测结果与统计]
-    L --> M[前端结果卡片 / 列表 / 叠加层展示]
+    G --> H[两阶段管线 FishAnalysisPipeline]
+    H --> H1[分割 segmentation.pt]
+    H1 --> H2[crop 裁剪 + 可测性分类]
+    H2 --> H3[几何测长 / 体长换算]
+    H3 --> I[准入判定 + 原因码]
+    I --> J[组装检测结果与统计]
+    J --> K[前端结果卡片 / 列表 / 叠加层展示]
 
     F --> N[后端抽帧采样]
     N --> O[逐帧 Base64 编码]
@@ -234,7 +256,7 @@ pnpm install
 | `frontend/.env.development` | 前端开发环境变量文件，仓库中已存在 |
 | `frontend/.env.production` | 前端生产环境变量文件，仓库中已存在 |
 
-后端 `.env` 建议包含以下模板内容：
+后端 `.env` 建议包含以下模板内容（生长识别开关为可选，缺省使用默认值）：
 
 ```env
 DATABASE_URL=sqlite:///./data/smart_fishery_db.db
@@ -243,7 +265,16 @@ ai_mode=real
 agent_sk=请在本地填写
 ai_model=qwen3.5-flash
 ai_base_url=请在本地填写
+
+# 生长识别推理路径：two_stage（冻结两阶段管线，默认）| legacy（旧 YOLO 回退）
+GROWTH_PIPELINE=two_stage
+# 管线 manifest 覆盖（为空使用正式清单 growth_final.json）
+GROWTH_MANIFEST_PATH=
+# 推理设备：cpu（默认）| cuda:0
+GROWTH_PIPELINE_DEVICE=cpu
 ```
+
+> **配置分工**：`.env` / `backend/app/core/config.py` 只放运行开关（管线选型、manifest 路径、推理设备、视频目录等）；算法参数（分类阈值、分割置信门槛、厘米换算、几何质量门槛、体长分档、估重系数、准入策略）统一在 `backend/app/models/ai/pipeline/manifests/growth_final.json` 中配置，该文件是这些参数的**唯一真源**，修改参数不需要改代码。
 
 前端开发环境变量当前可参考：
 
@@ -261,7 +292,7 @@ VITE_DROP_CONSOLE=false
 | 项目 | 说明 |
 |---|---|
 | SQLite 数据库 | 后端启动时会通过 `Base.metadata.create_all(bind=engine)` 自动创建表结构 |
-| 模型文件 | 生长识别依赖唯一模型 `backend/app/models/ai/best.pt`，该文件已存在于仓库中；如果被替换或删除，需要重新准备 |
+| 模型文件 | 两阶段管线权重位于 `backend/app/models/ai/releases/growth_20260808_v1/`（segmentation.pt / measurability_classifier.pt / classifier_backbone.pt），已随仓库分发，无需手动准备；legacy 回退路径依赖 `backend/app/models/ai/best.pt` |
 | 外部天气接口 | `weather_service.py` 会访问 Open-Meteo API，联网环境下可直接使用 |
 
 ### 8.6 数据库初始化
@@ -271,6 +302,17 @@ VITE_DROP_CONSOLE=false
 ```text
 backend/data/smart_fishery_db.db
 ```
+
+### 8.7 Linux 部署要点
+
+部署目标机为 Linux 设备（无 Windows 依赖），按以下要点操作：
+
+1. **克隆仓库后无需额外拷贝模型**：两阶段管线权重（`backend/app/models/ai/releases/growth_20260808_v1/`）已随仓库分发，manifest 中的模型路径为相对路径，自动解析到仓库根。
+2. **必须创建 `backend/.env`**：该文件未入库（gitignore），需按 §8.4 模板手动创建；至少包含 `DATABASE_URL` 与 AI 网关配置；生长识别开关缺省即用默认值（`two_stage` / `cpu`）。
+3. **生产代码无 Windows 绝对路径依赖**：模型路径、数据目录均为相对路径；视频目录默认指向 `../frontend/public/video`（相对 backend）。
+4. **依赖安装**：后端 `uv sync`（需 uv），前端 `pnpm install`（可选，若只跑后端 API 可跳过前端构建）。
+5. **启动**：`cd backend && uv run python -m app.main`，健康检查 `http://<IP>:8000/health`；如需外网访问，用 `uvicorn`/systemd 托管并开放 8000 端口。
+6. **CPU 推理**：默认 `GROWTH_PIPELINE_DEVICE=cpu`，无需 GPU/CUDA；推理耗时较 GPU 长属正常。
 
 
 ## 9. 启动方法
@@ -284,7 +326,7 @@ backend/data/smart_fishery_db.db
 | 后端依赖 | 已执行 `uv sync` |
 | 前端依赖 | 已执行 `pnpm install` |
 | 数据库文件 | `backend/data/smart_fishery_db.db` 可访问 |
-| 模型文件 | `backend/app/models/ai/best.pt` 存在 |
+| 模型文件 | 两阶段管线权重 `backend/app/models/ai/releases/growth_20260808_v1/` 存在（legacy 路径还需 `best.pt`） |
 | 后端端口 | 默认 `8000`，如被占用需先释放 |
 | 前端端口 | 开发环境默认 `3006`，如被占用需修改 `frontend/.env.development` |
 
@@ -385,7 +427,7 @@ curl "http://127.0.0.1:8000/api/growth/camera/stream"
 |---|---|---|
 | 后端启动失败 | `uv` 未安装、依赖未同步、Python 版本不满足 | 检查 `uv --version`，重新执行 `uv sync`，确认 Python >= 3.11.8 |
 | 前端启动失败 | `pnpm` 未安装或 `node_modules` 缺失 | 在 `frontend` 目录重新执行 `pnpm install` |
-| 识别接口返回模型错误 | `best.pt` 缺失或损坏 | 确认 `backend/app/models/ai/best.pt` 存在且可读取 |
+| 识别接口返回模型错误 | 管线权重缺失或损坏 | 确认 `backend/app/models/ai/releases/growth_20260808_v1/` 下三个 .pt 文件存在且可读取（legacy 路径检查 `best.pt`） |
 | 图片识别失败 | 上传内容不是有效图片或体积过大 | 检查 Base64 是否正确，图片是否超过 10MB 左右限制 |
 | 视频识别失败 | 视频格式不支持、文件太大、无法解码 | 使用 `.mp4`、`.mov`、`.webm`、`.avi`、`.mkv` 等支持格式，并控制文件大小 |
 | 前后端接口不通 | 前端代理指向错误或后端未启动 | 确认后端已启动，再检查 `frontend/.env.development` 中的 `VITE_API_PROXY_URL` |
@@ -398,9 +440,8 @@ curl "http://127.0.0.1:8000/api/growth/camera/stream"
 
 1. 将后端接口返回的错误码与前端提示文案进一步统一，减少页面内硬编码映射。
 2. 为 `growth` 视频任务增加更明确的过期清理机制，避免内存中的任务结果长期累积。
-3. 补齐根目录级别的部署说明与样例环境文件，减少首次启动成本。
-4. 为模型文件、数据库初始化和种子数据增加独立校验脚本，降低手工准备风险。
-5. 将水质分析、投喂建议和生长识别结果整理为更统一的数据契约，便于前后端协作和测试。
+3. 为模型文件、数据库初始化和种子数据增加独立校验脚本，降低手工准备风险。
+4. 将水质分析、投喂建议和生长识别结果整理为更统一的数据契约，便于前后端协作和测试。
 
 ## 13. 致谢
 
