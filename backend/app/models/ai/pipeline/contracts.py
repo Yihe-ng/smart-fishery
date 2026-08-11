@@ -36,6 +36,7 @@ class FishInstance:
     segmentation_confidence: float  # [0, 1]
     source_shape: Tuple[int, int]  # (width, height)
     class_name: Optional[str] = None  # 分割器原生类别名（可空，业务层不依赖）
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class FishSegmenterProtocol(Protocol):
