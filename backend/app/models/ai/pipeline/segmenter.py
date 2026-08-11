@@ -175,8 +175,9 @@ class UltralyticsSegmenter(FishSegmenterProtocol):
                     mask_bool = _mask_to_bool(raw_mask, height, width)
                 except Exception:
                     continue
+                component_audit: dict[str, Any] = {}
                 if self._mask_policy == "largest_connected_component":
-                    mask_bool, _ = clean_disconnected_components(
+                    mask_bool, component_audit = clean_disconnected_components(
                         mask_bool, self._secondary_review_area_ratio
                     )
                 elif self._mask_policy == "raw":
@@ -194,6 +195,7 @@ class UltralyticsSegmenter(FishSegmenterProtocol):
                         segmentation_confidence=float(box.conf[0]),
                         source_shape=(width, height),
                         class_name=class_name,
+                        metadata={"cleaned_component_audit": component_audit},
                     )
                 )
                 instance_counter += 1

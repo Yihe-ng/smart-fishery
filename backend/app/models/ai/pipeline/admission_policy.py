@@ -43,6 +43,14 @@ class AdmissionPolicyConfig:
     # 救援概率下限：None 表示不设下限（影子实验档位）；设置后分类概率低于
     # 该值的候选救援被阻断（审核数据：P<0.1 正确率仅 28%，P>=0.4 达 94%）
     min_rescue_probability: Optional[float] = None
+    # 两档救援：P >= ceiling 沿用基础几何救援；低于 ceiling 但不低于 floor
+    # 的候选必须额外通过以下路径质量门槛。None 表示不启用第二档质量门槛。
+    tier_b_probability_ceiling: Optional[float] = None
+    tier_b_min_segmentation_confidence: Optional[float] = None
+    tier_b_min_path_score: Optional[float] = None
+    tier_b_min_path_score_gap: Optional[float] = None
+    tier_b_max_path_turn_rate: Optional[float] = None
+    tier_b_max_curvature_ratio: Optional[float] = None
 
 
 @dataclass
@@ -78,6 +86,11 @@ def _collect_rescue_signals(
     reason_codes: List[str],
     raw_geometry_confidence: Optional[float] = None,
     p_measurable: Optional[float] = None,
+    segmentation_confidence: Optional[float] = None,
+    path_score: Optional[float] = None,
+    path_score_gap: Optional[float] = None,
+    path_turn_rate: Optional[float] = None,
+    curvature_ratio: Optional[float] = None,
 ) -> Dict[str, Any]:
     """汇总救援策略所需的信号快照（只读，供页面与调试使用）。"""
     return {
@@ -94,6 +107,11 @@ def _collect_rescue_signals(
         "reason_codes": list(reason_codes),
         "raw_geometry_confidence": raw_geometry_confidence,
         "p_measurable": p_measurable,
+        "segmentation_confidence": segmentation_confidence,
+        "path_score": path_score,
+        "path_score_gap": path_score_gap,
+        "path_turn_rate": path_turn_rate,
+        "curvature_ratio": curvature_ratio,
     }
 
 
@@ -113,6 +131,11 @@ def evaluate_admission(
     mask_abnormal: bool = False,
     length_anomaly: bool = False,
     p_measurable: Optional[float] = None,
+    segmentation_confidence: Optional[float] = None,
+    path_score: Optional[float] = None,
+    path_score_gap: Optional[float] = None,
+    path_turn_rate: Optional[float] = None,
+    curvature_ratio: Optional[float] = None,
     config: Optional[AdmissionPolicyConfig] = None,
 ) -> AdmissionEvaluation:
     """评估一条鱼的最终准入结论。
@@ -177,6 +200,11 @@ def evaluate_admission(
             reason_codes=reason_codes or [],
             raw_geometry_confidence=raw_confidence,
             p_measurable=p_measurable,
+            segmentation_confidence=segmentation_confidence,
+            path_score=path_score,
+            path_score_gap=path_score_gap,
+            path_turn_rate=path_turn_rate,
+            curvature_ratio=curvature_ratio,
         ),
     )
 
@@ -232,6 +260,59 @@ def _apply_geometry_rescue(
         and (s.get("p_measurable") or 0.0) < cfg.min_rescue_probability
     ):
         blocked.append("probability_below_floor")
+
+    probability = float(s.get("p_measurable") or 0.0)
+    if (
+        cfg.tier_b_probability_ceiling is not None
+        and probability < cfg.tier_b_probability_ceiling
+        and (
+            cfg.min_rescue_probability is None
+            or probability >= cfg.min_rescue_probability
+        )
+    ):
+        tier_b_checks = (
+            (
+                "tier_b_segmentation_confidence",
+                s.get("segmentation_confidence"),
+                cfg.tier_b_min_segmentation_confidence,
+                "min",
+            ),
+            ("tier_b_path_score", s.get("path_score"), cfg.tier_b_min_path_score, "min"),
+            (
+                "tier_b_path_score_gap",
+                s.get("path_score_gap"),
+                cfg.tier_b_min_path_score_gap,
+                "min",
+            ),
+            (
+                "tier_b_path_turn_rate",
+                s.get("path_turn_rate"),
+                cfg.tier_b_max_path_turn_rate,
+                "max",
+            ),
+            (
+                "tier_b_curvature_ratio",
+                s.get("curvature_ratio"),
+                cfg.tier_b_max_curvature_ratio,
+                "positive_max",
+            ),
+        )
+        for reason, raw_value, threshold, direction in tier_b_checks:
+            if threshold is None:
+                continue
+            if raw_value is None:
+                blocked.append(reason)
+                continue
+            value = float(raw_value)
+            passed = (
+                value >= threshold
+                if direction == "min"
+                else value <= threshold
+                if direction == "max"
+                else 0 < value <= threshold
+            )
+            if not passed:
+                blocked.append(reason)
 
     if blocked:
         evaluation.rescue_blocked_by = blocked

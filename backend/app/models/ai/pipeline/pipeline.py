@@ -17,6 +17,7 @@ import numpy as np
 
 from app.models.ai.pipeline.admission_policy import (
     AdmissionPolicyConfig,
+    MASK_ABNORMAL_CODES,
     evaluate_admission,
 )
 from app.models.ai.pipeline.classifier_adapters import MeasurabilityClassifierProtocol
@@ -301,13 +302,20 @@ class FishAnalysisPipeline:
             # 5) 准入策略：统一入口（strict 正式行为 + geometry_rescue 影子）
             #    strict 模式与历史行为逐字段一致；影子模式仅计算不改变 API 输出。
             measurement_reasons_original = list(measurement_reasons or [])
+            component_audit = instance.metadata.get("cleaned_component_audit") or {}
+            mask_abnormal = bool(
+                set(measurement_reasons_original) & MASK_ABNORMAL_CODES
+            ) or bool(
+                component_audit.get("multi_component_review")
+                and component_audit.get("removed_component_count", 0) > 0
+            )
             evaluation = evaluate_admission(
                 classifier_is_measurable=classifier_is_measurable,
                 segmentation_is_sufficient=segmentation_is_sufficient,
                 geometry_is_measurable=bool(
                     measurement_debug.get("geometry_is_measurable", False)
                 ),
-                measurement_succeeded=measurement_method is not None,
+                measurement_succeeded=measurement_method not in (None, "none"),
                 primary_length_px=primary_length_px,
                 reason_codes=measurement_reasons_original,
                 geometry_confidence=measurement_confidence,
@@ -319,12 +327,39 @@ class FishAnalysisPipeline:
                 no_trusted_measurement_path=(
                     "no_trusted_measurement_path" in measurement_reasons_original
                 ),
-                mask_abnormal=False,
+                mask_abnormal=mask_abnormal,
                 length_anomaly=False,
+                p_measurable=outcome.final_probability,
+                segmentation_confidence=instance.segmentation_confidence,
+                path_score=measurement_debug.get("path_score"),
+                path_score_gap=measurement_debug.get("path_score_gap"),
+                path_turn_rate=measurement_debug.get("path_turn_rate"),
+                curvature_ratio=measurement_debug.get("curvature_ratio"),
                 config=AdmissionPolicyConfig(
                     mode=self._manifest.admission_policy.mode,
                     geometry_rescue_enabled=(
                         self._manifest.admission_policy.geometry_rescue_enabled
+                    ),
+                    min_rescue_probability=(
+                        self._manifest.admission_policy.min_rescue_probability
+                    ),
+                    tier_b_probability_ceiling=(
+                        self._manifest.admission_policy.tier_b_probability_ceiling
+                    ),
+                    tier_b_min_segmentation_confidence=(
+                        self._manifest.admission_policy.tier_b_min_segmentation_confidence
+                    ),
+                    tier_b_min_path_score=(
+                        self._manifest.admission_policy.tier_b_min_path_score
+                    ),
+                    tier_b_min_path_score_gap=(
+                        self._manifest.admission_policy.tier_b_min_path_score_gap
+                    ),
+                    tier_b_max_path_turn_rate=(
+                        self._manifest.admission_policy.tier_b_max_path_turn_rate
+                    ),
+                    tier_b_max_curvature_ratio=(
+                        self._manifest.admission_policy.tier_b_max_curvature_ratio
                     ),
                 ),
             )

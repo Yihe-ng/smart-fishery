@@ -82,6 +82,9 @@
         </div>
       </el-col>
     </el-row>
+
+    <!-- 三阶段处理流程动画：随请求开始/结束显示隐藏，纯前端动画，不代表真实进度 -->
+    <GrowthProcessAnimation v-if="isProcessing" />
   </div>
 </template>
 
@@ -107,6 +110,7 @@
   import GrowthActionButtons from './components/GrowthActionButtons.vue'
   import GrowthDetectionList from './components/GrowthDetectionList.vue'
   import GrowthImageDisplay from './components/GrowthImageDisplay.vue'
+  import GrowthProcessAnimation from './components/GrowthProcessAnimation.vue'
   import GrowthResultCard from './components/GrowthResultCard.vue'
   import GrowthStatsSummary from './components/GrowthStatsSummary.vue'
   import GrowthVideoFrameStrip from './components/GrowthVideoFrameStrip.vue'

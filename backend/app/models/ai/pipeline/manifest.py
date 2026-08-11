@@ -129,6 +129,13 @@ class AdmissionPolicyManifest:
 
     mode: str = "strict"
     geometry_rescue_enabled: bool = False
+    min_rescue_probability: Optional[float] = None
+    tier_b_probability_ceiling: Optional[float] = None
+    tier_b_min_segmentation_confidence: Optional[float] = None
+    tier_b_min_path_score: Optional[float] = None
+    tier_b_min_path_score_gap: Optional[float] = None
+    tier_b_max_path_turn_rate: Optional[float] = None
+    tier_b_max_curvature_ratio: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -452,7 +459,49 @@ def _parse_admission_policy(raw: Any) -> AdmissionPolicyManifest:
     enabled = raw.get("geometry_rescue_enabled", False)
     if not isinstance(enabled, bool):
         raise ValueError("admission_policy.geometry_rescue_enabled 必须是布尔值")
-    return AdmissionPolicyManifest(mode=mode, geometry_rescue_enabled=enabled)
+
+    def optional_float(key: str, minimum: float, maximum: float) -> Optional[float]:
+        if raw.get(key) is None:
+            return None
+        return _require_float(
+            raw, "admission_policy", key, minimum=minimum, maximum=maximum
+        )
+
+    floor = optional_float("min_rescue_probability", 0.0, 1.0)
+    ceiling = optional_float("tier_b_probability_ceiling", 0.0, 1.0)
+    tier_values = {
+        "tier_b_min_segmentation_confidence": optional_float(
+            "tier_b_min_segmentation_confidence", 0.0, 1.0
+        ),
+        "tier_b_min_path_score": optional_float("tier_b_min_path_score", 0.0, 1.0),
+        "tier_b_min_path_score_gap": optional_float(
+            "tier_b_min_path_score_gap", 0.0, 1.0
+        ),
+        "tier_b_max_path_turn_rate": optional_float(
+            "tier_b_max_path_turn_rate", 0.0, 1.0
+        ),
+        "tier_b_max_curvature_ratio": optional_float(
+            "tier_b_max_curvature_ratio", 0.0, 100.0
+        ),
+    }
+    if ceiling is not None:
+        if floor is None or floor >= ceiling:
+            raise ValueError(
+                "admission_policy.min_rescue_probability 必须小于 tier_b_probability_ceiling"
+            )
+        missing = [key for key, value in tier_values.items() if value is None]
+        if missing:
+            raise ValueError(
+                "admission_policy 启用 tier_b 时缺少参数: " + ", ".join(missing)
+            )
+
+    return AdmissionPolicyManifest(
+        mode=mode,
+        geometry_rescue_enabled=enabled,
+        min_rescue_probability=floor,
+        tier_b_probability_ceiling=ceiling,
+        **tier_values,
+    )
 
 
 def _parse_business(raw: Dict[str, Any]) -> BusinessManifest:
