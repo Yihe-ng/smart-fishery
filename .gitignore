@@ -12,6 +12,7 @@
 !tests/**/*
 !pageAgent说明文档.md
 !README.md
+!示例图片/
 # 保留这两个目录下的所有内容
 !frontend/**/*
 !backend/**/*
@@ -24,3 +25,5 @@ frontend/.env
 frontend/.vscode/
 frontend/nul
 frontend/public/video
+backend/tests/
+backend/tools
