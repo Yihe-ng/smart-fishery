@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     health,
     menu,
     role,
+    storage,
     user,
     video,
     water_quality,
@@ -36,4 +37,5 @@ api_router.include_router(growth.router, prefix="/growth", tags=["growth"])
 api_router.include_router(growth_records.router, prefix="/growth", tags=["growth-records"])
 api_router.include_router(weather.router, prefix="/weather", tags=["weather"])
 api_router.include_router(video.router, prefix="/video", tags=["video"])
+api_router.include_router(storage.router, prefix="/storage", tags=["storage"])
 api_router.include_router(ai_router, prefix="/agent", tags=["ai-gateway"])

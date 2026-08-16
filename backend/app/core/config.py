@@ -53,6 +53,24 @@ class Settings(BaseSettings):
     # 视频文件扫描目录（相对 backend 目录）
     VIDEO_DIR: str = "../frontend/public/video"
 
+    # 统一存储层（app/services/storage.py）：local = 本地文件系统（默认）；
+    # object = S3 兼容对象存储（如 MinIO），需同时配置 STORAGE_ENDPOINT / STORAGE_BUCKET
+    # 与访问凭据。凭据只从环境变量 / backend/.env 读取，禁止硬编码进仓库。
+    STORAGE_BACKEND: str = "local"
+    STORAGE_LOCAL_DIR: str = "data/storage"
+    STORAGE_ENDPOINT: str = ""
+    STORAGE_BUCKET: str = ""
+    STORAGE_ACCESS_KEY: str = ""
+    STORAGE_SECRET_KEY: str = ""
+    STORAGE_SECURE: bool = False
+
+    # 数据保留策略：超期对象由 app/services/retention.py 的 enforce_retention 清理。
+    # 天数 <=0 表示该前缀不启用保留清理。默认 raw/（原始图像/视频）留 7 天，
+    # results/（识别结果）留 90 天，archive/（归档）留 365 天。
+    STORAGE_RAW_RETENTION_DAYS: int = 7
+    STORAGE_RESULTS_RETENTION_DAYS: int = 90
+    STORAGE_ARCHIVE_RETENTION_DAYS: int = 365
+
     model_config = SettingsConfigDict(env_file=".env")
 
 

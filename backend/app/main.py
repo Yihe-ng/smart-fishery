@@ -28,11 +28,18 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_growth_record_schema(engine)
     print("数据库表已初始化")
+
+    from app.tasks.scheduler import init_scheduler, register_default_jobs, shutdown_scheduler
+
+    init_scheduler()
+    register_default_jobs()
+
     print("应用启动完成")
 
     yield
 
     print("应用关闭中...")
+    shutdown_scheduler()
     print("应用已关闭")
 
 

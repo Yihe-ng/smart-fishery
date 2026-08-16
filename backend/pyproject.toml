@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11.8"
 dependencies = [
+    "apscheduler>=3.11.3",
     "fastapi>=0.135.1",
     "httpx>=0.28.1",
     "pydantic-settings>=2.13.1",
@@ -12,6 +13,7 @@ dependencies = [
     "sqlalchemy>=2.0.48",
     "sqlalchemy-utils>=0.42.1",
     "uvicorn>=0.41.0",
+    "websockets>=17.0.1",
     "passlib[bcrypt]>=1.7.4",
     "torch>=2.0.0",
     "torchvision>=0.15.0",

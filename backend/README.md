@@ -376,7 +376,7 @@ ws://localhost:8000/ws/camera/{camera_id}
 | water_quality_check | 每5分钟 | 水质告警检查 |
 | auto_feeding | 每30分钟 | 自动投喂检查 |
 | daily_report | 每天凌晨1点 | 生成日报 |
-| cleanup_data | 每周日凌晨3点 | 清理过期数据 |
+| cleanup_data | 每月1日凌晨3点 | 清理过期数据 |
 
 ### 任务配置
 
