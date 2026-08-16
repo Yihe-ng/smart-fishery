@@ -315,6 +315,7 @@
       form.isFullPage = row.meta?.isFullPage ?? false
     } else {
       const row = props.editData
+      form.id = row.id || 0
       form.authName = row.title || ''
       form.authLabel = row.authMark || ''
       form.authIcon = row.icon || ''
@@ -323,7 +324,7 @@
   }
 
   /**
-   * 提交表单
+   * 提交表单数据；成功提示由父组件在实际调用接口成功后统一弹出
    */
   const handleSubmit = async (): Promise<void> => {
     if (!formRef.value) return
@@ -331,7 +332,6 @@
     try {
       await formRef.value.validate()
       emit('submit', { ...form })
-      ElMessage.success(`${isEdit.value ? '编辑' : '新增'}成功`)
       handleCancel()
     } catch {
       ElMessage.error('表单校验失败，请检查输入')
