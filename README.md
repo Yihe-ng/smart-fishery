@@ -138,7 +138,7 @@ flowchart LR
 | `backend/app/models/` | ORM 模型目录，包含用户、水质数据、告警记录，以及 AI 推理相关代码与权重 |
 | `backend/app/models/ai/pipeline/` | 两阶段生长识别管线：分割/裁剪/可测性分类/时序/测长编排，manifest 驱动 |
 | `backend/config/growth/pipeline.final.json` | 正式冻结模型清单：模型算法参数唯一真源（分类阈值/厘米换算/几何质量门槛/准入策略） |
-| `backend/config/growth/grouper_growth_standard.json` | 养殖标准：月度生长评价规则唯一真源（第 3–15 月预期增长量/偏小偏大比例/群体样本规则/估重公式/视频临时旧分档） |
+| `backend/config/growth/grouper_growth_standard.json` | 养殖标准：月度生长评价规则唯一真源（第 3–15 月预期增长量/偏小偏大比例/图片群体样本规则/视频最少可评价帧数/估重公式） |
 | `backend/config/growth/README.md` | 配置目录说明：资料依据、字段含义、职责边界、校验要求与修改后需重启的说明 |
 | `backend/app/models/ai/releases/` | 管线冻结权重（segmentation.pt / measurability_classifier.pt / classifier_backbone.pt），随仓库分发 |
 | `backend/app/models/ai/yolo_detector.py` | legacy YOLO 推理封装（回退路径，`GROWTH_PIPELINE=legacy` 时使用） |
@@ -166,7 +166,7 @@ flowchart LR
 | 功能模块 | 功能作用 | 输入 | 处理逻辑 | 输出 |
 |---|---|---|---|---|
 | 生长图片识别 | 对单张图片中的鱼类进行识别 | Base64 图片数据 | `backend/app/api/v1/endpoints/growth.py` 调用两阶段管线 `FishAnalysisPipeline`（分割 → 可测性分类 → 几何测长），模型参数由 `config/growth/pipeline.final.json` 驱动，月度分档与估重由 `config/growth/grouper_growth_standard.json` 驱动，完成检测、体长/重量估算、月度生长评价与统计 | 识别结果、检测列表、统计信息、平均体长/体重、群体评价 assessment、错误码 |
-| 生长视频识别 | 对上传视频的关键帧进行识别 | 视频文件 | 后端接收上传文件后按时间采样抽帧，逐帧调用图片识别逻辑，异步生成任务结果 | 任务 ID、任务状态、视频元信息、关键帧识别结果、聚合统计 |
+| 生长视频识别 | 对上传视频的关键帧进行识别并形成月度群体评价 | 视频文件、养殖月数、投苗时平均全长 | 后端按视频时长自适应规划 3–8 个关键帧，OpenCV 解码后以图像数组逐帧进入共享识别管线；每帧独立评价，至少 3 个可评价帧时以帧级评价全长中位数形成视频结论。任务支持阶段进度、协作式取消、刷新恢复、终态释放和无模型轻量重评 | 任务 ID、阶段与进度、关键帧结果、跨帧检测记录统计、视频群体评价、部分结果与错误/警告码 |
 | 摄像头流地址获取 | 提供摄像头流播放地址 | 无 | `growth.py` 直接返回一个流地址字符串 | 流地址 |
 | 水质数据上报与分析 | 记录并分析水质指标 | 溶解氧、pH、温度、氨氮、亚硝酸盐等 | `algorithms/prediction.py` 根据阈值生成分析结论和告警等级，`services/water_analysis.py` 写入数据库 | 水质分析结果、告警等级、历史记录 |
 | 水质仪表盘 | 组织最新水质、设备、告警与指标信息 | 数据库中的水质记录 | `services/water_quality_dashboard.py` 根据历史记录构建当前帧、趋势文本、设备状态与告警列表 | 仪表盘帧数据 |
@@ -197,12 +197,13 @@ flowchart TD
     I --> J[组装检测结果与统计]
     J --> K[前端结果卡片 / 列表 / 叠加层展示]
 
-    F --> N[后端抽帧采样]
-    N --> O[逐帧 Base64 编码]
+    F --> N[按时长自适应规划 3–8 个关键帧]
+    N --> O[OpenCV 解码为图像数组]
     O --> H
-    I --> P[按关键帧生成任务结果]
-    P --> Q[任务状态轮询]
-    Q --> R[前端关键帧条 / 任务状态 / 聚合统计展示]
+    I --> P[逐帧月度评价]
+    P --> P1[可评价帧全长取中位数]
+    P1 --> Q[任务状态轮询 / 取消 / 恢复]
+    Q --> R[关键帧条 / 视频群体评价 / 投喂摘要]
 ```
 
 ## 7. 环境要求
@@ -273,12 +274,26 @@ GROWTH_MANIFEST_PATH=
 GROWTH_STANDARD_PATH=
 # 推理设备：cpu（默认）| cuda:0
 GROWTH_PIPELINE_DEVICE=cpu
+# 视频时序覆盖：留空跟随模型清单；也可显式设为 true/false
+GROWTH_VIDEO_TEMPORAL_ENABLED=
+
+# 视频任务运行参数（以下均为默认值）
+VIDEO_MIN_DURATION_SECONDS=3.0
+VIDEO_TARGET_INTERVAL_SECONDS=2.0
+VIDEO_MIN_FRAMES=3
+VIDEO_MAX_FRAMES=8
+VIDEO_PROCESS_SOFT_LIMIT_SECONDS=120.0
+VIDEO_PROCESS_MAX_SECONDS=180.0
+VIDEO_TASK_TTL_SECONDS=3600
+VIDEO_MAX_TERMINAL_TASKS=3
+VIDEO_DISPLAY_MAX_EDGE=1280
+VIDEO_DISPLAY_JPEG_QUALITY=85
 ```
 
 > **配置分工（三层）**：
-> 1. `.env` / `backend/app/core/config.py` 只放运行开关（管线选型、配置文件路径、推理设备、视频目录等）。
+> 1. `.env` / `backend/app/core/config.py` 只放运行开关（管线选型、配置文件路径、推理设备、视频任务采样/时间预算/生命周期、视频目录等）。
 > 2. 模型算法参数（分类阈值、分割置信门槛、厘米换算、几何质量门槛、准入策略）统一在 `backend/config/growth/pipeline.final.json`。
-> 3. 养殖业务参数（第 3–15 月预期累计增长量、偏小/偏大比例、群体最小样本与去极端规则、估重公式、视频临时旧分档 `legacy_video_rule`）统一在 `backend/config/growth/grouper_growth_standard.json`。
+> 3. 养殖业务参数（第 3–15 月预期累计增长量、偏小/偏大比例、图片群体最小样本与去极端规则、视频最少可评价帧数、估重公式）统一在 `backend/config/growth/grouper_growth_standard.json`。
 >
 > 每类参数只有一个真源，修改参数不需要改代码，但**必须重启后端**才生效。详见 `backend/config/growth/README.md`。
 
@@ -428,7 +443,9 @@ curl -X POST "http://127.0.0.1:8000/api/growth/detect" \
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/growth/detect/video" \
-  -F "file=@./sample.mp4"
+  -F "file=@./sample.mp4" \
+  -F "cultureMonth=6" \
+  -F "stockingAvgLengthCm=13"
 ```
 
 #### 查询视频任务
@@ -436,6 +453,18 @@ curl -X POST "http://127.0.0.1:8000/api/growth/detect/video" \
 ```bash
 curl "http://127.0.0.1:8000/api/growth/detect/video/<task_id>"
 ```
+
+#### 取消或释放视频任务
+
+```bash
+# 排队任务立即取消；处理中任务在当前帧返回后停止
+curl -X POST "http://127.0.0.1:8000/api/growth/detect/video/<task_id>/cancel"
+
+# 只释放 success / failed / cancelled 终态任务
+curl -X DELETE "http://127.0.0.1:8000/api/growth/detect/video/<task_id>"
+```
+
+完成后修改月份或投苗体长时，前端调用 `POST /api/growth/evaluate/video`，只提交已有关键帧的鱼体标识、可测性和体长，不重新上传视频或运行模型。
 
 #### 查询摄像头流地址
 
@@ -451,7 +480,8 @@ curl "http://127.0.0.1:8000/api/growth/camera/stream"
 | 前端启动失败 | `pnpm` 未安装或 `node_modules` 缺失 | 在 `frontend` 目录重新执行 `pnpm install` |
 | 识别接口返回模型错误 | 管线权重缺失或损坏 | 确认 `backend/app/models/ai/releases/growth_20260808_v1/` 下三个 .pt 文件存在且可读取（legacy 路径检查 `best.pt`） |
 | 图片识别失败 | 上传内容不是有效图片或体积过大 | 检查 Base64 是否正确，图片是否超过 10MB 左右限制 |
-| 视频识别失败 | 视频格式不支持、文件太大、无法解码 | 使用 `.mp4`、`.mov`、`.webm`、`.avi`、`.mkv` 等支持格式，并控制文件大小 |
+| 视频识别失败 | 视频短于 3 秒、格式不支持、文件太大或无法解码 | 使用时长不少于 3 秒的 `.mp4`、`.mov`、`.webm`、`.avi`、`.mkv` 等支持格式，并控制文件大小 |
+| 视频仅返回部分结果 | 达到处理时间预算或个别关键帧解码/分析失败 | 已完成关键帧仍可查看；结合 `warningCode` 判断超时、取消或单帧失败，不把跨帧检测记录数解释为独立鱼只数 |
 | 前后端接口不通 | 前端代理指向错误或后端未启动 | 确认后端已启动，再检查 `frontend/.env.development` 中的 `VITE_API_PROXY_URL` |
 | 页面跨域或 Cookie 问题 | 前端开发地址与后端 CORS 配置不一致 | 确认前端端口在 `3006` 或 `3008` 范围内，后端 CORS 已允许这些来源 |
 | SQLite 写入失败 | 数据库文件权限不足或路径不存在 | 检查 `backend/data/smart_fishery_db.db` 权限和目录是否存在 |
@@ -461,7 +491,7 @@ curl "http://127.0.0.1:8000/api/growth/camera/stream"
 ## 12. 后续优化方向
 
 1. 将后端接口返回的错误码与前端提示文案进一步统一，减少页面内硬编码映射。
-2. 为 `growth` 视频任务增加更明确的过期清理机制，避免内存中的任务结果长期累积。
+2. 如需严格中断卡死的同步模型推理，将视频推理隔离到独立进程，并把当前内存任务队列升级为可持久化任务系统。
 3. 为模型文件、数据库初始化和种子数据增加独立校验脚本，降低手工准备风险。
 4. 将水质分析、投喂建议和生长识别结果整理为更统一的数据契约，便于前后端协作和测试。
 
