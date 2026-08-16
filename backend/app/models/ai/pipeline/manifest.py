@@ -1,11 +1,15 @@
-"""模型 Manifest：部署权威配置（路径/阈值/后处理/时序/测长/业务等）。
+"""模型 Manifest：部署权威配置（模型路径/阈值/后处理/时序/测长/换算/准入）。
+
+职责边界：本清单只管"怎么测"。月度生长分档（偏小/正常/偏大）与体长估重属于养殖
+业务规则，已迁到 `config/growth/grouper_growth_standard.json`，由
+`app/services/growth_standard.py` 解释；清单不再有 business 段，也不解析它。
 
 设计原则：
 - 所有模型路径、imgsz、conf、NMS、类别语义、阈值、时序策略、窗口、batch size
   一律从 manifest 加载，禁止散落硬编码；
 - 非法配置 fail fast（缺字段/类型错/数值越界直接抛错）；
 - 当前所有条目必须标记 release_status=candidate（或 review），
-  解析器对新增测长和业务字段 fail fast，避免配置与代码口径漂移。
+  解析器对新增测长字段 fail fast，避免配置与代码口径漂移。
 """
 
 from __future__ import annotations
@@ -109,16 +113,6 @@ class MeasurementScaleManifest:
 
 
 @dataclass(frozen=True)
-class BusinessManifest:
-    """估算体长分档和石斑鱼经验估重公式。"""
-
-    small_threshold_cm: float = 15.0
-    large_threshold_cm: float = 25.0
-    weight_coefficient_a: float = 0.0285
-    weight_exponent_b: float = 2.937
-
-
-@dataclass(frozen=True)
 class AdmissionPolicyManifest:
     """A5 准入策略配置。
 
@@ -166,7 +160,6 @@ class ModelManifest:
     crop: CropManifest
     temporal: TemporalManifest
     measurement: MeasurementManifest
-    business: BusinessManifest = field(default_factory=BusinessManifest)
     admission_policy: AdmissionPolicyManifest = field(default_factory=AdmissionPolicyManifest)
     profile_revision: Optional[str] = None
     derived_from_manifest_id: Optional[str] = None
@@ -504,46 +497,6 @@ def _parse_admission_policy(raw: Any) -> AdmissionPolicyManifest:
     )
 
 
-def _parse_business(raw: Dict[str, Any]) -> BusinessManifest:
-    """解析估算体长分档和估重公式。"""
-    if not isinstance(raw, dict):
-        raise ValueError("business 必须是对象")
-    small = _require_float(
-        {"small_threshold_cm": raw.get("small_threshold_cm", 15.0)},
-        "business",
-        "small_threshold_cm",
-        minimum=0.0,
-        maximum=1e6,
-    )
-    large = _require_float(
-        {"large_threshold_cm": raw.get("large_threshold_cm", 25.0)},
-        "business",
-        "large_threshold_cm",
-        minimum=small,
-        maximum=1e6,
-    )
-    coefficient = _require_float(
-        {"weight_coefficient_a": raw.get("weight_coefficient_a", 0.0285)},
-        "business",
-        "weight_coefficient_a",
-        minimum=0.0,
-        maximum=1e6,
-    )
-    exponent = _require_float(
-        {"weight_exponent_b": raw.get("weight_exponent_b", 2.937)},
-        "business",
-        "weight_exponent_b",
-        minimum=0.0,
-        maximum=20.0,
-    )
-    return BusinessManifest(
-        small_threshold_cm=small,
-        large_threshold_cm=large,
-        weight_coefficient_a=coefficient,
-        weight_exponent_b=exponent,
-    )
-
-
 def _require_str_list(raw: Dict[str, Any], section: str, key: str) -> List[str]:
     values = raw.get(key)
     if not isinstance(values, list) or not values:
@@ -588,7 +541,6 @@ def parse_manifest(raw: Dict[str, Any]) -> ModelManifest:
         crop=_parse_crop(_require_mapping(raw, "crop")),
         temporal=_parse_temporal(_require_mapping(raw, "temporal")),
         measurement=_parse_measurement(_require_mapping(raw, "measurement")),
-        business=_parse_business(raw.get("business") or {}),
         admission_policy=_parse_admission_policy(raw.get("admission_policy")),
         profile_revision=(
             _require_str(raw, "manifest", "profile_revision")
@@ -619,7 +571,6 @@ _KNOWN_KEYS = {
     "crop",
     "temporal",
     "measurement",
-    "business",
     "admission_policy",
     "description",
 }

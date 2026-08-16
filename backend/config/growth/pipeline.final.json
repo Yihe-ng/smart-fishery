@@ -4,7 +4,7 @@
   "profile_revision": "admission-rescue-v2-20260811",
   "derived_from_manifest_id": "growth-pipeline-final-20260809-v3-scale-prior",
   "release_status": "final",
-  "description": "正式清单（2026-08-11）：沿用 v8 single-fish 分割、B0 分类、视频 S1 时序和 v3 measurement quality guard；启用经 536 个已检测实例离线重放筛选的 V2 两档几何救援。P>=0.40 采用基础几何救援；0.30<=P<0.40 还需通过更严格的分割与路径质量门槛；触边、异常 mask、路径歧义和无可信路径仍硬拒绝。0.11 cm/px 是演示场景先验，不是真实标定；位置修正关闭。回退方式：admission_policy.mode 改为 strict 且 geometry_rescue_enabled=false，重启后端。",
+  "description": "正式清单（2026-08-11）：沿用 v8 single-fish 分割、B0 分类、视频 S1 时序和 v3 measurement quality guard；启用经 536 个已检测实例离线重放筛选的 V2 两档几何救援。P>=0.40 采用基础几何救援；0.30<=P<0.40 还需通过更严格的分割与路径质量门槛；触边、异常 mask、路径歧义和无可信路径仍硬拒绝。measurement.scale.cm_per_pixel=0.08 是演示场景先验，不是真实标定；位置修正关闭。体长分档与估重不在本清单，已迁至 grouper_growth_standard.json。回退方式：admission_policy.mode 改为 strict 且 geometry_rescue_enabled=false，重启后端。",
   "fixture": null,
   "segmentation": {
     "backend": "ultralytics_seg",
@@ -70,7 +70,6 @@
     }
   },
   "measurement": {
-    "cm_per_pixel": 0.11,
     "algorithm": "visible_centerline_hybrid",
     "quality": {
       "min_area_px": 60,
@@ -100,12 +99,6 @@
       "applicable_min_px": null,
       "applicable_max_px": null
     }
-  },
-  "business": {
-    "small_threshold_cm": 15.0,
-    "large_threshold_cm": 25.0,
-    "weight_coefficient_a": 0.0285,
-    "weight_exponent_b": 2.937
   },
   "admission_policy": {
     "mode": "geometry_rescue",

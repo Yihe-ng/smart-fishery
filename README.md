@@ -50,7 +50,7 @@ flowchart LR
     P2 --> SEG[分割模型 segmentation.pt]
     P2 --> CLS[可测性分类器 measurability_classifier.pt]
     P2 --> LEN[几何测长 / 体长换算]
-    P2 --> MF[正式清单 growth_final.json 驱动]
+    P2 --> MF[正式清单 pipeline.final.json 驱动]
     SEG -->|legacy 回退| YD[YOLODetector + best.pt]
 
     WQ --> SV[业务服务层]
@@ -86,10 +86,7 @@ flowchart LR
 │   │   │   │   │   ├── pipeline.py               # 管线编排
 │   │   │   │   │   ├── manifest.py               # manifest 解析与校验
 │   │   │   │   │   ├── admission_policy.py       # A5 准入策略模块
-│   │   │   │   │   ├── segmenter.py / classifier_*.py / crop_builder.py / temporal.py
-│   │   │   │   │   └── manifests/
-│   │   │   │   │       ├── growth_final.json     # 正式冻结清单（参数唯一真源）
-│   │   │   │   │       └── growth_candidate.example.json
+│   │   │   │   │   └── segmenter.py / classifier_*.py / crop_builder.py / temporal.py
 │   │   │   │   └── releases/
 │   │   │   │       └── growth_20260808_v1/       # 冻结权重（分割/分类器/骨干）
 │   │   │   └── yolo_detector.py
@@ -140,7 +137,9 @@ flowchart LR
 | `backend/app/api/v1/endpoints/` | 后端业务接口实现目录，包含认证、水质、用户、权限、鱼塘、投喂、设备、告警、健康、天气、生长识别等接口 |
 | `backend/app/models/` | ORM 模型目录，包含用户、水质数据、告警记录，以及 AI 推理相关代码与权重 |
 | `backend/app/models/ai/pipeline/` | 两阶段生长识别管线：分割/裁剪/可测性分类/时序/测长编排，manifest 驱动 |
-| `backend/app/models/ai/pipeline/manifests/growth_final.json` | 正式冻结清单：算法参数唯一真源（分类阈值/厘米换算/质量门槛/体长分档/估重/准入策略） |
+| `backend/config/growth/pipeline.final.json` | 正式冻结模型清单：模型算法参数唯一真源（分类阈值/厘米换算/几何质量门槛/准入策略） |
+| `backend/config/growth/grouper_growth_standard.json` | 养殖标准：月度生长评价规则唯一真源（第 3–15 月预期增长量/偏小偏大比例/群体样本规则/估重公式/视频临时旧分档） |
+| `backend/config/growth/README.md` | 配置目录说明：资料依据、字段含义、职责边界、校验要求与修改后需重启的说明 |
 | `backend/app/models/ai/releases/` | 管线冻结权重（segmentation.pt / measurability_classifier.pt / classifier_backbone.pt），随仓库分发 |
 | `backend/app/models/ai/yolo_detector.py` | legacy YOLO 推理封装（回退路径，`GROWTH_PIPELINE=legacy` 时使用） |
 | `backend/algorithms/prediction.py` | 水质规则分析逻辑，根据传入指标输出分析结果和告警等级 |
@@ -166,7 +165,7 @@ flowchart LR
 
 | 功能模块 | 功能作用 | 输入 | 处理逻辑 | 输出 |
 |---|---|---|---|---|
-| 生长图片识别 | 对单张图片中的鱼类进行识别 | Base64 图片数据 | `backend/app/api/v1/endpoints/growth.py` 调用两阶段管线 `FishAnalysisPipeline`（分割 → 可测性分类 → 几何测长），参数由 `growth_final.json` 驱动，完成检测、体长/重量估算与统计 | 识别结果、检测列表、统计信息、平均体长/体重、错误码 |
+| 生长图片识别 | 对单张图片中的鱼类进行识别 | Base64 图片数据 | `backend/app/api/v1/endpoints/growth.py` 调用两阶段管线 `FishAnalysisPipeline`（分割 → 可测性分类 → 几何测长），模型参数由 `config/growth/pipeline.final.json` 驱动，月度分档与估重由 `config/growth/grouper_growth_standard.json` 驱动，完成检测、体长/重量估算、月度生长评价与统计 | 识别结果、检测列表、统计信息、平均体长/体重、群体评价 assessment、错误码 |
 | 生长视频识别 | 对上传视频的关键帧进行识别 | 视频文件 | 后端接收上传文件后按时间采样抽帧，逐帧调用图片识别逻辑，异步生成任务结果 | 任务 ID、任务状态、视频元信息、关键帧识别结果、聚合统计 |
 | 摄像头流地址获取 | 提供摄像头流播放地址 | 无 | `growth.py` 直接返回一个流地址字符串 | 流地址 |
 | 水质数据上报与分析 | 记录并分析水质指标 | 溶解氧、pH、温度、氨氮、亚硝酸盐等 | `algorithms/prediction.py` 根据阈值生成分析结论和告警等级，`services/water_analysis.py` 写入数据库 | 水质分析结果、告警等级、历史记录 |
@@ -268,13 +267,20 @@ ai_base_url=请在本地填写
 
 # 生长识别推理路径：two_stage（冻结两阶段管线，默认）| legacy（旧 YOLO 回退）
 GROWTH_PIPELINE=two_stage
-# 管线 manifest 覆盖（为空使用正式清单 growth_final.json）
+# 模型清单覆盖（为空使用正式清单 config/growth/pipeline.final.json）
 GROWTH_MANIFEST_PATH=
+# 养殖标准覆盖（为空使用 config/growth/grouper_growth_standard.json）
+GROWTH_STANDARD_PATH=
 # 推理设备：cpu（默认）| cuda:0
 GROWTH_PIPELINE_DEVICE=cpu
 ```
 
-> **配置分工**：`.env` / `backend/app/core/config.py` 只放运行开关（管线选型、manifest 路径、推理设备、视频目录等）；算法参数（分类阈值、分割置信门槛、厘米换算、几何质量门槛、体长分档、估重系数、准入策略）统一在 `backend/app/models/ai/pipeline/manifests/growth_final.json` 中配置，该文件是这些参数的**唯一真源**，修改参数不需要改代码。
+> **配置分工（三层）**：
+> 1. `.env` / `backend/app/core/config.py` 只放运行开关（管线选型、配置文件路径、推理设备、视频目录等）。
+> 2. 模型算法参数（分类阈值、分割置信门槛、厘米换算、几何质量门槛、准入策略）统一在 `backend/config/growth/pipeline.final.json`。
+> 3. 养殖业务参数（第 3–15 月预期累计增长量、偏小/偏大比例、群体最小样本与去极端规则、估重公式、视频临时旧分档 `legacy_video_rule`）统一在 `backend/config/growth/grouper_growth_standard.json`。
+>
+> 每类参数只有一个真源，修改参数不需要改代码，但**必须重启后端**才生效。详见 `backend/config/growth/README.md`。
 
 前端开发环境变量当前可参考：
 
