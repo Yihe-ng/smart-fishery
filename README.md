@@ -294,6 +294,12 @@ VIDEO_TASK_TTL_SECONDS=3600
 VIDEO_MAX_TERMINAL_TASKS=3
 VIDEO_DISPLAY_MAX_EDGE=1280
 VIDEO_DISPLAY_JPEG_QUALITY=85
+
+# 统一存储层与数据保留策略（可选，以下均为默认值；不用对象存储则保持 local 即可）
+STORAGE_BACKEND=local
+STORAGE_RAW_RETENTION_DAYS=7
+STORAGE_RESULTS_RETENTION_DAYS=90
+STORAGE_ARCHIVE_RETENTION_DAYS=365
 ```
 
 > **配置分工（三层）**：
@@ -337,6 +343,7 @@ export const SHOW_GROWTH_STATUS_UI = false
 | SQLite 数据库 | 后端启动时通过 `Base.metadata.create_all(bind=engine)` 创建表结构，并自动补齐已有 `growth_records` 表的新字段；菜单表为空时首次访问菜单接口会写入内置种子菜单 |
 | 模型文件 | 两阶段管线权重位于 `backend/app/models/ai/releases/growth_20260808_v1/`（segmentation.pt / measurability_classifier.pt / classifier_backbone.pt），已随仓库分发，无需手动准备；legacy 回退路径依赖 `backend/app/models/ai/best.pt` |
 | 外部天气接口 | `weather_service.py` 会访问 Open-Meteo API，联网环境下可直接使用 |
+| 数据管理菜单 | “数据管理”页面的菜单记录需执行 `cd backend && uv run python scripts/seed_storage_menu.py` 幂等播种（内置种子菜单不含该项，新旧数据库都需要跑一次） |
 
 ### 8.6 数据库初始化
 
@@ -423,6 +430,22 @@ python dev.py
 
 该方式适合本地开发联调，且启动顺序仍然是先后端、后前端。
 
+### 9.5 启动模拟投喂机（可选，演示真实投喂指令）
+
+投喂页的“快速投喂”按钮与 AI 助手的“确认执行”都会通过 WebSocket 向 `feeder-001` 下发真实指令；投喂机不在线时接口会返回“投喂机不在线，指令未下发”。要演示完整链路，另开一个终端启动模拟投喂机：
+
+```bash
+cd backend
+uv run python scripts/mock_feeder_client.py --auto-ack
+```
+
+| 项 | 说明 |
+|---|---|
+| `--auto-ack` | 收到 feed 指令后自动回送“投喂开始 / 投喂完成”状态，前端投喂页会依次弹出对应提示 |
+| 浏览器版 | 不想开终端时，可用浏览器打开 `backend/scripts/mock_feeder.html` 代替 |
+| 状态订阅地址 | 前端投喂页固定订阅 `ws://<后端主机>:8000/ws/device/feeding-client`，要求后端在 8000 端口可直连（反代/换端口时通知会静默失效，投喂本身不受影响） |
+| 可选参数 | `--host` / `--port` 指定后端地址，`--feeder-id` 指定投喂机编号（默认 feeder-001） |
+
 ## 10. 使用方法
 
 ### 10.1 Web 页面使用
@@ -435,7 +458,8 @@ python dev.py
 | 生长记录查询 | 打开“生长记录”页面 | 按池塘、来源和日期筛选 SQLite 中的识别记录，查看详情或删除记录 |
 | 菜单管理 | 以管理员身份打开“系统管理 → 菜单管理” | 管理目录、页面菜单和按钮权限；修改后重启不会丢失 |
 | 水质监控 | 打开水质监控页面 | 查看最新水质、历史数据、阈值和仪表盘帧数据 |
-| 智能投喂 | 打开投喂页面 | 查看投喂配置、日志和智能投喂建议 |
+| 智能投喂 | 打开投喂页面，点“投喂 Xg”按钮 | 查看投喂配置、日志和智能投喂建议；指令经 WebSocket 下发到投喂机，页面弹出“投喂开始 / 完成”提示并新增执行日志（需先启动模拟投喂机，见 9.5） |
+| 数据管理 | 打开“数据管理”页面（菜单需按 8.5 播种） | 查看存储后端类型、各保留规则（raw / results / archive）的对象数量与体积、上次清理时间 |
 
 ### 10.2 接口调用示例
 

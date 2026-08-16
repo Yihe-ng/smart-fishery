@@ -75,7 +75,7 @@ export function manualFeeding(amount: number): Promise<boolean> {
   return request
     .post<{ id: string; amount: number }>({
       url: '/api/feeding/manual',
-      params: { amount }
+      data: { amount }
     })
     .then(() => true)
 }
