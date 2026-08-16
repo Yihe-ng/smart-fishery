@@ -293,6 +293,22 @@ VITE_ACCESS_MODE=frontend
 VITE_DROP_CONSOLE=false
 ```
 
+#### 生长识别状态显示开关
+
+生长识别页的“偏小 / 正常 / 偏大”状态字段由前端源码开关控制：
+
+```ts
+// frontend/src/views/growth-monitoring/detect/constants/statusColors.ts
+export const SHOW_GROWTH_STATUS_UI = false
+```
+
+| 取值 | 页面行为 |
+|---|---|
+| `false`（当前值） | 隐藏群体状态标签、状态分布表、单鱼状态及图片标注中的状态词，仅保留体长等信息 |
+| `true` | 恢复上述状态字段展示 |
+
+该开关只改变生长识别页的前端渲染，不影响后端评价、接口字段或已保存数据。开发环境修改后可热更新；生产环境修改后需重新执行 `pnpm build` 并部署前端。
+
 ### 8.5 初始化必要服务
 
 | 项目 | 说明 |

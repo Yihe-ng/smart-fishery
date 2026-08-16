@@ -134,18 +134,20 @@
   const cards = ref<AISuggestionCard[]>([])
   const panelState = ref({ hasNewRisk: false, hasNewSuggestion: false })
 
-  /**
-   * “当前风险摘要”卡片暂停展示（方案 §8.3）。
-   * 该卡片当前依赖 Mock 水质、默认 1000 尾和平均 300 g 的规则，不足以作为生长结论的依据，
-   * 因此只在前端过滤渲染；后端 suggestion_service 的生成代码保持不动，后续接入真实数据后可直接恢复。
-   */
-  const HIDDEN_CARD_IDS = [
-    'feeding-risk-summary',
-    'feeding-recommendation',
-    'feeding-recommendation-unavailable'
-  ]
+  /** 保留水质与设备建议，只在展示层移除具体建议投喂克数。 */
+  const sanitizeFeedingAmountText = (text: string) =>
+    text.replace(/(?:推荐|建议)投喂量(?:约|为)?\s*\d+(?:\.\d+)?\s*g[，,]?\s*/gi, '').trim()
 
-  const visibleCards = computed(() => cards.value.filter((card) => !HIDDEN_CARD_IDS.includes(card.id)))
+  const visibleCards = computed(() =>
+    cards.value.map((card) => ({
+      ...card,
+      summary: sanitizeFeedingAmountText(card.summary),
+      rationale: card.rationale
+        .map(sanitizeFeedingAmountText)
+        .filter((reason) => reason.length > 0),
+      suggestedAmount: undefined
+    }))
+  )
 
   const activePondId = computed(() => props.pondId || DEFAULT_GROWTH_POND_ID)
   const growthSummary = computed(() => growthRecognitionStore.getLatestSummary(activePondId.value))
