@@ -27,3 +27,5 @@ frontend/nul
 frontend/public/video
 backend/tests/
 backend/tools
+# 忽略本地 SQLite 数据库（演示/运行时数据，不入库）
+backend/data/*.db

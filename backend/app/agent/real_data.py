@@ -68,7 +68,7 @@ def get_pond_summary(
     db: Session | None = None,
 ) -> dict[str, Any]:
     current_record, _ = get_frame_records(current_index, db=db)
-    target_id = current_record.pond_id if current_record is not None else (pond_id or "pond-001")
+    target_id = current_record.pond_id if current_record is not None else (pond_id or "T001")
     return {
         "pondId": target_id,
         "name": f"智慧鱼塘 {target_id}",

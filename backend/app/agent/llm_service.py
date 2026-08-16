@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import urllib.error
 import urllib.request
@@ -27,6 +28,8 @@ from app.agent.tool_registry import (
     run_tool,
 )
 
+logger = logging.getLogger(__name__)
+
 MAX_TOOL_CALLS = 2
 
 
@@ -34,7 +37,7 @@ def build_manual_feeding_preview(
     pond_id: str | None, amount: float
 ) -> ManualFeedingPreviewResponse:
     settings = get_ai_settings()
-    target_pond = pond_id or "pond-001"
+    target_pond = pond_id or "T001"
     feeder_id = "feeder-001"
     duration = 10
     expires_at = (datetime.now() + timedelta(minutes=10)).isoformat()
@@ -241,6 +244,25 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     return payload
 
 
+def _remote_degraded_decision(
+    request: InvokeRequest,
+    allowed_tools: list[str],
+    tool_results: list[dict[str, Any]],
+    reason: str,
+) -> dict[str, Any]:
+    """远程模型不可用（超时/错误/异常响应）时切换到本地降级决策。
+
+    返回带 __degraded__ 标记的包裹结果，invoke_llm 据此标记本次请求后续
+    轮次直接走本地决策，避免每轮都重复等待远程超时。
+    """
+    logger.warning("AI 远程模型不可用（%s），切换到本地降级决策", reason)
+    return {
+        "type": "__degraded__",
+        "reason": reason,
+        "decision": _mock_decide_next_step(request, allowed_tools, tool_results),
+    }
+
+
 def _remote_decide_next_step(
     request: InvokeRequest,
     allowed_tools: list[str],
@@ -264,33 +286,28 @@ def _remote_decide_next_step(
         with urllib.request.urlopen(http_request, timeout=20) as response:
             raw_payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        return {
-            "type": "answer",
-            "assistantMessage": f"远程模型服务返回错误（HTTP {exc.code}），已切换到降级模式。",
-        }
+        return _remote_degraded_decision(
+            request, allowed_tools, tool_results, f"HTTP {exc.code}"
+        )
     except urllib.error.URLError as exc:
-        return {
-            "type": "answer",
-            "assistantMessage": f"无法连接远程模型服务（{exc.reason}），已切换到降级模式。",
-        }
+        return _remote_degraded_decision(
+            request, allowed_tools, tool_results, f"网络错误 {exc.reason}"
+        )
     except TimeoutError:
-        return {
-            "type": "answer",
-            "assistantMessage": "远程模型服务响应超时，已切换到降级模式。",
-        }
+        return _remote_degraded_decision(
+            request, allowed_tools, tool_results, "响应超时"
+        )
     content = raw_payload.get("choices", [{}])[0].get("message", {}).get("content", "")
     if not content:
-        return {
-            "type": "answer",
-            "assistantMessage": "远程模型返回空响应，已切换到降级模式。",
-        }
+        return _remote_degraded_decision(
+            request, allowed_tools, tool_results, "空响应"
+        )
     try:
         return _extract_json_object(content)
     except ValueError:
-        return {
-            "type": "answer",
-            "assistantMessage": "远程模型返回格式异常，已切换到降级模式。",
-        }
+        return _remote_degraded_decision(
+            request, allowed_tools, tool_results, "格式异常"
+        )
 
 
 def _decide_next_step(
@@ -359,17 +376,30 @@ def invoke_llm(request: InvokeRequest) -> InvokeResponse:
     assistant_message = ""
     status = "completed"
 
+    degraded = False
     for _ in range(MAX_TOOL_CALLS + 1):
         try:
-            decision = _decide_next_step(request, allowed_tools, tool_results)
+            if degraded:
+                decision = _mock_decide_next_step(request, allowed_tools, tool_results)
+            else:
+                decision = _decide_next_step(request, allowed_tools, tool_results)
+                if decision.get("type") == "__degraded__":
+                    degraded = True
+                    warnings.append(
+                        f"Remote model degraded: {decision.get('reason', 'unavailable')}"
+                    )
+                    decision = decision["decision"]
         except urllib.error.HTTPError as exc:
             warnings.append(f"Model HTTP error: {exc.code}")
+            degraded = True
             decision = _mock_decide_next_step(request, allowed_tools, tool_results)
         except urllib.error.URLError as exc:
             warnings.append(f"Model network error: {exc.reason}")
+            degraded = True
             decision = _mock_decide_next_step(request, allowed_tools, tool_results)
         except Exception as exc:
             warnings.append(f"Model response invalid: {exc}")
+            degraded = True
             decision = _mock_decide_next_step(request, allowed_tools, tool_results)
 
         if decision.get("type") == "answer":

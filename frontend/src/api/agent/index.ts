@@ -34,7 +34,10 @@ export function fetchAIInvoke(payload: {
 }) {
   return request.post<AIAgentInvokeResponse>({
     url: '/api/agent/agent/invoke',
-    data: payload
+    data: payload,
+    // 真实 LLM 最多 3 轮决策（每轮 20s 超时）+ 工具执行，默认 15s 会在模型慢时被前端掐断，
+    // 出现"网络连接异常"但后端日志仍为 200 的假象；放宽到 90s 与图片识别一致。
+    timeout: 90_000
   })
 }
 
