@@ -57,18 +57,6 @@
         </template>
       </el-table-column>
     </el-table>
-
-    <div class="summary-footer">
-      <span>{{ videoMode ? '累计鱼体检测次数' : '识别总数' }}</span>
-      <el-tag type="info">{{ stats.detectedCount }}</el-tag>
-    </div>
-    <div class="summary-footer compact">
-      <span>可测 / 不可测</span>
-      <span class="count-pair">
-        <el-tag type="success">{{ stats.measurableCount }}</el-tag>
-        <el-tag type="info">{{ stats.unmeasurableCount }}</el-tag>
-      </span>
-    </div>
   </el-card>
 </template>
 
@@ -224,17 +212,6 @@
         font-variant-numeric: tabular-nums;
         color: var(--el-text-color-primary);
       }
-    }
-
-    .summary-footer.compact {
-      padding-top: 8px;
-      margin-top: 8px;
-    }
-
-    .count-pair {
-      display: inline-flex;
-      gap: 6px;
-      align-items: center;
     }
   }
 </style>

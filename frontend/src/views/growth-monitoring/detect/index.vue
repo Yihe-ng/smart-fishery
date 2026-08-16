@@ -43,16 +43,6 @@
             </ElButton>
           </div>
           <GrowthResultCard :result="activeDetection" :empty-text="resultEmptyText" />
-          <GrowthDetectionList
-            class="growth-fish-list"
-            :class="{
-              'is-image-mode': inputMode !== 'growthVideo',
-              'is-video-mode': inputMode === 'growthVideo'
-            }"
-            :detections="activeDetections"
-            :selected-id="activeSelectedDetectionId"
-            @select="handleSelectDetection"
-          />
         </div>
       </el-col>
 
@@ -163,7 +153,6 @@
   } from './constants/assessmentParams'
   import GrowthActionButtons from './components/GrowthActionButtons.vue'
   import GrowthAssessmentControls from './components/GrowthAssessmentControls.vue'
-  import GrowthDetectionList from './components/GrowthDetectionList.vue'
   import GrowthImageDisplay from './components/GrowthImageDisplay.vue'
   import GrowthProcessAnimation from './components/GrowthProcessAnimation.vue'
   import GrowthResultCard from './components/GrowthResultCard.vue'
@@ -1145,11 +1134,6 @@
       min-height: 0;
     }
 
-    .growth-sidebar-stack :deep(.growth-detection-list) {
-      flex: 1;
-      min-height: 0;
-    }
-
     @media (width <= 768px) {
       .growth-workspace-row {
         height: auto;
@@ -1158,11 +1142,6 @@
 
       .growth-sidebar-col {
         margin-bottom: 16px;
-      }
-
-      .growth-sidebar-stack :deep(.growth-detection-list) {
-        flex: initial;
-        min-height: 0;
       }
     }
 
@@ -1174,16 +1153,6 @@
 
       .growth-sidebar-stack.is-image-mode {
         flex: initial;
-      }
-
-      .growth-sidebar-stack :deep(.growth-fish-list.is-image-mode) {
-        flex: initial;
-        height: clamp(320px, 36vh, 420px);
-      }
-
-      .growth-sidebar-stack :deep(.growth-fish-list.is-video-mode) {
-        flex: 1;
-        min-height: 0;
       }
     }
   }
