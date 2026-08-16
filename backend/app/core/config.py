@@ -11,7 +11,7 @@ class Settings(BaseSettings):
       视频时序、测长算法与几何质量门槛、像素→厘米换算、可测性准入策略。
     - 养殖标准 `config/growth/grouper_growth_standard.json` 管"测出来怎么评"：
       第 3–15 个月预期累计增长量、每月偏小/偏大比例、群体最小样本与去极端规则、
-      体长估重公式、视频临时旧分档规则（legacy_video_rule）。
+      视频最少可评价帧数和体长估重公式。
     - 已删除的历史死配置：GROWTH_SMALL_THRESHOLD / GROWTH_LARGE_THRESHOLD；
       体长分档与估重曾在 manifest.business 段，现已迁至养殖标准 JSON。
     """
@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     # 视频模式时序 override：None=跟随 manifest（正式清单启用 S1）；
     # True/False 可强制开启/关闭（实验用途）。
     GROWTH_VIDEO_TEMPORAL_ENABLED: Optional[bool] = None
+
+    # 视频任务运行参数：只控制采样、任务生命周期和展示资源，不属于养殖评价标准。
+    VIDEO_MIN_DURATION_SECONDS: float = 3.0
+    VIDEO_TARGET_INTERVAL_SECONDS: float = 2.0
+    VIDEO_MIN_FRAMES: int = 3
+    VIDEO_MAX_FRAMES: int = 8
+    VIDEO_PROCESS_SOFT_LIMIT_SECONDS: float = 120.0
+    VIDEO_PROCESS_MAX_SECONDS: float = 180.0
+    VIDEO_TASK_TTL_SECONDS: int = 60 * 60
+    VIDEO_MAX_TERMINAL_TASKS: int = 3
+    VIDEO_DISPLAY_MAX_EDGE: int = 1280
+    VIDEO_DISPLAY_JPEG_QUALITY: int = 85
 
     # 视频文件扫描目录（相对 backend 目录）
     VIDEO_DIR: str = "../frontend/public/video"
