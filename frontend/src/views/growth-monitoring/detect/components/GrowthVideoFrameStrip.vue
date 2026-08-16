@@ -25,7 +25,17 @@
         <img :src="frame.image.src" :alt="`关键帧 ${frame.frameId}`" class="frame-thumb" />
         <div class="frame-meta">
           <span class="frame-time">{{ formatTimestamp(frame.timestampSec) }}</span>
-          <span class="frame-count">{{ frame.stats.detectedCount }} 条鱼</span>
+          <span class="frame-count">{{ frame.stats.measurableCount }} 条可测鱼</span>
+        </div>
+        <div class="frame-status" :class="`status-${frame.frameStatus}`">
+          <span v-if="frame.frameStatus === 'evaluable'">可评价</span>
+          <span v-else-if="frame.frameStatus === 'insufficient_sample'">样本不足</span>
+          <span v-else>无有效检测</span>
+          <span
+            v-if="frame.frameStatus === 'evaluable'"
+            class="evaluable-dot"
+            aria-label="参与视频评价"
+          />
         </div>
       </button>
     </div>
@@ -128,6 +138,33 @@
     justify-content: space-between;
     font-size: 12px;
     color: var(--el-text-color-secondary);
+  }
+
+  .frame-status {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status-evaluable {
+    color: var(--el-color-success);
+  }
+
+  .status-insufficient_sample {
+    color: var(--el-color-warning);
+  }
+
+  .status-no_valid_detection {
+    color: var(--el-text-color-placeholder);
+  }
+
+  .evaluable-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--el-color-success);
+    border-radius: 50%;
   }
 
   .frame-time {

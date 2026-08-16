@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { onBeforeUnmount, onMounted, ref } from 'vue'
+  import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
   defineOptions({ name: 'GrowthProcessAnimation' })
 
@@ -8,6 +8,41 @@
 
   const MODEL_LOADING_HINT = '首次识别可能需要加载模型，请稍候'
   const PROCESSING_HINT = '模型正在处理中，请继续稍候'
+
+  const props = withDefaults(
+    defineProps<{
+      isVideo?: boolean
+      stage?: 'queued' | 'preparing' | 'analyzing' | 'finalizing'
+      completedFrameCount?: number
+      plannedFrameCount?: number
+      cancelling?: boolean
+      showCancel?: boolean
+    }>(),
+    {
+      isVideo: false,
+      stage: 'preparing',
+      completedFrameCount: 0,
+      plannedFrameCount: 0,
+      cancelling: false,
+      showCancel: false
+    }
+  )
+
+  const emit = defineEmits<{
+    cancel: []
+  }>()
+
+  const title = computed(() => {
+    if (!props.isVideo) return '正在分析鱼群图像'
+    if (props.cancelling) return '正在取消视频识别'
+    if (props.stage === 'finalizing') return '正在整理已完成的关键帧结果'
+    return '正在分析鱼群视频'
+  })
+
+  const progressText = computed(() => {
+    if (!props.isVideo || props.stage === 'queued' || props.stage === 'preparing') return ''
+    return `正在处理关键帧 ${props.completedFrameCount}/${props.plannedFrameCount}`
+  })
 
   const hintText = ref(MODEL_LOADING_HINT)
   let hintTimer: number | null = null
@@ -27,8 +62,13 @@
 </script>
 
 <template>
-  <div class="growth-process-animation" role="status" aria-live="polite">
-    <p class="process-title">正在分析鱼群图像</p>
+  <div
+    class="growth-process-animation"
+    :class="{ 'is-video': isVideo }"
+    role="status"
+    aria-live="polite"
+  >
+    <p class="process-title">{{ title }}</p>
 
     <div class="process-stages">
       <span class="process-stage stage-1">实例分割</span>
@@ -38,7 +78,18 @@
       <span class="process-stage stage-3">体长估算</span>
     </div>
 
-    <p class="process-hint">{{ hintText }}</p>
+    <p v-if="progressText" class="process-hint">{{ progressText }}</p>
+    <p v-else class="process-hint">{{ hintText }}</p>
+    <ElButton
+      v-if="isVideo && showCancel"
+      class="process-cancel"
+      size="small"
+      :loading="cancelling"
+      :disabled="cancelling"
+      @click="emit('cancel')"
+    >
+      {{ cancelling ? '正在取消' : '取消识别' }}
+    </ElButton>
   </div>
 </template>
 
@@ -55,6 +106,15 @@
     pointer-events: none;
     transform: translateX(-50%);
     text-align: center;
+  }
+
+  .growth-process-animation.is-video .process-stage,
+  .growth-process-animation.is-video .process-stage::before {
+    animation: none;
+  }
+
+  .growth-process-animation.is-video .process-stage::after {
+    background: rgb(24 144 255 / 8%);
   }
 
   .process-title {
@@ -128,6 +188,10 @@
     line-height: 1.6;
     color: var(--el-text-color-secondary);
     opacity: 0.85;
+  }
+
+  .process-cancel {
+    pointer-events: auto;
   }
 
   /* 轻微呼吸动画（标题） */

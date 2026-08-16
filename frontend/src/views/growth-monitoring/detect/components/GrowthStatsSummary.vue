@@ -20,8 +20,8 @@
         {{ formatLengthCm(assessment?.trimmedMeanLengthCm) }}
         <span class="metric-unit">cm</span>
       </div>
-      <div class="metric-label">群体评价平均全长</div>
-      <div class="metric-note">已去掉极端值</div>
+      <div class="metric-label">{{ videoMode ? '视频群体评价全长' : '群体评价平均全长' }}</div>
+      <div class="metric-note">{{ videoMode ? '可评价关键帧全长中位数' : '已去掉极端值' }}</div>
     </div>
 
     <div v-if="showReferenceRange" class="reference-block">
@@ -45,7 +45,11 @@
       <strong>{{ allMeasurableAvgText }} cm</strong>
     </div>
 
-    <el-table v-if="SHOW_GROWTH_STATUS_UI && showDistribution" :data="tableData" style="width: 100%">
+    <el-table
+      v-if="SHOW_GROWTH_STATUS_UI && showDistribution"
+      :data="tableData"
+      style="width: 100%"
+    >
       <el-table-column prop="type" label="生长状态" />
       <el-table-column prop="count" label="数量" align="center">
         <template #default="{ row }">
@@ -55,7 +59,7 @@
     </el-table>
 
     <div class="summary-footer">
-      <span>识别总数</span>
+      <span>{{ videoMode ? '累计鱼体检测次数' : '识别总数' }}</span>
       <el-tag type="info">{{ stats.detectedCount }}</el-tag>
     </div>
     <div class="summary-footer compact">
@@ -91,12 +95,14 @@
       cultureMonth?: CultureMonthSelection
       /** 轻量重评进行中：只在本卡片提示，图片与单鱼列表保持可用 */
       evaluating?: boolean
+      videoMode?: boolean
     }>(),
     {
       assessment: null,
       summary: null,
       cultureMonth: null,
-      evaluating: false
+      evaluating: false,
+      videoMode: false
     }
   )
 
@@ -105,10 +111,10 @@
   const cohortLabel = computed(() => GROWTH_COHORT_STATUS_LABEL[cohortStatus.value])
   const cohortText = computed(() => GROWTH_COHORT_STATUS_TEXT[cohortStatus.value])
 
-  // 群体分档结论只在样本充足且已完成月度评价时展示（方案 §7.1）。
+  // 未知月份不显示分档/参考范围；视频样本充足时仍展示跨帧中位数体长（方案 §13.2）。
   const isAssessed = computed(() => cohortStatus.value !== 'unassessed')
   const showCohortMean = computed(
-    () => isAssessed.value && props.assessment?.sampleSufficient === true
+    () => props.assessment?.sampleSufficient === true && (props.videoMode || isAssessed.value)
   )
   const showReferenceRange = computed(
     () => isAssessed.value && props.assessment?.referenceLengthCm !== null

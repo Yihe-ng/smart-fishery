@@ -100,6 +100,7 @@
   }
 
   const triggerVideoUpload = () => {
+    if (props.beforeImageUpload && !props.beforeImageUpload()) return
     videoInputRef.value?.click()
   }
 
