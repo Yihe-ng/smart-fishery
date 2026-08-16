@@ -133,6 +133,7 @@
   import AISuggestionPanel from './components/AISuggestionPanel.vue'
   import WeatherCard from './components/WeatherCard.vue'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
+  import { DEFAULT_GROWTH_POND_ID } from '@/store/modules/growth-recognition'
   import { getVideoList } from '@/api/video'
   import type { FeedingConfig, FeedingLog } from '@/types/feeding'
 
@@ -142,7 +143,7 @@
   const videoSources = ref<string[]>([])
 
   const { snapshot } = useDemoFrameSnapshot()
-  const pondId = computed(() => snapshot.pondId)
+  const pondId = computed(() => snapshot.pondId ?? DEFAULT_GROWTH_POND_ID)
   const currentIndex = computed(() => snapshot.currentIndex)
   const config = reactive<FeedingConfig>({
     feedCoefficient: 1.6,

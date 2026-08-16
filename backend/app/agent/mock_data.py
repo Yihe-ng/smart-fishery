@@ -8,7 +8,7 @@ from app.api.v1.endpoints.feeding import mock_feeding_config, mock_feeding_logs
 
 
 def get_mock_pond(pond_id: str | None) -> Dict[str, Any]:
-    target_id = pond_id or "pond-001"
+    target_id = pond_id or "T001"
     mode = get_ai_settings().ai_mode
     return {
         "pondId": target_id,
