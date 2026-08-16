@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     feeding,
     fish_pond,
     growth,
+    growth_records,
     health,
     menu,
     role,
@@ -32,6 +33,7 @@ api_router.include_router(device.router, prefix="/device", tags=["device"])
 api_router.include_router(alert.router, prefix="/alert", tags=["alert"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(growth.router, prefix="/growth", tags=["growth"])
+api_router.include_router(growth_records.router, prefix="/growth", tags=["growth-records"])
 api_router.include_router(weather.router, prefix="/weather", tags=["weather"])
 api_router.include_router(video.router, prefix="/video", tags=["video"])
 api_router.include_router(ai_router, prefix="/agent", tags=["ai-gateway"])

@@ -228,3 +228,82 @@ export interface GrowthVideoDetectResultResponse {
   createdAt?: number | null
   finishedAt?: number | null
 }
+
+/** 生长识别记录来源：图片识别 / 视频任务 */
+export type GrowthRecordSourceType = 'image' | 'video'
+
+/** 识别成功后落库的可测摘要（演示数据不入库） */
+export interface GrowthRecordSavePayload {
+  pondId: string
+  sourceType: GrowthRecordSourceType
+  recognizedAt: string
+  detectedCount: number
+  measurableCount: number
+  unmeasurableCount: number
+  small: number
+  normal: number
+  large: number
+  unassessed: number
+  plannedFrameCount?: number
+  completedFrameCount?: number
+  evaluableFrameCount?: number
+  detectionOccurrenceCount?: number
+  measurableOccurrenceCount?: number
+  cultureMonth: number | null
+  stockingAvgLengthCm: number | null
+  avgBodyLengthCm: number
+  avgWeightG: number
+  referenceLengthCm: number | null
+  smallThresholdCm: number | null
+  largeThresholdCm: number | null
+  trimmedMeanLengthCm: number | null
+  allMeasurableAvgLengthCm: number | null
+  cohortStatus: GrowthCohortStatus | null
+  advice: string | null
+}
+
+/** 轻量重评后仅更新月度评价相关字段 */
+export interface GrowthRecordAssessmentUpdatePayload {
+  cultureMonth: number | null
+  stockingAvgLengthCm: number | null
+  referenceLengthCm: number | null
+  smallThresholdCm: number | null
+  largeThresholdCm: number | null
+  trimmedMeanLengthCm: number | null
+  allMeasurableAvgLengthCm: number | null
+  cohortStatus: GrowthCohortStatus | null
+  advice: string | null
+}
+
+/** 数据库返回的生长识别记录 */
+export interface GrowthRecordItem {
+  id: number
+  pondId: string
+  sourceType: GrowthRecordSourceType
+  recognizedAt: string
+  detectedCount: number
+  measurableCount: number
+  unmeasurableCount: number
+  small: number
+  normal: number
+  large: number
+  unassessed: number
+  plannedFrameCount: number | null
+  completedFrameCount: number | null
+  evaluableFrameCount: number | null
+  detectionOccurrenceCount: number | null
+  measurableOccurrenceCount: number | null
+  cultureMonth: number | null
+  stockingAvgLengthCm: number | null
+  avgBodyLengthCm: number
+  avgWeightG: number
+  referenceLengthCm: number | null
+  smallThresholdCm: number | null
+  largeThresholdCm: number | null
+  trimmedMeanLengthCm: number | null
+  allMeasurableAvgLengthCm: number | null
+  cohortStatus: GrowthCohortStatus | null
+  advice: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}

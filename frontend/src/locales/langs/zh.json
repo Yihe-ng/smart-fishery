@@ -247,8 +247,8 @@
       "title": "石斑鱼智慧监测",
       "dashboard": "监测大屏",
       "waterQuality": "水质监测",
-      "disease": "病害识别",
       "growth": "生长识别",
+      "growthRecords": "生长记录",
       "feeding": "精准投喂",
       "production": "生产数据"
     }

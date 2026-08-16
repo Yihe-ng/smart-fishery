@@ -22,6 +22,10 @@ export interface LatestGrowthRecognitionSummary {
   sourceType: GrowthRecognitionSourceType
   sampleSource: GrowthRecognitionSampleSource
   taskId?: string
+  /** 摘要落库后回写的数据库记录 id；轻量重评按此 id 更新记录而不是新增历史行 */
+  recordId?: number
+  /** 数据库记录更新时间，用于跨标签页/浏览器判断评价是否已刷新 */
+  recordUpdatedAt?: string
   recognizedAt: string
   validUntil: string
   detectedCount: number
@@ -208,6 +212,16 @@ export const useGrowthRecognitionStore = defineStore(
       return new Date(summary.validUntil).getTime() < Date.now()
     }
 
+    /** 摘要落库成功后回写数据库记录 id，供后续轻量重评按记录更新 */
+    const setRecordId = (pondId: string, recordId: number) => {
+      const summary = latestSummaryByPond.value[pondId]
+      if (!summary) return
+      latestSummaryByPond.value = {
+        ...latestSummaryByPond.value,
+        [pondId]: { ...summary, recordId }
+      }
+    }
+
     /** 只清除识别摘要；已记忆的养殖参数（recentParams）按方案 §5.2 必须保留 */
     const clearLatestSummary = (pondId?: string) => {
       if (!pondId) {
@@ -249,6 +263,7 @@ export const useGrowthRecognitionStore = defineStore(
       setLatestSummary,
       getLatestSummary,
       isSummaryExpired,
+      setRecordId,
       clearLatestSummary,
       setRecentParams,
       clearRecentParams

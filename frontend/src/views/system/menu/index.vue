@@ -55,8 +55,15 @@
   import { useTableColumns } from '@/hooks/core/useTableColumns'
   import type { AppRouteRecord } from '@/types/router'
   import MenuDialog from './modules/menu-dialog.vue'
-  import { fetchGetMenuList } from '@/api/system-manage'
-  import { ElTag, ElMessageBox } from 'element-plus'
+  import {
+    fetchCreateMenu,
+    fetchDeleteMenu,
+    fetchGetMenuTree,
+    fetchUpdateMenu,
+    type MenuSaveParams,
+    type MenuTreeNode
+  } from '@/api/system-manage'
+  import { ElMessage, ElTag, ElMessageBox } from 'element-plus'
 
   defineOptions({ name: 'Menus' })
 
@@ -99,6 +106,59 @@
     getMenuList()
   })
 
+  /** 表格行：后端菜单节点映射为路由记录，并附带编辑时间/状态列所需字段 */
+  interface MenuRowRecord extends AppRouteRecord {
+    createTime: string
+    status: number
+  }
+
+  /**
+   * 把后端菜单树映射为页面需要的路由记录树：
+   * 按钮节点（menuType=3）转为父菜单 meta.authList 的权限标识；
+   * 节点 id 保留在行对象上，供编辑/删除接口使用。
+   */
+  const toMenuRowRecords = (nodes: MenuTreeNode[]): MenuRowRecord[] => {
+    return nodes.map((node) => {
+      const buttonChildren = (node.children ?? []).filter((child) => child.menuType === 3)
+      const menuChildren = (node.children ?? []).filter((child) => child.menuType !== 3)
+      const authList = buttonChildren.map((button) => ({
+        id: button.id,
+        parentId: node.id,
+        parentCode: node.menuCode,
+        title: button.menuName,
+        authMark: button.permission ?? ''
+      }))
+
+      return {
+        id: node.id,
+        path: node.path ?? '',
+        name: node.menuCode,
+        component: node.component ?? '',
+        createTime: node.createTime,
+        status: node.status,
+        children: toMenuRowRecords(menuChildren),
+        meta: {
+          title: node.menuName,
+          icon: node.icon ?? undefined,
+          sort: node.sort,
+          isEnable: node.status !== 0,
+          roles: node.roles ?? undefined,
+          keepAlive: node.keepAlive ?? undefined,
+          isHide: node.isHide ?? undefined,
+          isHideTab: node.isHideTab ?? undefined,
+          link: node.link ?? undefined,
+          isIframe: node.isIframe ?? undefined,
+          showBadge: node.showBadge ?? undefined,
+          showTextBadge: node.showTextBadge ?? undefined,
+          fixedTab: node.fixedTab ?? undefined,
+          activePath: node.activePath ?? undefined,
+          isFullPage: node.isFullPage ?? undefined,
+          authList: authList.length ? authList : undefined
+        }
+      }
+    })
+  }
+
   /**
    * 获取菜单列表数据
    */
@@ -106,8 +166,8 @@
     loading.value = true
 
     try {
-      const list = await fetchGetMenuList()
-      tableData.value = list
+      const tree = await fetchGetMenuTree()
+      tableData.value = toMenuRowRecords(tree)
     } catch (error) {
       throw error instanceof Error ? error : new Error('获取菜单失败')
     } finally {
@@ -180,14 +240,23 @@
       }
     },
     {
-      prop: 'date',
+      prop: 'createTime',
       label: '编辑时间',
-      formatter: () => '2022-3-12 12:00:00'
+      formatter: (row: AppRouteRecord) => (row as MenuRowRecord).createTime || '-'
     },
     {
       prop: 'status',
       label: '状态',
-      formatter: () => h(ElTag, { type: 'success' }, () => '启用')
+      formatter: (row: AppRouteRecord) => {
+        // isHide（侧边栏隐藏）与 status（启用/停用）是两个字段，隐藏态优先展示
+        if (row.meta?.isHide) {
+          return h(ElTag, { type: 'info' }, () => '隐藏')
+        }
+        const disabled = (row as MenuRowRecord).status === 0
+        return h(ElTag, { type: disabled ? 'danger' : 'success' }, () =>
+          disabled ? '停用' : '启用'
+        )
+      }
     },
     {
       prop: 'operation',
@@ -205,7 +274,7 @@
             }),
             h(ArtButtonTable, {
               type: 'delete',
-              onClick: () => handleDeleteAuth()
+              onClick: () => handleDeleteAuth(row)
             })
           ])
         }
@@ -213,7 +282,7 @@
         return h('div', buttonStyle, [
           h(ArtButtonTable, {
             type: 'add',
-            onClick: () => handleAddAuth(),
+            onClick: () => handleAddAuth(row),
             title: '新增权限'
           }),
           h(ArtButtonTable, {
@@ -222,7 +291,7 @@
           }),
           h(ArtButtonTable, {
             type: 'delete',
-            onClick: () => handleDeleteMenu()
+            onClick: () => handleDeleteMenu(row)
           })
         ])
       }
@@ -290,14 +359,23 @@
 
       if (item.meta?.authList?.length) {
         const authChildren: AppRouteRecord[] = item.meta.authList.map(
-          (auth: { title: string; authMark: string }) => ({
+          (auth: {
+            id?: number
+            parentId?: number
+            parentCode?: string
+            title: string
+            authMark: string
+          }) => ({
+            id: auth.id,
             path: `${item.path}_auth_${auth.authMark}`,
             name: `${String(item.name)}_auth_${auth.authMark}`,
             meta: {
               title: auth.title,
               authMark: auth.authMark,
               isAuthButton: true,
-              parentPath: item.path
+              parentPath: item.path,
+              parentId: auth.parentId,
+              parentCode: auth.parentCode
             }
           })
         )
@@ -361,13 +439,20 @@
     dialogVisible.value = true
   }
 
+  /** 新增按钮权限的挂载信息：父菜单 id 与路由 name（用于生成按钮 menuCode） */
+  let buttonParentId = 0
+  let buttonParentCode = ''
+
   /**
    * 添加权限按钮
+   * @param row 权限挂载的父菜单行
    */
-  const handleAddAuth = (): void => {
+  const handleAddAuth = (row: AppRouteRecord): void => {
     dialogType.value = 'menu'
     editData.value = null
     lockMenuType.value = false
+    buttonParentId = Number(row.id ?? 0)
+    buttonParentCode = String(row.name ?? '')
     dialogVisible.value = true
   }
 
@@ -389,9 +474,12 @@
   const handleEditAuth = (row: AppRouteRecord): void => {
     dialogType.value = 'button'
     editData.value = {
+      id: row.id,
       title: row.meta?.title,
       authMark: row.meta?.authMark
     }
+    buttonParentId = Number((row.meta as { parentId?: number }).parentId ?? 0)
+    buttonParentCode = String((row.meta as { parentCode?: string }).parentCode ?? '')
     lockMenuType.value = false
     dialogVisible.value = true
   }
@@ -400,60 +488,134 @@
    * 菜单表单数据类型
    */
   interface MenuFormData {
+    id: number
     name: string
     path: string
     component?: string
     icon?: string
     roles?: string[]
     sort?: number
+    isEnable?: boolean
+    keepAlive?: boolean
+    isHide?: boolean
+    isHideTab?: boolean
+    label?: string
+    authName?: string
+    authLabel?: string
+    authSort?: number
+    menuType?: 'menu' | 'button'
     [key: string]: any
   }
 
+  /** 从 http 错误中提取后端 detail 文案（如"该菜单下有子菜单，无法删除"） */
+  const getMenuErrorText = (error: unknown, fallback: string): string => {
+    const detail = (error as { data?: { detail?: string } })?.data?.detail
+    return detail || fallback
+  }
+
   /**
-   * 提交表单数据
+   * 提交表单数据：新增/编辑 菜单或按钮权限
    * @param formData 表单数据
    */
-  const handleSubmit = (formData: MenuFormData): void => {
-    console.log('提交数据:', formData)
-    // TODO: 调用API保存数据
-    getMenuList()
+  const handleSubmit = async (formData: MenuFormData): Promise<void> => {
+    const editing = formData.id > 0
+
+    try {
+      if (formData.menuType === 'button') {
+        const payload: MenuSaveParams = {
+          parentId: buttonParentId,
+          menuName: formData.authName ?? '',
+          menuCode: `${buttonParentCode || 'Menu'}_${formData.authLabel ?? ''}`,
+          menuType: 3,
+          permission: formData.authLabel ?? '',
+          sort: formData.authSort ?? 1
+        }
+        if (editing) {
+          await fetchUpdateMenu(formData.id, payload)
+        } else {
+          await fetchCreateMenu(payload)
+        }
+      } else {
+        const payload: MenuSaveParams = {
+          menuName: formData.name,
+          menuCode: formData.label || formData.name,
+          menuType: 2,
+          icon: formData.icon || null,
+          path: formData.path || null,
+          component: formData.component || null,
+          sort: formData.sort ?? 1,
+          status: formData.isEnable === false ? 0 : 1,
+          roles: formData.roles?.length ? formData.roles : null,
+          keepAlive: formData.keepAlive ?? null,
+          isHide: formData.isHide ?? null,
+          isHideTab: formData.isHideTab ?? null,
+          link: formData.link || null,
+          isIframe: formData.isIframe ?? null,
+          showBadge: formData.showBadge ?? null,
+          showTextBadge: formData.showTextBadge || null,
+          fixedTab: formData.fixedTab ?? null,
+          activePath: formData.activePath || null,
+          isFullPage: formData.isFullPage ?? null
+        }
+        if (editing) {
+          await fetchUpdateMenu(formData.id, payload)
+        } else {
+          await fetchCreateMenu({ parentId: 0, ...payload })
+        }
+      }
+
+      ElMessage.success(`${editing ? '编辑' : '新增'}成功`)
+      getMenuList()
+    } catch (error) {
+      console.warn('[Menus] 保存菜单失败:', error)
+    }
   }
 
   /**
    * 删除菜单
+   * @param row 菜单行数据
    */
-  const handleDeleteMenu = async (): Promise<void> => {
+  const handleDeleteMenu = async (row: AppRouteRecord): Promise<void> => {
     try {
       await ElMessageBox.confirm('确定要删除该菜单吗？删除后无法恢复', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       })
+    } catch {
+      return
+    }
+
+    try {
+      await fetchDeleteMenu(Number(row.id), { showErrorMessage: false })
       ElMessage.success('删除成功')
       getMenuList()
     } catch (error) {
-      if (error !== 'cancel') {
-        ElMessage.error('删除失败')
-      }
+      ElMessage.error(getMenuErrorText(error, '删除失败'))
     }
   }
 
   /**
    * 删除权限按钮
+   * @param row 权限行数据
    */
-  const handleDeleteAuth = async (): Promise<void> => {
+  const handleDeleteAuth = async (row: AppRouteRecord): Promise<void> => {
     try {
       await ElMessageBox.confirm('确定要删除该权限吗？删除后无法恢复', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       })
+    } catch {
+      return
+    }
+
+    try {
+      await fetchDeleteMenu(Number(row.id), { showErrorMessage: false })
       ElMessage.success('删除成功')
       getMenuList()
     } catch (error) {
-      if (error !== 'cancel') {
-        ElMessage.error('删除失败')
-      }
+      ElMessage.error(getMenuErrorText(error, '删除失败'))
     }
   }
 

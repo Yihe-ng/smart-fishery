@@ -114,6 +114,7 @@
     DEFAULT_GROWTH_POND_ID,
     useGrowthRecognitionStore
   } from '@/store/modules/growth-recognition'
+  import { useGrowthSummaryHydration } from '@/composables/useGrowthSummaryHydration'
   import type { AISeverity, AISuggestionCard } from '@/types'
   import {
     GROWTH_COHORT_STATUS_LABEL,
@@ -150,6 +151,8 @@
   )
 
   const activePondId = computed(() => props.pondId || DEFAULT_GROWTH_POND_ID)
+  // 本地缓存为空或库里有更新记录时，从数据库恢复最近识别摘要
+  useGrowthSummaryHydration(activePondId)
   const growthSummary = computed(() => growthRecognitionStore.getLatestSummary(activePondId.value))
   const growthExpired = computed(() => growthRecognitionStore.isSummaryExpired(growthSummary.value))
 

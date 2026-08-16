@@ -10,7 +10,7 @@
 import type { AppRouteRecord } from '@/types/router'
 import { useUserStore } from '@/store/modules/user'
 import { useAppMode } from '@/hooks/core/useAppMode'
-import { fetchGetMenuList } from '@/api/system-manage'
+import { fetchGetMenuList, type MenuTreeNode } from '@/api/system-manage'
 import { asyncRoutes } from '../routes/asyncRoutes'
 import { RoutesAlias } from '../routesAlias'
 import { formatMenuTitle } from '@/utils'
@@ -58,7 +58,49 @@ export class MenuProcessor {
    */
   private async processBackendMenu(): Promise<AppRouteRecord[]> {
     const list = await fetchGetMenuList()
-    return this.filterEmptyMenus(list)
+    const menuList = list.map((item) => this.mapBackendMenu(item))
+    const roles = useUserStore().info?.roles
+    return this.filterEmptyMenus(
+      roles && roles.length > 0 ? this.filterMenuByRoles(menuList, roles) : menuList
+    )
+  }
+
+  /**
+   * 将菜单管理接口的节点转换为路由菜单。
+   * 按钮节点不生成页面路由，而是挂到父菜单的 authList 上。
+   */
+  private mapBackendMenu(node: MenuTreeNode): AppRouteRecord {
+    const children = node.children ?? []
+    const authList = children
+      .filter((child) => child.menuType === 3)
+      .map((child) => ({ title: child.menuName, authMark: child.permission ?? '' }))
+    const routeChildren = children
+      .filter((child) => child.menuType !== 3)
+      .map((child) => this.mapBackendMenu(child))
+
+    return {
+      id: node.id,
+      path: node.path ?? '',
+      name: node.menuCode,
+      component: node.component ?? undefined,
+      children: routeChildren.length > 0 ? routeChildren : undefined,
+      meta: {
+        title: node.menuName,
+        icon: node.icon ?? undefined,
+        roles: node.roles ?? undefined,
+        keepAlive: node.keepAlive ?? undefined,
+        isHide: node.isHide ?? undefined,
+        isHideTab: node.isHideTab ?? undefined,
+        link: node.link ?? undefined,
+        isIframe: node.isIframe ?? undefined,
+        showBadge: node.showBadge ?? undefined,
+        showTextBadge: node.showTextBadge ?? undefined,
+        fixedTab: node.fixedTab ?? undefined,
+        activePath: node.activePath ?? undefined,
+        isFullPage: node.isFullPage ?? undefined,
+        authList: authList.length > 0 ? authList : undefined
+      }
+    }
   }
 
   /**

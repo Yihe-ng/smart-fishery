@@ -76,6 +76,7 @@
   import { getDashboardFrame } from '@/api/water-quality'
   import { getVideoList } from '@/api/video'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
+  import { useGrowthSummaryHydration } from '@/composables/useGrowthSummaryHydration'
   import {
     DEFAULT_GROWTH_POND_ID,
     useGrowthRecognitionStore
@@ -98,6 +99,8 @@
       dashboardFrame.value?.waterQuality?.pondId ??
       DEFAULT_GROWTH_POND_ID
   )
+  // 本地缓存为空或库里有更新记录时，从数据库恢复最近识别摘要
+  useGrowthSummaryHydration(currentPondId)
 
   const latestGrowthSummary = computed(() =>
     growthRecognitionStore.getLatestSummary(currentPondId.value)

@@ -1,9 +1,9 @@
 # 智渔精养·石斑鱼智慧养殖一体化系统
 
 ## 1. 项目简介
-智渔精养·石斑鱼智慧养殖一体化系统是一个前后端分离的渔业管理应用，后端基于 FastAPI 提供统一 API 与 WebSocket 能力，前端基于 Vue 3 + Vite 构建交互界面。仓库内已包含水质监测、智能投喂、设备/告警管理、用户与权限管理、天气查询，以及“生长识别”相关的图片和视频识别能力。
+智渔精养·石斑鱼智慧养殖一体化系统是一个前后端分离的渔业管理应用，后端基于 FastAPI 提供统一 API 与 WebSocket 能力，前端基于 Vue 3 + Vite 构建交互界面。仓库内已包含水质监测、智能投喂、设备/告警管理、用户与权限管理、菜单管理、天气查询，以及“生长识别”相关的图片和视频识别能力。
 
-系统主要用于渔业日常管理与识别分析：既可记录和查看水质数据、设备状态与告警，也可通过两阶段生长识别管线（分割 → 可测性分类 → 几何测长）对鱼类生长状态进行图片识别和视频关键帧识别，并在前端页面中展示识别结果、统计信息和视频任务状态。适用场景包括鱼塘监控、养殖生产管理、生长辅助识别、投喂建议查看与管理后台操作。
+系统主要用于渔业日常管理与识别分析：既可记录和查看水质数据、设备状态与告警，也可通过两阶段生长识别管线（分割 → 可测性分类 → 几何测长）对鱼类生长状态进行图片识别和视频关键帧识别。识别摘要、评价结论和视频统计会保存到 SQLite，并可在“生长记录”页面查询，控制台和投喂页面会自动恢复最近记录。适用场景包括鱼塘监控、养殖生产管理、生长辅助识别、投喂建议查看与管理后台操作。
 
 ## 2. 技术栈
 
@@ -25,7 +25,7 @@
 | 后端框架 | FastAPI | 提供 REST API 与 WebSocket 路由 |
 | 后端运行 | Uvicorn | 启动 FastAPI 服务 |
 | 后端语言 | Python 3.11+ | 后端业务实现 |
-| 数据库 | SQLite、SQLAlchemy、sqlalchemy-utils | 持久化水质、用户、告警等数据 |
+| 数据库 | SQLite、SQLAlchemy、sqlalchemy-utils | 持久化水质、用户、告警、菜单和生长识别记录 |
 | 数据校验 | Pydantic、pydantic-settings | 配置与接口数据模型 |
 | 鉴权/密码 | passlib[bcrypt] | 密码处理与认证相关能力 |
 | AI / 模型 | torch、torchvision、ultralytics、Pillow、opencv-python | 两阶段生长识别管线（分割 + 可测性分类 + 几何测长），YOLO 用于分割与分类推理 |
@@ -42,8 +42,8 @@ flowchart LR
     F -->|WebSocket| W[WebSocket 路由]
 
     B --> A[业务 API 路由层]
-    A --> WQ[水质 / 告警 / 设备 / 投喂 / 用户 / 权限 / 天气]
-    A --> G[生长识别接口]
+    A --> WQ[水质 / 告警 / 设备 / 投喂 / 用户 / 权限 / 菜单 / 天气]
+    A --> G[生长识别与记录接口]
     A --> AG[AI Gateway / Agent 路由]
 
     G --> P2[两阶段管线 FishAnalysisPipeline]
@@ -117,7 +117,9 @@ flowchart LR
 │   │   ├── types
 │   │   ├── utils
 │   │   └── views
-│   │       └── growth-monitoring/detect
+│   │       └── growth-monitoring
+│   │           ├── detect                         # 生长识别
+│   │           └── records                        # SQLite 生长记录查询
 │   ├── public
 │   ├── scripts
 │   ├── index.html
@@ -134,8 +136,8 @@ flowchart LR
 |---|---|
 | `backend/app/main.py` | 后端服务入口，创建 FastAPI 应用，注册 CORS、API 路由和 WebSocket 路由，并在启动时初始化数据库表 |
 | `backend/app/api/v1/api.py` | API 汇总入口，统一挂载各业务路由 |
-| `backend/app/api/v1/endpoints/` | 后端业务接口实现目录，包含认证、水质、用户、权限、鱼塘、投喂、设备、告警、健康、天气、生长识别等接口 |
-| `backend/app/models/` | ORM 模型目录，包含用户、水质数据、告警记录，以及 AI 推理相关代码与权重 |
+| `backend/app/api/v1/endpoints/` | 后端业务接口实现目录，包含认证、水质、用户、权限、鱼塘、投喂、设备、告警、健康、天气、菜单和生长识别/记录接口 |
+| `backend/app/models/` | ORM 模型目录，包含用户、水质数据、告警、菜单和生长记录模型，以及 AI 推理相关代码与权重 |
 | `backend/app/models/ai/pipeline/` | 两阶段生长识别管线：分割/裁剪/可测性分类/时序/测长编排，manifest 驱动 |
 | `backend/config/growth/pipeline.final.json` | 正式冻结模型清单：模型算法参数唯一真源（分类阈值/厘米换算/几何质量门槛/准入策略） |
 | `backend/config/growth/grouper_growth_standard.json` | 养殖标准：月度生长评价规则唯一真源（第 3–15 月预期增长量/偏小偏大比例/图片群体样本规则/视频最少可评价帧数/估重公式） |
@@ -153,6 +155,8 @@ flowchart LR
 | `frontend/src/router/` | 前端路由配置、守卫与路由模块 |
 | `frontend/src/api/` | 前端 API 封装目录，对接后端各业务接口 |
 | `frontend/src/views/growth-monitoring/detect/` | 生长识别页面与组件，负责图片/视频识别交互、结果展示和任务状态管理 |
+| `frontend/src/views/growth-monitoring/records/` | 生长识别记录页面，负责 SQLite 记录的筛选、分页、详情和删除 |
+| `frontend/src/views/system/menu/` | 菜单管理页面，负责菜单/按钮的增删改和启停状态 |
 | `frontend/src/views/dashboard/fishery-console/` | 渔业控制台首页，展示天气、告警、水质、投喂和识别结果等信息 |
 | `frontend/src/store/` | Pinia 状态管理目录 |
 | `frontend/src/components/` | 可复用业务组件与通用组件 |
@@ -167,6 +171,7 @@ flowchart LR
 |---|---|---|---|---|
 | 生长图片识别 | 对单张图片中的鱼类进行识别 | Base64 图片数据 | `backend/app/api/v1/endpoints/growth.py` 调用两阶段管线 `FishAnalysisPipeline`（分割 → 可测性分类 → 几何测长），模型参数由 `config/growth/pipeline.final.json` 驱动，月度分档与估重由 `config/growth/grouper_growth_standard.json` 驱动，完成检测、体长/重量估算、月度生长评价与统计 | 识别结果、检测列表、统计信息、平均体长/体重、群体评价 assessment、错误码 |
 | 生长视频识别 | 对上传视频的关键帧进行识别并形成月度群体评价 | 视频文件、养殖月数、投苗时平均全长 | 后端按视频时长自适应规划 3–8 个关键帧，OpenCV 解码后以图像数组逐帧进入共享识别管线；每帧独立评价，至少 3 个可评价帧时以帧级评价全长中位数形成视频结论。任务支持阶段进度、协作式取消、刷新恢复、终态释放和无模型轻量重评 | 任务 ID、阶段与进度、关键帧结果、跨帧检测记录统计、视频群体评价、部分结果与错误/警告码 |
+| 生长记录与跨页联动 | 保存并查询识别后的摘要和评价 | 图片/视频识别摘要、评价参数 | 前端成功识别后写入 `/api/growth/records`；控制台、投喂建议和记录页通过 `/api/growth/records/latest` 恢复最近记录；重评使用 PUT 更新原记录 | SQLite 历史记录、分页列表、详情、群体状态和管理建议 |
 | 摄像头流地址获取 | 提供摄像头流播放地址 | 无 | `growth.py` 直接返回一个流地址字符串 | 流地址 |
 | 水质数据上报与分析 | 记录并分析水质指标 | 溶解氧、pH、温度、氨氮、亚硝酸盐等 | `algorithms/prediction.py` 根据阈值生成分析结论和告警等级，`services/water_analysis.py` 写入数据库 | 水质分析结果、告警等级、历史记录 |
 | 水质仪表盘 | 组织最新水质、设备、告警与指标信息 | 数据库中的水质记录 | `services/water_quality_dashboard.py` 根据历史记录构建当前帧、趋势文本、设备状态与告警列表 | 仪表盘帧数据 |
@@ -174,6 +179,7 @@ flowchart LR
 | 天气查询 | 获取当前天气与气压风险 | 经纬度 | `services/weather_service.py` 请求 Open-Meteo API，并计算气压风险等级 | 当前天气、气压风险、更新时间 |
 | 用户认证 | 登录与用户信息获取 | 用户名、密码或 token | `app/api/v1/endpoints/auth.py` 结合密码校验与用户信息查询 | 登录结果、用户信息 |
 | 用户/角色/菜单管理 | 管理后台用户权限 | 用户、角色、菜单数据 | 通过 CRUD 和路由层完成增删改查与权限映射 | 列表、详情、更新结果 |
+| 菜单管理 | 管理目录、页面菜单和按钮权限 | 菜单名称、路由、组件、角色、启停状态 | 前端使用后端菜单模式，从 `/api/v3/system/menus/list` 生成路由；菜单 CRUD 写入 SQLite，空表首次访问时自动写入内置种子菜单 | 菜单树、路由权限、按钮权限和持久化配置 |
 | 鱼塘/设备/告警管理 | 管理渔场基础资源与告警记录 | 鱼塘、设备、告警相关数据 | 通过对应 REST 路由访问数据库模型和业务服务 | 列表、详情、状态更新结果 |
 | 前端页面交互 | 提供识别、监控、控制台等页面 | 用户操作、API 响应数据 | Vue 页面通过 `src/api/*` 调用后端接口，结合 Pinia、路由守卫和组件化页面渲染 | 页面视图、图表、识别结果、表单与列表 |
 
@@ -304,7 +310,7 @@ VITE_BASE_URL=/
 VITE_PORT=3006
 VITE_API_URL=/
 VITE_API_PROXY_URL=http://127.0.0.1:8000
-VITE_ACCESS_MODE=frontend
+VITE_ACCESS_MODE=backend
 VITE_DROP_CONSOLE=false
 ```
 
@@ -328,7 +334,7 @@ export const SHOW_GROWTH_STATUS_UI = false
 
 | 项目 | 说明 |
 |---|---|
-| SQLite 数据库 | 后端启动时会通过 `Base.metadata.create_all(bind=engine)` 自动创建表结构 |
+| SQLite 数据库 | 后端启动时通过 `Base.metadata.create_all(bind=engine)` 创建表结构，并自动补齐已有 `growth_records` 表的新字段；菜单表为空时首次访问菜单接口会写入内置种子菜单 |
 | 模型文件 | 两阶段管线权重位于 `backend/app/models/ai/releases/growth_20260808_v1/`（segmentation.pt / measurability_classifier.pt / classifier_backbone.pt），已随仓库分发，无需手动准备；legacy 回退路径依赖 `backend/app/models/ai/best.pt` |
 | 外部天气接口 | `weather_service.py` 会访问 Open-Meteo API，联网环境下可直接使用 |
 
@@ -426,6 +432,8 @@ python dev.py
 | 生长图片识别 | 打开前端后进入“生长识别”页面，上传图片 | 页面返回检测框、类别状态、体长估算、重量估算和统计信息 |
 | 生长视频识别 | 在“生长识别”页面上传视频文件 | 后端生成异步任务，前端轮询任务状态并展示关键帧识别结果 |
 | 控制台查看 | 打开渔业控制台首页 | 查看天气、水质、告警、投喂和识别结果等信息 |
+| 生长记录查询 | 打开“生长记录”页面 | 按池塘、来源和日期筛选 SQLite 中的识别记录，查看详情或删除记录 |
+| 菜单管理 | 以管理员身份打开“系统管理 → 菜单管理” | 管理目录、页面菜单和按钮权限；修改后重启不会丢失 |
 | 水质监控 | 打开水质监控页面 | 查看最新水质、历史数据、阈值和仪表盘帧数据 |
 | 智能投喂 | 打开投喂页面 | 查看投喂配置、日志和智能投喂建议 |
 
@@ -465,6 +473,30 @@ curl -X DELETE "http://127.0.0.1:8000/api/growth/detect/video/<task_id>"
 ```
 
 完成后修改月份或投苗体长时，前端调用 `POST /api/growth/evaluate/video`，只提交已有关键帧的鱼体标识、可测性和体长，不重新上传视频或运行模型。
+
+#### 生长记录接口
+
+```bash
+# 查询分页记录
+curl "http://127.0.0.1:8000/api/growth/records?page_num=1&page_size=10"
+
+# 查询某池塘最近一次记录
+curl "http://127.0.0.1:8000/api/growth/records/latest?pond_id=T001"
+```
+
+识别成功后由前端自动写入记录；演示数据不会落库。数据库只保存跨页面展示所需的摘要、评价和视频统计，不保存图片 Base64、掩码或单鱼检测明细。
+
+#### 菜单接口
+
+```bash
+# 查询菜单树
+curl "http://127.0.0.1:8000/api/v3/system/menus/list"
+
+# 查询简化菜单列表
+curl "http://127.0.0.1:8000/api/v3/system/menus/simple"
+```
+
+前端默认使用 `VITE_ACCESS_MODE=backend`。如需临时恢复前端静态路由，可将该值改为 `frontend` 并重新启动/构建前端。
 
 #### 查询摄像头流地址
 
