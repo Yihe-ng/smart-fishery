@@ -23,22 +23,16 @@ export const fisheryRoutes: AppRouteRecord = {
       meta: { title: 'menus.fishery.growth', icon: 'ri:scales-3-line', keepAlive: true }
     },
     {
+      path: 'growth-records',
+      name: 'GrowthRecords',
+      component: '/growth-monitoring/records/index',
+      meta: { title: 'menus.fishery.growthRecords', icon: 'ri:file-list-3-line', keepAlive: true }
+    },
+    {
       path: 'feeding',
       name: 'Feeding',
       component: '/feeding/index',
       meta: { title: 'menus.fishery.feeding', icon: 'ri:hand-coin-line', keepAlive: true }
-    },
-    {
-      path: 'fish-disease',
-      name: 'FishDisease',
-      component: '/outside/Iframe',
-      redirect: '/fishery/growth',
-      meta: {
-        title: 'menus.fishery.disease',
-        icon: 'ri:microscope-line',
-        keepAlive: true,
-        isHide: true
-      }
     },
     {
       path: 'water-quality',

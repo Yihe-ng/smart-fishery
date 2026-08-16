@@ -247,8 +247,8 @@
       "title": "Smart Fishery",
       "dashboard": "Monitoring Dashboard",
       "waterQuality": "Water Quality",
-      "disease": "Disease Detection",
       "growth": "Growth Identification",
+      "growthRecords": "Growth Records",
       "feeding": "Precision Feeding",
       "production": "Production Data"
     }

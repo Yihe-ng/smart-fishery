@@ -160,6 +160,7 @@
   import GrowthVideoFrameStrip from './components/GrowthVideoFrameStrip.vue'
   import GrowthVideoTaskState from './components/GrowthVideoTaskState.vue'
   import { useGrowthVideoTask } from './composables/useGrowthVideoTask'
+  import { useGrowthRecordSync } from './composables/useGrowthRecordSync'
 
   defineOptions({ name: 'GrowthMonitoringDetect' })
 
@@ -225,6 +226,7 @@
   } = useGrowthVideoTask()
 
   const growthRecognitionStore = useGrowthRecognitionStore()
+  const { syncRecord, syncReevaluated } = useGrowthRecordSync()
   const router = useRouter()
 
   // 首次使用没有记忆值时保持为空，不自动填入 13 cm（方案 §5.2）。
@@ -541,15 +543,15 @@
         unassessed: response.stats.unassessed
       }
     })
+
+    const saved = growthRecognitionStore.getLatestSummary(pondId)
+    if (saved) syncRecord(saved)
   }
 
   const writeVideoRecognitionSummary = () => {
     if (
       growthVideoTaskStatus.value !== 'success' ||
-      growthVideoAggregateStats.value.detectedCount <= 0 ||
-      !growthVideoAssessment.value?.sampleSufficient ||
-      growthVideoAssessment.value.cohortStatus === 'unassessed' ||
-      growthVideoAssessment.value.cohortStatus === 'insufficient'
+      growthVideoAggregateStats.value.detectedCount <= 0
     ) {
       return
     }
@@ -578,15 +580,15 @@
       avgWeightG: growthVideoAggregateSummary.value.avgWeightG,
       avgConfidence: undefined,
       isDemoData: false,
-      cultureMonth: evaluated.cultureMonth,
-      stockingAvgLengthCm: evaluated.stockingAvgLengthCm,
-      referenceLengthCm: evaluated.referenceLengthCm,
-      smallThresholdCm: evaluated.smallThresholdCm,
-      largeThresholdCm: evaluated.largeThresholdCm,
-      trimmedMeanLengthCm: evaluated.trimmedMeanLengthCm,
-      allMeasurableAvgLengthCm: evaluated.allMeasurableAvgLengthCm,
-      cohortStatus: evaluated.cohortStatus,
-      advice: evaluated.advice,
+      cultureMonth: evaluated?.cultureMonth ?? null,
+      stockingAvgLengthCm: evaluated?.stockingAvgLengthCm ?? null,
+      referenceLengthCm: evaluated?.referenceLengthCm ?? null,
+      smallThresholdCm: evaluated?.smallThresholdCm ?? null,
+      largeThresholdCm: evaluated?.largeThresholdCm ?? null,
+      trimmedMeanLengthCm: evaluated?.trimmedMeanLengthCm ?? null,
+      allMeasurableAvgLengthCm: evaluated?.allMeasurableAvgLengthCm ?? null,
+      cohortStatus: evaluated?.cohortStatus ?? 'unassessed',
+      advice: evaluated?.advice ?? null,
       perStatus: {
         small: 0,
         normal: 0,
@@ -594,6 +596,9 @@
         unassessed: 0
       }
     })
+
+    const saved = growthRecognitionStore.getLatestSummary(pondId)
+    if (saved) syncRecord(saved)
   }
 
   const clearAssessmentErrors = () => {
@@ -987,6 +992,9 @@
         unassessed: nextStats.unassessed
       }
     })
+
+    const updated = growthRecognitionStore.getLatestSummary(DEFAULT_GROWTH_POND_ID)
+    if (updated) syncReevaluated(updated)
   }
 
   /** 投苗体长失焦或回车时提交；仅在重评成功后记忆新参数。 */

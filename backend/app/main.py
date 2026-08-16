@@ -14,8 +14,11 @@ async def lifespan(app: FastAPI):
     from app.api.v1.endpoints.growth import get_growth_manifest
     from app.db.session import engine
     from app.db.base import Base
+    from app.db.schema import ensure_growth_record_schema
     from app.models.user import User
     from app.models.water import WaterQualityData, AlertRecord
+    from app.models.growth import GrowthRecord
+    from app.models.menu import Menu
     from app.services.growth_standard import load_growth_standard
 
     get_growth_manifest()
@@ -23,6 +26,7 @@ async def lifespan(app: FastAPI):
     print("生长识别配置已校验并缓存")
 
     Base.metadata.create_all(bind=engine)
+    ensure_growth_record_schema(engine)
     print("数据库表已初始化")
     print("应用启动完成")
 
