@@ -5,13 +5,15 @@ from typing import Optional
 class Settings(BaseSettings):
     """全局环境配置（由 backend/.env 覆盖默认值）。
 
-    ⚠️ 配置分工说明：
-    - 本文件只放"运行开关/入口"（选哪个管线、用哪个 manifest、设备、目录等）。
-    - 算法参数（阈值/换算/分档/估重/准入策略）一律在
-      `app/models/ai/pipeline/manifests/growth_final.json`（manifest）中配置，
-      不要在 config.py 重复定义——manifest 是这些参数的唯一真源。
-    - 已删除的历史死配置：GROWTH_SMALL_THRESHOLD / GROWTH_LARGE_THRESHOLD
-      （体长分档实际由 manifest.business.small/large_threshold_cm 控制）。
+    ⚠️ 配置分工说明（三层，互不重叠）：
+    - 本文件只放"运行开关/入口"：选哪个管线、用哪个配置文件、推理设备、目录。
+    - 模型清单 `config/growth/pipeline.final.json` 管"怎么测"：模型与权重、裁剪、
+      视频时序、测长算法与几何质量门槛、像素→厘米换算、可测性准入策略。
+    - 养殖标准 `config/growth/grouper_growth_standard.json` 管"测出来怎么评"：
+      第 3–15 个月预期累计增长量、每月偏小/偏大比例、群体最小样本与去极端规则、
+      体长估重公式、视频临时旧分档规则（legacy_video_rule）。
+    - 已删除的历史死配置：GROWTH_SMALL_THRESHOLD / GROWTH_LARGE_THRESHOLD；
+      体长分档与估重曾在 manifest.business 段，现已迁至养殖标准 JSON。
     """
 
     DATABASE_URL: str = "sqlite:///./data/smart_fishery_db.db"
@@ -24,9 +26,12 @@ class Settings(BaseSettings):
     # 生长识别推理路径开关：legacy（旧双类 YOLO，回退）| two_stage（冻结两阶段管线）
     # 2026-08-08 用户授权：默认切换 two_stage，legacy 保留作回退。
     GROWTH_PIPELINE: str = "two_stage"
-    # 新管线 model manifest 路径（为空时使用正式清单 growth_final.json；
-    # 显式指定 growth_candidate.example.json 可用于候选 smoke/回归）
+    # 新管线模型清单路径（为空时使用 config/growth/pipeline.final.json；
+    # 显式指定 config/growth/pipeline.candidate.example.json 可用于候选 smoke/回归）
     GROWTH_MANIFEST_PATH: str = ""
+    # 养殖标准（月度生长评价规则）路径；为空时使用
+    # config/growth/grouper_growth_standard.json。修改 JSON 后需重启后端生效。
+    GROWTH_STANDARD_PATH: str = ""
     # 新管线推理设备（cpu/cuda:0；训练 Agent 占用 GPU 时使用 cpu）
     GROWTH_PIPELINE_DEVICE: str = "cpu"
     # 视频模式时序 override：None=跟随 manifest（正式清单启用 S1）；

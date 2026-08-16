@@ -27,7 +27,20 @@
           }"
           :style="sidebarStackStyle"
         >
-          <GrowthStatsSummary :stats="activeStats" />
+          <GrowthStatsSummary
+            :stats="activeStats"
+            :assessment="activeAssessment"
+            :summary="activeSummary"
+            :culture-month="cultureMonth"
+            :evaluating="isReevaluating"
+          />
+          <div v-if="showFeedingEntry" class="feeding-entry-tip">
+            <span>识别完成，可查看联动投喂建议</span>
+            <ElButton type="primary" text size="small" @click="goToFeeding">
+              前往精准投喂
+              <ArtSvgIcon icon="ri:arrow-right-line" />
+            </ElButton>
+          </div>
           <GrowthResultCard :result="activeDetection" :empty-text="resultEmptyText" />
           <GrowthDetectionList
             class="growth-fish-list"
@@ -72,9 +85,22 @@
             @select="handleSelectFrame"
           />
 
+          <GrowthAssessmentControls
+            v-if="inputMode !== 'growthVideo'"
+            ref="assessmentControlsRef"
+            v-model:culture-month="cultureMonth"
+            v-model:stocking-avg-length-cm="stockingAvgLengthCm"
+            :reference-preview="referencePreview"
+            :errors="assessmentErrors"
+            :disabled="isProcessing"
+            @commit-length="handleStockingLengthCommit"
+            @clear-errors="clearAssessmentErrors"
+          />
+
           <GrowthActionButtons
             :processing="isProcessing"
             :has-image="hasVisualResult"
+            :before-image-upload="validateAssessmentParamsBeforeUpload"
             @upload-image="handleImageUpload"
             @upload-video="handleVideoUpload"
             @clear="handleClear"
@@ -90,24 +116,36 @@
 
 <script setup lang="ts">
   import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+  import { useRouter } from 'vue-router'
   import { ElMessage } from 'element-plus'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
-  import { detectGrowth } from '@/api/growth-monitoring/detect'
+  import { detectGrowth, evaluateGrowth } from '@/api/growth-monitoring/detect'
   import {
     DEFAULT_GROWTH_POND_ID,
     useGrowthRecognitionStore
   } from '@/store/modules/growth-recognition'
   import { loadingService } from '@/utils/ui'
   import type {
+    GrowthAssessment,
     GrowthDetectErrorCode,
     GrowthDetectResponse,
     GrowthDetectionItem,
     GrowthImageMeta,
     GrowthStats,
+    GrowthSummary,
     GrowthTaskStatus,
     GrowthVideoDetectErrorCode
   } from '@/types/growth-monitoring'
+  import {
+    UNKNOWN_CULTURE_MONTH,
+    formatLengthCm,
+    isKnownCultureMonth,
+    isValidStockingLength,
+    type CultureMonthSelection,
+    type GrowthAssessmentErrors
+  } from './constants/assessmentParams'
   import GrowthActionButtons from './components/GrowthActionButtons.vue'
+  import GrowthAssessmentControls from './components/GrowthAssessmentControls.vue'
   import GrowthDetectionList from './components/GrowthDetectionList.vue'
   import GrowthImageDisplay from './components/GrowthImageDisplay.vue'
   import GrowthProcessAnimation from './components/GrowthProcessAnimation.vue'
@@ -125,9 +163,15 @@
     small: 0,
     normal: 0,
     large: 0,
+    unassessed: 0,
     detectedCount: 0,
     measurableCount: 0,
     unmeasurableCount: 0
+  }
+
+  const EMPTY_SUMMARY: GrowthSummary = {
+    avgBodyLengthCm: 0,
+    avgWeightG: 0
   }
 
   const inputMode = ref<InputMode>('image')
@@ -136,6 +180,8 @@
   const detections = ref<GrowthDetectionItem[]>([])
   const selectedDetectionId = ref<string | null>(null)
   const stats = ref<GrowthStats>({ ...EMPTY_STATS })
+  const summary = ref<GrowthSummary>({ ...EMPTY_SUMMARY })
+  const assessment = ref<GrowthAssessment | null>(null)
   const errorCode = ref<GrowthDetectErrorCode | null>(null)
   const errorMessage = ref('')
   const mainStackRef = ref<HTMLElement>()
@@ -161,6 +207,26 @@
   } = useGrowthVideoTask()
 
   const growthRecognitionStore = useGrowthRecognitionStore()
+  const router = useRouter()
+
+  // 首次使用没有记忆值时保持为空，不自动填入 13 cm（方案 §5.2）。
+  const cultureMonth = ref<CultureMonthSelection>(
+    growthRecognitionStore.recentParams.cultureMonth ?? null
+  )
+  const stockingAvgLengthCm = ref<number | null>(
+    growthRecognitionStore.recentParams.stockingAvgLengthCm ?? null
+  )
+  const assessmentErrors = ref<GrowthAssessmentErrors>({})
+  const assessmentControlsRef = ref<{ focusFirstError: () => void; flashErrors: () => void }>()
+  const isReevaluating = ref(false)
+  // 重评请求序号：只接受序号最新的响应，避免连续改参数时旧响应覆盖新结论。
+  let reevaluateRequestSeq = 0
+  let reevaluateAbortController: AbortController | null = null
+  let restoringAssessmentParams = false
+  let lastSuccessfulAssessmentParams = {
+    cultureMonth: cultureMonth.value,
+    stockingAvgLengthCm: stockingAvgLengthCm.value
+  }
 
   const imageSelectedDetection = computed(
     () => detections.value.find((item) => item.id === selectedDetectionId.value) ?? null
@@ -195,6 +261,49 @@
       ? (selectedGrowthFrame.value?.stats ?? EMPTY_STATS)
       : stats.value
   )
+
+  const activeSummary = computed(() =>
+    inputMode.value === 'growthVideo'
+      ? (selectedGrowthFrame.value?.summary ?? EMPTY_SUMMARY)
+      : summary.value
+  )
+
+  // 视频路径本期不做月度评价，因此不向群体卡片提供 assessment。
+  const activeAssessment = computed(() =>
+    inputMode.value === 'growthVideo' ? null : assessment.value
+  )
+
+  const showFeedingEntry = computed(
+    () => inputMode.value === 'image' && taskStatus.value === 'success' && detections.value.length > 0
+  )
+
+  const goToFeeding = () => router.push({ name: 'Feeding' })
+
+  /**
+   * 上传前的参考范围预览：仅在月份与投苗体长均有效时展示。
+   * 参考全长与上下限来自最近一次后端评价结果，前端不复制计算公式；
+   * 尚无后端结果时只展示已选月份，不猜测参考范围。
+   */
+  const referencePreview = computed(() => {
+    if (!isKnownCultureMonth(cultureMonth.value)) return ''
+    if (!isValidStockingLength(stockingAvgLengthCm.value)) return ''
+
+    const monthText = `投苗后第 ${cultureMonth.value} 个月`
+    const evaluated = assessment.value
+
+    if (
+      !evaluated ||
+      evaluated.cultureMonth !== cultureMonth.value ||
+      evaluated.stockingAvgLengthCm !== stockingAvgLengthCm.value ||
+      evaluated.referenceLengthCm === null ||
+      evaluated.smallThresholdCm === null ||
+      evaluated.largeThresholdCm === null
+    ) {
+      return `${monthText}｜投苗时平均全长 ${formatLengthCm(stockingAvgLengthCm.value)} cm`
+    }
+
+    return `${monthText}｜综合参考全长 ${formatLengthCm(evaluated.referenceLengthCm)} cm｜正常参考范围 ${formatLengthCm(evaluated.smallThresholdCm)}–${formatLengthCm(evaluated.largeThresholdCm)} cm`
+  })
 
   const displayTaskStatus = computed<GrowthTaskStatus>(() => {
     if (inputMode.value === 'growthVideo') {
@@ -282,6 +391,8 @@
     detections.value = []
     selectedDetectionId.value = null
     stats.value = { ...EMPTY_STATS }
+    summary.value = { ...EMPTY_SUMMARY }
+    assessment.value = null
     errorCode.value = null
     errorMessage.value = ''
   }
@@ -338,6 +449,9 @@
     detections.value = response.detections
     selectedDetectionId.value = response.selectedDetectionId
     stats.value = response.stats
+    summary.value = response.summary
+    // 评价失败时后端返回 assessment=null，但体长测量结果仍然有效，必须保留。
+    assessment.value = response.assessment ?? null
     errorCode.value = response.errorCode
     errorMessage.value = mapImageErrorMessage(response.errorCode)
   }
@@ -364,6 +478,7 @@
 
     // 第一阶段生长识别页没有池塘选择，先写入默认池塘，避免跨页摘要缺少业务归属。
     const pondId = DEFAULT_GROWTH_POND_ID
+    const evaluated = response.assessment ?? null
 
     growthRecognitionStore.setLatestSummary({
       pondId,
@@ -378,7 +493,22 @@
       avgBodyLengthCm: response.summary.avgBodyLengthCm,
       avgWeightG: response.summary.avgWeightG,
       avgConfidence: getAverageConfidence(response.detections),
-      isDemoData: false
+      isDemoData: false,
+      cultureMonth: evaluated?.cultureMonth ?? null,
+      stockingAvgLengthCm: evaluated?.stockingAvgLengthCm ?? null,
+      referenceLengthCm: evaluated?.referenceLengthCm ?? null,
+      smallThresholdCm: evaluated?.smallThresholdCm ?? null,
+      largeThresholdCm: evaluated?.largeThresholdCm ?? null,
+      trimmedMeanLengthCm: evaluated?.trimmedMeanLengthCm ?? null,
+      allMeasurableAvgLengthCm: evaluated?.allMeasurableAvgLengthCm ?? null,
+      cohortStatus: evaluated?.cohortStatus ?? 'unassessed',
+      advice: evaluated?.advice ?? null,
+      perStatus: {
+        small: response.stats.small,
+        normal: response.stats.normal,
+        large: response.stats.large,
+        unassessed: response.stats.unassessed
+      }
     })
   }
 
@@ -412,6 +542,73 @@
     })
   }
 
+  const clearAssessmentErrors = () => {
+    if (!assessmentErrors.value.cultureMonth && !assessmentErrors.value.stockingAvgLengthCm) return
+    assessmentErrors.value = {}
+  }
+
+  /**
+   * 上传前校验养殖参数，负责在打开文件选择器之前拦截无效输入。
+   * 月份必须已选择；选择“不清楚，仅测量体长”时豁免投苗体长校验，可直接上传。
+   * 校验失败会写入中文错误文案，由参数区高亮闪烁并聚焦第一个错误字段；返回 false 阻止弹出文件选择窗口。
+   * 校验通过时把本次参数写入 store 记忆（长期保留，不随清空结果失效）。
+   */
+  const validateAssessmentParamsBeforeUpload = () => {
+    const errors: GrowthAssessmentErrors = {}
+    const isUnknownMonth = cultureMonth.value === UNKNOWN_CULTURE_MONTH
+
+    if (cultureMonth.value === null) {
+      errors.cultureMonth = '请选择养殖月数；若确实不清楚，请选择“不清楚，仅测量体长”'
+    } else if (!isUnknownMonth && !isKnownCultureMonth(cultureMonth.value)) {
+      errors.cultureMonth = '养殖月数需在第 3–15 个月之间'
+    }
+
+    if (!isUnknownMonth && cultureMonth.value !== null) {
+      if (stockingAvgLengthCm.value === null) {
+        errors.stockingAvgLengthCm = '请填写投苗时平均全长（cm）'
+      } else if (!isValidStockingLength(stockingAvgLengthCm.value)) {
+        errors.stockingAvgLengthCm = '投苗时平均全长需在 1.0–100.0 cm 之间'
+      }
+    }
+
+    assessmentErrors.value = errors
+
+    if (errors.cultureMonth || errors.stockingAvgLengthCm) {
+      assessmentControlsRef.value?.flashErrors()
+      assessmentControlsRef.value?.focusFirstError()
+      return false
+    }
+
+    growthRecognitionStore.setRecentParams({
+      cultureMonth: isUnknownMonth ? undefined : cultureMonth.value,
+      stockingAvgLengthCm: isUnknownMonth ? undefined : stockingAvgLengthCm.value
+    })
+
+    return true
+  }
+
+  /** 传给后端的评价参数：选择“不清楚”时两个字段都置空，后端只测量体长 */
+  const buildAssessmentParams = () => {
+    if (!isKnownCultureMonth(cultureMonth.value)) {
+      return { cultureMonth: null, stockingAvgLengthCm: null }
+    }
+
+    return {
+      cultureMonth: cultureMonth.value,
+      stockingAvgLengthCm: isValidStockingLength(stockingAvgLengthCm.value)
+        ? stockingAvgLengthCm.value
+        : null
+    }
+  }
+
+  const rememberSuccessfulAssessmentParams = () => {
+    lastSuccessfulAssessmentParams = {
+      cultureMonth: cultureMonth.value,
+      stockingAvgLengthCm: stockingAvgLengthCm.value
+    }
+    growthRecognitionStore.setRecentParams(lastSuccessfulAssessmentParams)
+  }
+
   const handleImageUpload = async (imgData: string) => {
     clearVideoTask()
     inputMode.value = 'image'
@@ -424,14 +621,17 @@
     detections.value = []
     selectedDetectionId.value = null
     stats.value = { ...EMPTY_STATS }
+    summary.value = { ...EMPTY_SUMMARY }
+    assessment.value = null
     errorCode.value = null
     errorMessage.value = ''
 
     try {
       taskStatus.value = 'processing'
-      const result = await detectGrowth(imgData)
+      const result = await detectGrowth(imgData, buildAssessmentParams())
       applyDetectResponse(result)
       writeImageRecognitionSummary(result)
+      rememberSuccessfulAssessmentParams()
 
       if (result.errorCode === 'NO_FISH_DETECTED') {
         ElMessage.warning('未识别到石斑鱼')
@@ -443,6 +643,8 @@
       detections.value = []
       selectedDetectionId.value = null
       stats.value = { ...EMPTY_STATS }
+      summary.value = { ...EMPTY_SUMMARY }
+      assessment.value = null
 
       const rawMessage = String(error?.message || '')
       const matchedCode = (
@@ -500,10 +702,122 @@
     selectGrowthFrame(frameId)
   }
 
+  // 只清图片与识别结果；已记忆的养殖参数按方案 §5.2 保留，方便连续识别同一批鱼。
   const handleClear = () => {
+    reevaluateAbortController?.abort()
+    reevaluateAbortController = null
+    isReevaluating.value = false
     resetAllState()
     ElMessage.info('已清空识别结果')
   }
+
+  /**
+   * 识别完成后修改养殖参数时的轻量重评。
+   * 月份修改立即触发，投苗体长修改在失焦或回车时触发，避免每敲一位数字都发请求。
+   * 只把已有的单鱼可测性与体长发给后端重算状态，不重新上传图片、不重新运行模型。
+   * 连续修改时先 abort 旧请求，并用请求序号丢弃迟到的旧响应，防止乱序覆盖最新结论。
+   * 重评失败保留上一次成功的结论与参数，也不覆盖 store 里的成功摘要。
+   */
+  const reevaluateAssessment = async () => {
+    if (inputMode.value === 'growthVideo') return
+    if (taskStatus.value !== 'success' || !detections.value.length) return
+
+    const params = buildAssessmentParams()
+    if (isKnownCultureMonth(cultureMonth.value) && params.stockingAvgLengthCm === null) return
+
+    reevaluateAbortController?.abort()
+    const controller = new AbortController()
+    reevaluateAbortController = controller
+    const requestSeq = ++reevaluateRequestSeq
+    isReevaluating.value = true
+
+    try {
+      const response = await evaluateGrowth(
+        {
+          cultureMonth: params.cultureMonth,
+          stockingAvgLengthCm: params.stockingAvgLengthCm,
+          fishMeasurements: detections.value.map((item) => ({
+            id: item.id,
+            isMeasurable: item.isMeasurable,
+            bodyLengthCm: item.bodyLengthCm
+          }))
+        },
+        { signal: controller.signal }
+      )
+
+      if (requestSeq !== reevaluateRequestSeq) return
+
+      const statusById = new Map(response.detections.map((item) => [item.id, item]))
+      detections.value = detections.value.map((item) => {
+        const evaluated = statusById.get(item.id)
+        return evaluated
+          ? { ...item, status: evaluated.status, statusText: evaluated.statusText }
+          : item
+      })
+      stats.value = response.stats
+      summary.value = response.summary
+      assessment.value = response.assessment
+
+      writeReevaluatedSummary(response.assessment, response.stats)
+      rememberSuccessfulAssessmentParams()
+    } catch {
+      if (requestSeq === reevaluateRequestSeq) {
+        restoringAssessmentParams = true
+        cultureMonth.value = lastSuccessfulAssessmentParams.cultureMonth
+        stockingAvgLengthCm.value = lastSuccessfulAssessmentParams.stockingAvgLengthCm
+        await nextTick()
+        restoringAssessmentParams = false
+        ElMessage.warning('生长评价更新失败，仍展示上一次评价结果')
+      }
+    } finally {
+      if (requestSeq === reevaluateRequestSeq) {
+        isReevaluating.value = false
+        reevaluateAbortController = null
+      }
+    }
+  }
+
+  /** 重评成功后覆盖摘要中的评价字段，保持 24 小时有效期的起点仍是首次识别时间 */
+  const writeReevaluatedSummary = (
+    evaluated: GrowthAssessment | null,
+    nextStats: GrowthStats
+  ) => {
+    const existing = growthRecognitionStore.getLatestSummary(DEFAULT_GROWTH_POND_ID)
+    if (!existing) return
+
+    growthRecognitionStore.setLatestSummary({
+      ...existing,
+      small: nextStats.small,
+      normal: nextStats.normal,
+      large: nextStats.large,
+      cultureMonth: evaluated?.cultureMonth ?? null,
+      stockingAvgLengthCm: evaluated?.stockingAvgLengthCm ?? null,
+      referenceLengthCm: evaluated?.referenceLengthCm ?? null,
+      smallThresholdCm: evaluated?.smallThresholdCm ?? null,
+      largeThresholdCm: evaluated?.largeThresholdCm ?? null,
+      trimmedMeanLengthCm: evaluated?.trimmedMeanLengthCm ?? null,
+      allMeasurableAvgLengthCm: evaluated?.allMeasurableAvgLengthCm ?? null,
+      cohortStatus: evaluated?.cohortStatus ?? 'unassessed',
+      advice: evaluated?.advice ?? null,
+      perStatus: {
+        small: nextStats.small,
+        normal: nextStats.normal,
+        large: nextStats.large,
+        unassessed: nextStats.unassessed
+      }
+    })
+  }
+
+  /** 投苗体长失焦或回车时提交；仅在重评成功后记忆新参数。 */
+  const handleStockingLengthCommit = () => {
+    reevaluateAssessment()
+  }
+
+  // 月份变更立即重评；选择“不清楚”时同样触发，让状态回落为“未评估”。
+  watch(cultureMonth, () => {
+    if (restoringAssessmentParams) return
+    reevaluateAssessment()
+  })
 
   watch(isProcessing, (value) => {
     if (value) {
@@ -546,6 +860,7 @@
 
   onUnmounted(() => {
     mainStackResizeObserver?.disconnect()
+    reevaluateAbortController?.abort()
     loadingService.hideLoading()
   })
 </script>
@@ -600,6 +915,20 @@
       flex: 1;
       flex-direction: column;
       min-height: 0;
+    }
+
+    .feeding-entry-tip {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      background: var(--el-color-primary-light-9);
+      border: 1px solid var(--el-color-primary-light-7);
+      border-radius: 8px;
     }
 
     .growth-main-stack {

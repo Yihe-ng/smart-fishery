@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "cohort_rule": {
+    "min_measurable_count": 3,
+    "drop_shortest_count": 1
+  },
+  "weight_estimation": {
+    "coefficient_a": 0.0285,
+    "exponent_b": 2.937
+  },
+  "monthly_rules": {
+    "3": {
+      "expected_gain_cm": 4.5,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "4": {
+      "expected_gain_cm": 6.0,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "5": {
+      "expected_gain_cm": 7.5,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "6": {
+      "expected_gain_cm": 9.0,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "7": {
+      "expected_gain_cm": 10.5,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "8": {
+      "expected_gain_cm": 12.0,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "9": {
+      "expected_gain_cm": 13.5,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "10": {
+      "expected_gain_cm": 15.0,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "11": {
+      "expected_gain_cm": 16.5,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "12": {
+      "expected_gain_cm": 18.0,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "13": {
+      "expected_gain_cm": 19.5,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "14": {
+      "expected_gain_cm": 21.0,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    },
+    "15": {
+      "expected_gain_cm": 22.5,
+      "small_ratio": 0.85,
+      "large_ratio": 1.15
+    }
+  },
+  "legacy_video_rule": {
+    "temporary": true,
+    "small_threshold_cm": 15.0,
+    "large_threshold_cm": 25.0
+  }
+}

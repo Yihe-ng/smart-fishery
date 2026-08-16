@@ -256,8 +256,9 @@
         border-left: 3px solid var(--el-color-success);
       }
 
+      // 偏大统一为蓝色（方案 §7.2）：偏大只表示高于参考范围，不代表危险，因此不用 danger 红。
       &.large {
-        border-left: 3px solid var(--el-color-danger);
+        border-left: 3px solid var(--el-color-primary);
       }
     }
 

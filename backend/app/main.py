@@ -11,10 +11,16 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     print("应用启动中...")
 
+    from app.api.v1.endpoints.growth import get_growth_manifest
     from app.db.session import engine
     from app.db.base import Base
     from app.models.user import User
     from app.models.water import WaterQualityData, AlertRecord
+    from app.services.growth_standard import load_growth_standard
+
+    get_growth_manifest()
+    load_growth_standard()
+    print("生长识别配置已校验并缓存")
 
     Base.metadata.create_all(bind=engine)
     print("数据库表已初始化")

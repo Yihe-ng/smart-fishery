@@ -71,10 +71,17 @@
   import { ElMessage } from 'element-plus'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
 
-  defineProps<{
-    processing: boolean
-    hasImage: boolean
-  }>()
+  const props = withDefaults(
+    defineProps<{
+      processing: boolean
+      hasImage: boolean
+      /** 打开文件选择器之前的父级校验；返回 false 表示参数无效，不弹出文件选择窗口 */
+      beforeImageUpload?: () => boolean
+    }>(),
+    {
+      beforeImageUpload: undefined
+    }
+  )
 
   const emit = defineEmits<{
     uploadImage: [imgData: string]
@@ -85,7 +92,10 @@
   const imageInputRef = ref<HTMLInputElement>()
   const videoInputRef = ref<HTMLInputElement>()
 
+  // 校验必须发生在打开文件选择器之前，不能等用户选完文件才提示参数缺失。
   const triggerImageUpload = () => {
+    if (props.beforeImageUpload && !props.beforeImageUpload()) return
+
     imageInputRef.value?.click()
   }
 

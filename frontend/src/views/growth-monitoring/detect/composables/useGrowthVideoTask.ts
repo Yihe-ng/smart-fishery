@@ -20,6 +20,7 @@ export function useGrowthVideoTask() {
     small: 0,
     normal: 0,
     large: 0,
+    unassessed: 0,
     detectedCount: 0,
     measurableCount: 0,
     unmeasurableCount: 0
@@ -98,6 +99,7 @@ export function useGrowthVideoTask() {
       small: 0,
       normal: 0,
       large: 0,
+      unassessed: 0,
       detectedCount: 0,
       measurableCount: 0,
       unmeasurableCount: 0
@@ -130,6 +132,7 @@ export function useGrowthVideoTask() {
       small: 0,
       normal: 0,
       large: 0,
+      unassessed: 0,
       detectedCount: 0,
       measurableCount: 0,
       unmeasurableCount: 0
@@ -152,6 +155,7 @@ export function useGrowthVideoTask() {
       small: 0,
       normal: 0,
       large: 0,
+      unassessed: 0,
       detectedCount: 0,
       measurableCount: 0,
       unmeasurableCount: 0

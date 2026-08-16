@@ -41,6 +41,7 @@
   import { computed } from 'vue'
   import type { CSSProperties } from 'vue'
   import type { GrowthDetectionItem } from '@/types/growth-monitoring'
+  import { SHOW_GROWTH_STATUS_UI } from '../constants/statusColors'
 
   interface OverlayBounds {
     left: number
@@ -137,7 +138,11 @@
       return {
         id: detection.id,
         isMeasurable: detection.isMeasurable,
-        labelText: detection.labelText,
+        labelText: SHOW_GROWTH_STATUS_UI
+          ? detection.labelText
+          : detection.isMeasurable
+            ? `${detection.bodyLengthCm.toFixed(1)}cm`
+            : detection.labelText,
         style
       }
     })
