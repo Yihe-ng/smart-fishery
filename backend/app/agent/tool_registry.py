@@ -32,7 +32,7 @@ def get_feeding_recommendation(
     )
     pressure_risk = weather_service.get_pressure_risk_for_feeding(None)
     plan = smart_feeding_service.calculate_feeding_plan(
-        pond_id=pond_id or "pond-001",
+        pond_id=pond_id,
         current_index=current_index,
         db=db,
     )

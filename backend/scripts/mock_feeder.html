@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>模拟投喂机</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+    background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 24px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
+  .card {
+    background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: #94a3b8; }
+  input, select, button {
+    background: #0f172a; color: #e2e8f0; border: 1px solid #334155;
+    border-radius: 6px; padding: 8px 10px; font-size: 14px;
+  }
+  input:focus { outline: 2px solid #38bdf8; }
+  button { cursor: pointer; font-weight: 600; }
+  button.primary { background: #0ea5e9; color: #082f49; border-color: #0ea5e9; }
+  button.danger { background: #ef4444; color: #fff; border-color: #ef4444; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status-line { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #64748b; }
+  .dot.on { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+  .dot.off { background: #ef4444; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+  .tag.blue { background: #0ea5e9; color: #082f49; }
+  #feedingBanner {
+    display: none; background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    color: #fff; border-radius: 10px; padding: 18px; margin-bottom: 16px;
+    font-size: 18px; font-weight: 700; text-align: center;
+  }
+  #feedingBanner small { font-weight: 400; opacity: 0.85; display: block; margin-top: 4px; }
+  #log {
+    background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+    height: 320px; overflow-y: auto; padding: 12px; font-family: Consolas, Menlo, monospace;
+    font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-all;
+  }
+  .l-ts { color: #64748b; }
+  .l-info { color: #e2e8f0; }
+  .l-ok   { color: #4ade80; }
+  .l-err  { color: #f87171; }
+  .l-cmd  { color: #fbbf24; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>模拟投喂机</h1>
+  <div class="sub">连接后端 WebSocket，演示「AI 预览 → 确认 → 执行 → 投喂机收到指令」链路</div>
+
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>后端地址</label>
+        <input id="host" value="10.247.162.13" placeholder="新大陆设备 IP" style="width: 170px" />
+      </div>
+      <div class="field">
+        <label>端口</label>
+        <input id="port" value="8000" style="width: 80px" />
+      </div>
+      <div class="field">
+        <label>投喂机编号</label>
+        <input id="feederId" value="feeder-001" style="width: 130px" />
+      </div>
+      <button id="btnConnect" class="primary">连接</button>
+      <button id="btnDisconnect" class="danger" disabled>断开</button>
+    </div>
+    <div class="status-line" style="margin-top: 14px">
+      <span class="dot off" id="dot"></span>
+      <span id="statusText">未连接</span>
+      <span class="tag blue" id="autoAckTag">自动回执：开</span>
+      <label style="font-size: 12px; color: #94a3b8; margin-left: auto; display: flex; align-items: center; gap: 6px">
+        <input type="checkbox" id="autoAck" checked /> 收到指令后自动回送执行状态
+      </label>
+    </div>
+  </div>
+
+  <div id="feedingBanner">🔧 正在投喂 <span id="bannerAmount"></span> g</div>
+
+  <div class="card" style="padding: 10px">
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const logBox = $('log');
+let ws = null;
+let reconnectTimer = null;
+let closedByUser = false;
+let currentFeederId = '';
+
+function nowTime() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function log(line, cls = 'l-info') {
+  const el = document.createElement('div');
+  el.innerHTML = `<span class="l-ts">[${nowTime()}] </span><span class="${cls}"></span>`;
+  el.lastChild.textContent = line;
+  logBox.appendChild(el);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+function setStatus(online, text) {
+  $('dot').className = 'dot ' + (online ? 'on' : 'off');
+  $('statusText').textContent = text;
+}
+
+function buildUrl() {
+  const host = $('host').value.trim() || '127.0.0.1';
+  const port = $('port').value.trim() || '8000';
+  const feeder = $('feederId').value.trim() || 'feeder-001';
+  return { url: `ws://${host}:${port}/ws/feeding/${feeder}`, feeder };
+}
+
+function connect() {
+  closedByUser = false;
+  clearTimeout(reconnectTimer);
+  const { url, feeder } = buildUrl();
+  currentFeederId = feeder;
+  log(`正在连接 ${url} ...`);
+  try {
+    ws = new WebSocket(url);
+  } catch (e) {
+    log(`连接失败：${e.message}`, 'l-err');
+    return;
+  }
+
+  ws.onopen = () => {
+    setStatus(true, `已上线：${feeder}（等待后端下发指令）`);
+    log(`✅ 已连接：${feeder}`, 'l-ok');
+    $('btnConnect').disabled = true;
+    $('btnDisconnect').disabled = false;
+    $('host').disabled = $('port').disabled = $('feederId').disabled = true;
+  };
+
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { log(`收到非 JSON: ${ev.data}`, 'l-err'); return; }
+    log(`收到指令帧: ${JSON.stringify(msg)}`, 'l-cmd');
+
+    if (msg.type === 'command' && msg.command === 'feed') {
+      const data = msg.data || {};
+      const amount = data.amount || 0;
+      const duration = data.duration || 0;
+      $('bannerAmount').textContent = amount;
+      $('feedingBanner').style.display = 'block';
+      log(`🔧 模拟执行：投喂 ${amount}g，持续 ${duration} 秒`, 'l-ok');
+      if ($('autoAck').checked) {
+        ws.send(JSON.stringify({ type: 'feeding_status', data: { feeder_id: currentFeederId, status: 'feeding', amount } }));
+        setTimeout(() => {
+          ws.send(JSON.stringify({ type: 'feeding_complete', data: { feeder_id: currentFeederId, amount, status: 'completed' } }));
+          log('✅ 已回送 feeding_complete', 'l-ok');
+          $('feedingBanner').style.display = 'none';
+        }, Math.min(duration, 2) * 1000);
+      } else {
+        setTimeout(() => { $('feedingBanner').style.display = 'none'; }, 2500);
+      }
+    }
+  };
+
+  ws.onclose = () => {
+    setStatus(false, '已断开');
+    log('连接已断开', 'l-err');
+    $('btnConnect').disabled = false;
+    $('btnDisconnect').disabled = true;
+    $('host').disabled = $('port').disabled = $('feederId').disabled = false;
+    if (!closedByUser) {
+      log('3 秒后自动重连 ...');
+      reconnectTimer = setTimeout(connect, 3000);
+    }
+  };
+
+  ws.onerror = (e) => {
+    log('WebSocket 错误', 'l-err');
+  };
+}
+
+function disconnect() {
+  closedByUser = true;
+  clearTimeout(reconnectTimer);
+  if (ws) { try { ws.close(); } catch {} ws = null; }
+}
+
+$('btnConnect').addEventListener('click', connect);
+$('btnDisconnect').addEventListener('click', disconnect);
+log('页面就绪。填入新大陆设备 IP 后点「连接」。');
+</script>
+</body>
+</html>

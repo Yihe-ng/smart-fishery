@@ -28,7 +28,7 @@ class SmartFeedingService:
 
     def calculate_feeding_plan(
         self,
-        pond_id: str,
+        pond_id: str | None = None,
         current_index: int | None = None,
         fish_count: int = 1000,
         avg_fish_weight: float = 300,
@@ -89,7 +89,7 @@ class SmartFeedingService:
 
     def _load_water_quality(
         self,
-        pond_id: str,
+        pond_id: str | None = None,
         current_index: int | None = None,
         db: Optional[Session] = None,
     ) -> SimpleNamespace | None:

@@ -35,6 +35,12 @@ export const fisheryRoutes: AppRouteRecord = {
       meta: { title: 'menus.fishery.feeding', icon: 'ri:hand-coin-line', keepAlive: true }
     },
     {
+      path: 'data-management',
+      name: 'DataManagement',
+      component: '/fishery/data-management/index',
+      meta: { title: 'menus.fishery.dataManagement', icon: 'ri:database-2-line', keepAlive: true }
+    },
+    {
       path: 'water-quality',
       name: 'WaterQuality',
       component: '/monitoring/water-quality/index',

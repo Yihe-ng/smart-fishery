@@ -80,16 +80,34 @@ class AIRoutesTestCase(unittest.TestCase):
         self.assertIn("previewText", payload)
 
     def test_invoke_returns_warning_and_never_executes_in_mock_mode(self):
-        response = self.client.post(
-            "/api/agent/agent/invoke",
-            json={
-                "pageId": "feeding",
-                "messages": [{"role": "user", "content": "Please generate a manual feeding preview for 600g."}],
-                "contextVersion": "ctx-test",
-                "pageContextSummary": {"sourceMode": "mock"},
-                "allowedTools": ["preview_manual_feeding_action"],
-            },
-        )
+        # 与 _mock_decide_next_step 一致的两步决策：先返回预览工具调用，再返回带确认的最终回答。
+        def mock_preview_decision(request, allowed_tools, tool_results):
+            if tool_results:
+                return {
+                    "type": "answer",
+                    "assistantMessage": "已生成手动投喂预览，请确认后执行。",
+                    "confirmPreview": tool_results[-1]["output"],
+                }
+            return {
+                "type": "tool",
+                "toolName": "preview_manual_feeding_action",
+                "arguments": {"pondId": "pond-001", "amount": 600},
+            }
+
+        with patch(
+            "app.agent.llm_service._decide_next_step",
+            side_effect=mock_preview_decision,
+        ):
+            response = self.client.post(
+                "/api/agent/agent/invoke",
+                json={
+                    "pageId": "feeding",
+                    "messages": [{"role": "user", "content": "Please generate a manual feeding preview for 600g."}],
+                    "contextVersion": "ctx-test",
+                    "pageContextSummary": {"sourceMode": "mock"},
+                    "allowedTools": ["preview_manual_feeding_action"],
+                },
+            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()["data"]

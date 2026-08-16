@@ -188,6 +188,41 @@
     }
   }
 
+  // 订阅投喂执行状态（投喂开始/完成）——后端经 WebSocket 广播给前端客户端
+  let feedingWs: WebSocket | null = null
+  const subscribeFeedingStatus = () => {
+    const wsUrl = `ws://${window.location.hostname}:8000/ws/device/feeding-client`
+    try {
+      feedingWs = new WebSocket(wsUrl)
+      feedingWs.onmessage = (ev) => {
+        let msg: { type?: string; data?: { amount?: number } }
+        try {
+          msg = JSON.parse(ev.data as string)
+        } catch {
+          return
+        }
+        const amount = msg.data?.amount
+        if (msg.type === 'feeding_status') {
+          ElMessage.info(`投喂开始：${amount ?? ''}g`)
+        } else if (msg.type === 'feeding_complete') {
+          ElMessage.success(`投喂完成：${amount ?? ''}g`)
+        }
+      }
+      feedingWs.onclose = () => {
+        feedingWs = null
+      }
+    } catch {
+      feedingWs = null
+    }
+  }
+
+  const unsubscribeFeedingStatus = () => {
+    if (feedingWs) {
+      feedingWs.close()
+      feedingWs = null
+    }
+  }
+
   const fetchVideoList = async () => {
     try {
       const sources = await getVideoList()
@@ -201,7 +236,10 @@
   onMounted(async () => {
     fetchVideoList()
     await loadData()
+    subscribeFeedingStatus()
   })
+
+  onUnmounted(unsubscribeFeedingStatus)
 </script>
 
 <style scoped lang="scss">

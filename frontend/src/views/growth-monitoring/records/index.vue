@@ -135,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted, reactive, ref } from 'vue'
+  import { onActivated, onMounted, reactive, ref } from 'vue'
   import { useRouter } from 'vue-router'
   import { ElMessage, ElMessageBox } from 'element-plus'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
@@ -162,6 +162,9 @@
   const currentPage = ref(1)
   const pageSize = ref(10)
   const total = ref(0)
+
+  // KeepAlive 缓存下首次激活会同时触发 onMounted 与 onActivated，用该标记避免重复加载
+  let isFirstActivation = true
 
   const searchQuery = reactive({
     pondId: '',
@@ -322,6 +325,16 @@
   }
 
   onMounted(() => {
+    loadData()
+  })
+
+  onActivated(() => {
+    // 页面被 KeepAlive 缓存，从标签页切回时不会重新挂载（onMounted 不触发）。
+    // 首次激活已由 onMounted 加载，之后每次切回都重新拉取，保证新识别记录立即可见。
+    if (isFirstActivation) {
+      isFirstActivation = false
+      return
+    }
     loadData()
   })
 </script>

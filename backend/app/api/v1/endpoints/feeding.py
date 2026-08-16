@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.agent.preview_store import (
     mark_manual_feeding_preview_executed,
@@ -128,8 +128,24 @@ async def get_feeding_logs(
     )
 
 
+class ManualFeedRequest(BaseModel):
+    amount: int = Field(..., gt=0, description="投喂量（克）")
+
+
 @router.post("/manual", response_model=BaseResponse[dict])
-async def manual_feeding(amount: int = Query(..., description="投喂量（克）")):
+async def manual_feeding(request: ManualFeedRequest):
+    amount = request.amount
+    duration = max(1, int(amount / 100))
+    result = await smart_feeding_service.execute_feeding(
+        feeder_id="feeder-001", amount=amount, duration=duration
+    )
+    if not result["success"]:
+        return BaseResponse[dict](
+            code=400,
+            msg=f"投喂机 {result['feeder_id']} 不在线，指令未下发（请先连接模拟投喂机）",
+            data={"delivered": False},
+        )
+
     new_log = {
         "id": str(len(mock_feeding_logs) + 1),
         "feed_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -141,8 +157,8 @@ async def manual_feeding(amount: int = Query(..., description="投喂量（克�
 
     return BaseResponse[dict](
         code=200,
-        msg="投喂成功",
-        data={"id": new_log["id"], "amount": amount},
+        msg="投喂指令已下发",
+        data={"id": new_log["id"], "amount": amount, "delivered": True},
     )
 
 

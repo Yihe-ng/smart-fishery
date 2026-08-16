@@ -134,6 +134,16 @@ class AgentRealDataTestCase(unittest.TestCase):
         self.assertEqual(payload["waterQuality"]["temperature"], 31.2)
         self.assertIn("投喂", payload["recommendation"])
 
+    def test_feeding_recommendation_resolves_latest_pond_when_pond_missing(self):
+        session = self.TestSessionLocal()
+        try:
+            payload = get_feeding_recommendation(None, db=session)
+        finally:
+            session.close()
+
+        self.assertEqual(payload["canFeed"], True)
+        self.assertEqual(payload["waterQuality"]["temperature"], 31.2)
+
     def test_page_context_uses_real_data_instead_of_mock_builder(self):
         session = self.TestSessionLocal()
         try:
