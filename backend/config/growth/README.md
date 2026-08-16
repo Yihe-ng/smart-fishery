@@ -6,15 +6,31 @@
 |---|---|---|
 | `pipeline.final.json` | 模型清单（manifest） | 正式冻结清单：分割/分类模型与权重、裁剪方式、视频时序策略、测长算法与几何质量门槛、像素→厘米换算、可测性准入策略 |
 | `pipeline.candidate.example.json` | 模型清单（manifest） | 候选示例模板（`candidate_fixture`），试验新模型/新参数时复制改用，也是测试/smoke 的默认清单。**不要删**，多处测试依赖 |
-| `grouper_growth_standard.json` | 养殖标准 | 月度生长评价业务规则：第 3–15 个月预期累计增长量、每月偏小/偏大比例、群体最小样本与去极端规则、体长估重公式、视频临时旧分档规则 |
+| `grouper_growth_standard.json` | 养殖标准 | 月度生长评价业务规则：第 3–15 个月预期累计增长量、每月偏小/偏大比例、图片群体最小样本与去极端规则、视频最少可评价帧数、体长估重公式 |
 
 ## 1. 职责边界（重要）
 
 - **模型清单只管"怎么测"**：模型在哪、阈值多少、几何质量怎么卡、像素怎么换成厘米。
 - **养殖标准只管"测出来怎么评"**：这条鱼相对本月参考全长是偏小/正常/偏大，鱼群整体如何，给出什么管理方向。
-- **`backend/app/core/config.py` / `backend/.env` 只管"用哪个文件、在哪跑"**：`GROWTH_PIPELINE`（管线选型）、`GROWTH_MANIFEST_PATH`（清单覆盖）、`GROWTH_STANDARD_PATH`（养殖标准覆盖）、`GROWTH_PIPELINE_DEVICE`（推理设备）、`GROWTH_VIDEO_TEMPORAL_ENABLED`（视频时序覆盖）。
+- **`backend/app/core/config.py` / `backend/.env` 只管"用哪个文件、在哪跑、任务怎么运行"**：除管线、配置文件、推理设备和视频时序覆盖外，还包含视频采样、处理时间预算、任务 TTL、终态缓存上限和展示帧压缩设置。
 
 体长分档（偏小/偏大）和估重公式**曾经**放在模型清单的 `business` 段，现已全部迁到 `grouper_growth_standard.json`。模型清单不再有 `business` 段，代码也不再解析它。
+
+### 视频任务运行参数
+
+以下参数位于 `backend/app/core/config.py`，可由 `backend/.env` 同名字段覆盖；它们控制任务运行，不改变月度评价口径：
+
+| 参数 | 默认值 | 作用 |
+|---|---:|---|
+| `VIDEO_MIN_DURATION_SECONDS` | `3.0` | 可处理视频的最短时长（秒） |
+| `VIDEO_TARGET_INTERVAL_SECONDS` | `2.0` | 自适应采样的目标时间间隔（秒） |
+| `VIDEO_MIN_FRAMES` / `VIDEO_MAX_FRAMES` | `3` / `8` | 单视频计划关键帧数边界 |
+| `VIDEO_PROCESS_SOFT_LIMIT_SECONDS` | `120.0` | 达到后保留已完成帧并停止启动新帧 |
+| `VIDEO_PROCESS_MAX_SECONDS` | `180.0` | 单帧返回后检查的最大处理预算；同步推理不能被强制中断 |
+| `VIDEO_TASK_TTL_SECONDS` | `3600` | 终态任务在内存中的保留时间（秒） |
+| `VIDEO_MAX_TERMINAL_TASKS` | `3` | 内存中最多保留的终态视频任务数 |
+| `VIDEO_DISPLAY_MAX_EDGE` | `1280` | 返回前端的展示帧最长边（像素） |
+| `VIDEO_DISPLAY_JPEG_QUALITY` | `85` | 展示帧 JPEG 编码质量 |
 
 ## 2. 养殖标准的资料依据
 
@@ -58,9 +74,9 @@
 {
   "schema_version": 1,
   "cohort_rule": { "min_measurable_count": 3, "drop_shortest_count": 1 },
+  "video_cohort_rule": { "min_evaluable_frames": 3 },
   "weight_estimation": { "coefficient_a": 0.0285, "exponent_b": 2.937 },
-  "monthly_rules": { "3": { "expected_gain_cm": 4.5, "small_ratio": 0.85, "large_ratio": 1.15 } },
-  "legacy_video_rule": { "temporary": true, "small_threshold_cm": 15.0, "large_threshold_cm": 25.0 }
+  "monthly_rules": { "3": { "expected_gain_cm": 4.5, "small_ratio": 0.85, "large_ratio": 1.15 } }
 }
 ```
 
@@ -69,11 +85,11 @@
 | `schema_version` | 配置结构版本，当前仅支持 `1` |
 | `cohort_rule.min_measurable_count` | 群体评价所需的最少可测鱼数量，低于它群体状态为"样本不足"（不低于 3） |
 | `cohort_rule.drop_shortest_count` | 群体评价前去掉的最短记录条数（当前为 1；最短值并列时也只去掉一条），必须小于 `min_measurable_count` |
+| `video_cohort_rule.min_evaluable_frames` | 视频形成中位数结论所需的最少可评价关键帧数量（不低于 3） |
 | `weight_estimation.coefficient_a` / `exponent_b` | 估重公式 `体重(g) = a × 全长(cm) ^ b` 的系数与指数，均须为正数 |
 | `monthly_rules.<月>.expected_gain_cm` | 该月相对投苗时平均全长的**累计**预期增长量（cm），须为正且不随月份下降 |
 | `monthly_rules.<月>.small_ratio` | 偏小下限比例，须满足 `0 < small_ratio < 1` |
 | `monthly_rules.<月>.large_ratio` | 偏大上限比例，须满足 `large_ratio > 1` |
-| `legacy_video_rule` | 视频路径的临时固定分档，见下节 |
 
 计算口径：
 
@@ -91,26 +107,15 @@
 - 可测但没有养殖月数/投苗体长 → **未评估**（不是"不可测"，也不回退任何固定阈值）
 - 无法可靠测长 → 不可测（不参与任何平均值）
 
-## 4. `legacy_video_rule` 是临时兼容，不是业务标准
-
-配置拆分之前，图片和视频共用固定的 15 / 25 cm 分档。为了让本期拆分**不改变视频行为**，把这两个固定阈值原样迁到 `legacy_video_rule`：
-
-- **仅视频路径读取**（`backend/app/api/v1/endpoints/growth.py` 的视频分帧分档）。
-- **图片路径禁止读取**，也不作为图片评价失败时的回退规则——图片评价失败时可测鱼一律显示"未评估"。
-- `temporary: true` 是强制标记，缺失或为 false 时加载直接失败。
-- 后续视频月度评价改造必须补齐养殖月份与投苗体长，并复用同一套评价服务；改造完成后删除本段。
-
-这是一项明确的技术债，不应被解释为长期业务标准。
-
-## 5. 读取、校验与生效
+## 4. 读取、校验与生效
 
 - 后端在需要时读取并**严格校验**这两类配置，解析结果在进程内缓存，接口请求不重复读盘。
 - **修改任何 JSON 后必须重启后端才能生效**（没有热加载）。
 - 模型清单错误 → 图片识别不可用（fail fast，缺字段/类型错/数值越界直接抛错）。
 - 养殖标准错误 → 模型测量仍可用，但生长评价降级为"未评估"，不产生群体分档与投喂方向；具体文件、字段和校验错误只记录到后端终端日志，不返回给前端。
-- 养殖标准校验项：第 3–15 个月完整无缺无重复、增长量为正且不下降、`0 < small_ratio < 1`、`large_ratio > 1`、`min_measurable_count >= 3`、`drop_shortest_count < min_measurable_count`、估重系数与指数为正、`legacy_video_rule.temporary == true`。
+- 养殖标准校验项：第 3–15 个月完整无缺无重复、增长量为正且不下降、`0 < small_ratio < 1`、`large_ratio > 1`、`min_measurable_count >= 3`、`drop_shortest_count < min_measurable_count`、`min_evaluable_frames >= 3`、估重系数与指数为正。
 
-## 6. 模型清单：两个文件的区别
+## 5. 模型清单：两个文件的区别
 
 | | `pipeline.final.json` | `pipeline.candidate.example.json` |
 |---|---|---|
@@ -132,7 +137,7 @@ ModelManifest（内存对象）
 分割 → 可测性分类 → 裁剪 → 视频时序 → 测长 → 厘米换算 → 准入判定
 ```
 
-## 7. 模型清单常用可调字段
+## 6. 模型清单常用可调字段
 
 | 想达到的效果 | 改哪个字段 | 当前值 |
 |---|---|---|
@@ -170,7 +175,7 @@ ModelManifest（内存对象）
 
 调参口诀：**先想目标 → 定方向（放宽/收紧）→ 只改对应字段**。一次只调 1~2 个字段，改完跑 smoke/回归对比。不知道卡在哪就看结果里的 `measurement_reasons`（如 `low_solidity`、`curvature_too_high`），它直接告诉你被哪条门槛拒的。
 
-## 8. 怎么用
+## 7. 怎么用
 
 ### 场景 A：微调生产参数（推荐）
 
@@ -190,7 +195,7 @@ ModelManifest（内存对象）
 5. 跑 smoke/回归验证（此时 `is_candidate_fixture()=True`，系统明确是试用）。
 6. 满意后：把参数合并进 `pipeline.final.json`（保持 `release_status=final`），删除候选文件。
 
-## 9. 常见问题
+## 8. 常见问题
 
 **Q：`pipeline.candidate.example.json` 能删吗？**
 不建议。`tests/pipeline/test_manifest.py`（含硬断言）、`tests/models/test_two_stage_pipeline_smoke.py`、

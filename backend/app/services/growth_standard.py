@@ -53,7 +53,7 @@ class GrowthStandardError(ValueError):
     """养殖标准缺失、结构非法或数值越界。
 
     调用方（图片识别端点）捕获它后必须保留模型测量结果、把可测鱼置为
-    "未评估"，禁止回退到图片旧的固定 15/25 cm 分档（方案 §9.4）。
+    "未评估"，禁止回退到任何未配置的固定阈值（方案 §9.4）。
     """
 
 
@@ -83,16 +83,10 @@ class WeightEstimation:
 
 
 @dataclass(frozen=True)
-class LegacyVideoRule:
-    """视频路径的临时固定分档（15/25 cm）。
+class VideoCohortRule:
+    """视频级评价规则：形成视频结论所需的最少可评价关键帧数。"""
 
-    ⚠️ 临时兼容：仅视频路径可读，图片路径禁止读取，也不作为图片评价失败的回退；
-    视频完成月度评价改造后应连同本段配置一起删除（方案 §11）。
-    """
-
-    temporary: bool
-    small_threshold_cm: float
-    large_threshold_cm: float
+    min_evaluable_frames: int
 
 
 @dataclass(frozen=True)
@@ -101,9 +95,9 @@ class GrowthStandard:
 
     schema_version: int
     cohort_rule: CohortRule
+    video_cohort_rule: VideoCohortRule
     weight_estimation: WeightEstimation
     monthly_rules: Dict[int, MonthlyRule]
-    legacy_video_rule: LegacyVideoRule
 
 
 @dataclass(frozen=True)
@@ -168,6 +162,20 @@ class GrowthEvaluation:
     advice: str = COHORT_ADVICE["unassessed"]
 
 
+@dataclass(frozen=True)
+class VideoGrowthEvaluation:
+    """多关键帧视频的群体评价结果，不进行跨帧鱼只身份合并。"""
+
+    frame_evaluations: List[GrowthEvaluation] = field(default_factory=list)
+    video_length_cm: Optional[float] = None
+    all_measurable_avg_length_cm: Optional[float] = None
+    evaluable_frame_count: int = 0
+    cohort_status: str = "unassessed"
+    sample_sufficient: bool = False
+    reference_range: Optional[ReferenceRange] = None
+    advice: str = COHORT_ADVICE["unassessed"]
+
+
 _cache_lock = threading.Lock()
 _cache: Dict[str, GrowthStandard] = {}
 
@@ -202,17 +210,6 @@ def clear_growth_standard_cache() -> None:
     """清空进程内缓存（供测试在不同配置之间切换使用）。"""
     with _cache_lock:
         _cache.clear()
-
-
-def load_legacy_video_rule(path: Optional[str] = None) -> LegacyVideoRule:
-    """读取视频路径的临时旧分档规则，并强制校验 temporary=true。
-
-    ⚠️ 临时兼容：仅视频逐帧分档调用；图片路径调用即为实现错误。
-    """
-    rule = load_growth_standard(path).legacy_video_rule
-    if not rule.temporary:
-        raise GrowthStandardError("legacy_video_rule.temporary 必须为 true（临时兼容标记）")
-    return rule
 
 
 def calculate_reference_range(
@@ -355,6 +352,66 @@ def evaluate_growth_measurements(
     )
 
 
+def evaluate_video_measurements(
+    frame_measurements: Sequence[Sequence[FishMeasurement]],
+    context: AssessmentContext,
+    standard: Optional[GrowthStandard] = None,
+) -> VideoGrowthEvaluation:
+    """按帧评价视频，并以帧级评价全长的中位数形成视频级结论。
+
+    每个关键帧独立复用 `evaluate_growth_measurements`，因此同一条鱼跨帧出现时
+    仍按检测次数统计，不尝试推断独立鱼只身份。奇数帧取排序后的中间值，偶数帧
+    取中间两个未四舍五入值的算术平均；显示层再负责格式化。函数不运行模型，
+    养殖标准错误继续向端点抛出，由端点决定降级为未评估。
+    """
+    resolved = standard or load_growth_standard()
+    frame_evaluations: List[GrowthEvaluation] = []
+    all_lengths: List[float] = []
+    for measurements in frame_measurements:
+        evaluation = evaluate_growth_measurements(measurements, context, resolved)
+        frame_evaluations.append(evaluation)
+        all_lengths.extend(
+            item.body_length_cm for item in measurements if item.has_valid_length()
+        )
+
+    frame_lengths = sorted(
+        float(evaluation.trimmed_mean_length_cm)
+        for evaluation in frame_evaluations
+        if evaluation.trimmed_mean_length_cm is not None
+    )
+    video_length: Optional[float] = None
+    if frame_lengths:
+        middle = len(frame_lengths) // 2
+        if len(frame_lengths) % 2:
+            video_length = frame_lengths[middle]
+        else:
+            video_length = (frame_lengths[middle - 1] + frame_lengths[middle]) / 2
+
+    reference_range = calculate_reference_range(context, resolved)
+    evaluable_frame_count = len(frame_lengths)
+    if reference_range is None:
+        cohort_status = "unassessed"
+    elif evaluable_frame_count < resolved.video_cohort_rule.min_evaluable_frames:
+        cohort_status = "insufficient"
+    else:
+        cohort_status = classify_growth_length(video_length or 0.0, reference_range)
+
+    return VideoGrowthEvaluation(
+        frame_evaluations=frame_evaluations,
+        video_length_cm=video_length,
+        all_measurable_avg_length_cm=(
+            sum(all_lengths) / len(all_lengths) if all_lengths else None
+        ),
+        evaluable_frame_count=evaluable_frame_count,
+        cohort_status=cohort_status,
+        sample_sufficient=(
+            evaluable_frame_count >= resolved.video_cohort_rule.min_evaluable_frames
+        ),
+        reference_range=reference_range,
+        advice=COHORT_ADVICE[cohort_status],
+    )
+
+
 def _resolve_cohort_status(
     trimmed_mean: Optional[float],
     reference_range: Optional[ReferenceRange],
@@ -416,13 +473,13 @@ def _parse_standard(raw: Dict[str, object]) -> GrowthStandard:
     return GrowthStandard(
         schema_version=schema_version,
         cohort_rule=_parse_cohort_rule(_require_section(raw, "cohort_rule")),
+        video_cohort_rule=_parse_video_cohort_rule(
+            _require_section(raw, "video_cohort_rule")
+        ),
         weight_estimation=_parse_weight_estimation(
             _require_section(raw, "weight_estimation")
         ),
         monthly_rules=_parse_monthly_rules(_require_section(raw, "monthly_rules")),
-        legacy_video_rule=_parse_legacy_video_rule(
-            _require_section(raw, "legacy_video_rule")
-        ),
     )
 
 
@@ -487,16 +544,9 @@ def _parse_monthly_rules(raw: Dict[str, object]) -> Dict[int, MonthlyRule]:
     return parsed
 
 
-def _parse_legacy_video_rule(raw: Dict[str, object]) -> LegacyVideoRule:
-    temporary = raw.get("temporary")
-    if temporary is not True:
-        raise GrowthStandardError("legacy_video_rule.temporary 必须为 true（临时兼容标记）")
-    small = _require_positive_float(raw, "legacy_video_rule", "small_threshold_cm")
-    large = _require_positive_float(raw, "legacy_video_rule", "large_threshold_cm")
-    if large < small:
-        raise GrowthStandardError(
-            "legacy_video_rule.large_threshold_cm 不得小于 small_threshold_cm"
-        )
-    return LegacyVideoRule(
-        temporary=True, small_threshold_cm=small, large_threshold_cm=large
-    )
+def _parse_video_cohort_rule(raw: Dict[str, object]) -> VideoCohortRule:
+    """校验视频形成中位数结论所需的最少有效帧数。"""
+    minimum = _require_int(raw, "video_cohort_rule", "min_evaluable_frames")
+    if minimum < 3:
+        raise GrowthStandardError("video_cohort_rule.min_evaluable_frames 不得低于 3")
+    return VideoCohortRule(min_evaluable_frames=minimum)

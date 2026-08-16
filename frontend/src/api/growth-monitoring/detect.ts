@@ -3,15 +3,12 @@ import type {
   GrowthDetectResponse,
   GrowthEvaluateRequest,
   GrowthEvaluateResponse,
+  GrowthEvaluateVideoRequest,
+  GrowthEvaluateVideoResponse,
+  GrowthAssessmentParams,
   GrowthVideoDetectCreateResponse,
   GrowthVideoDetectResultResponse
 } from '@/types/growth-monitoring'
-
-/** 图片识别可选的月度评价参数；不传时后端只测量体长，可测鱼状态为“未评估” */
-export interface GrowthAssessmentParams {
-  cultureMonth?: number | null
-  stockingAvgLengthCm?: number | null
-}
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -71,18 +68,63 @@ export async function evaluateGrowth(
 }
 
 export async function uploadGrowthVideo(file: File): Promise<GrowthVideoDetectCreateResponse> {
+  return uploadGrowthVideoWithAssessment(file)
+}
+
+export async function uploadGrowthVideoWithAssessment(
+  file: File,
+  assessment?: GrowthAssessmentParams
+): Promise<GrowthVideoDetectCreateResponse> {
   const formData = new FormData()
   formData.append('file', file)
+  if (assessment?.cultureMonth !== undefined && assessment.cultureMonth !== null) {
+    formData.append('cultureMonth', String(assessment.cultureMonth))
+  }
+  if (assessment?.stockingAvgLengthCm !== undefined && assessment.stockingAvgLengthCm !== null) {
+    formData.append('stockingAvgLengthCm', String(assessment.stockingAvgLengthCm))
+  }
 
   return api.post<GrowthVideoDetectCreateResponse>({
     url: '/api/growth/detect/video',
-    data: formData
+    data: formData,
+    timeout: 30_000
   })
 }
 
 export async function getGrowthVideoTask(taskId: string): Promise<GrowthVideoDetectResultResponse> {
   return api.get<GrowthVideoDetectResultResponse>({
     url: `/api/growth/detect/video/${taskId}`
+  })
+}
+
+export async function cancelGrowthVideoTask(
+  taskId: string
+): Promise<GrowthVideoDetectResultResponse> {
+  return api.post<GrowthVideoDetectResultResponse>({
+    url: `/api/growth/detect/video/${taskId}/cancel`,
+    data: {},
+    timeout: 10_000
+  })
+}
+
+export async function deleteGrowthVideoTask(
+  taskId: string
+): Promise<GrowthVideoDetectResultResponse> {
+  return api.del<GrowthVideoDetectResultResponse>({
+    url: `/api/growth/detect/video/${taskId}`
+  })
+}
+
+export async function evaluateGrowthVideo(
+  payload: GrowthEvaluateVideoRequest,
+  options?: { signal?: AbortSignal }
+): Promise<GrowthEvaluateVideoResponse> {
+  return api.post<GrowthEvaluateVideoResponse>({
+    url: '/api/growth/evaluate/video',
+    data: payload,
+    timeout: 10_000,
+    signal: options?.signal,
+    showErrorMessage: false
   })
 }
 

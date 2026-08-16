@@ -32,6 +32,7 @@
             :assessment="activeAssessment"
             :summary="activeSummary"
             :culture-month="cultureMonth"
+            :video-mode="inputMode === 'growthVideo'"
             :evaluating="isReevaluating"
           />
           <div v-if="showFeedingEntry" class="feeding-entry-tip">
@@ -71,22 +72,29 @@
           <GrowthVideoTaskState
             v-if="inputMode === 'growthVideo'"
             :task-status="growthVideoTaskStatus"
+            :stage="growthVideoStage"
             :progress="growthVideoProgress"
             :filename="growthVideoMeta?.filename"
             :frame-count="growthVideoFrames.length"
+            :planned-frame-count="growthVideoPlannedFrameCount"
+            :completed-frame-count="growthVideoCompletedFrameCount"
+            :evaluable-frame-count="growthVideoEvaluableFrameCount"
+            :detection-occurrence-count="growthVideoDetectionOccurrenceCount"
             :aggregate-stats="growthVideoAggregateStats"
+            :is-partial="growthVideoIsPartial"
+            :is-cancelling="growthVideoIsCancelling"
             :error-message="activeErrorMessage"
+            @cancel="handleCancelVideo"
           />
 
           <GrowthVideoFrameStrip
-            v-if="inputMode === 'growthVideo' && growthVideoTaskStatus === 'success'"
+            v-if="inputMode === 'growthVideo' && growthVideoFrames.length"
             :frames="growthVideoFrames"
             :selected-frame-id="selectedGrowthFrameId"
             @select="handleSelectFrame"
           />
 
           <GrowthAssessmentControls
-            v-if="inputMode !== 'growthVideo'"
             ref="assessmentControlsRef"
             v-model:culture-month="cultureMonth"
             v-model:stocking-avg-length-cm="stockingAvgLengthCm"
@@ -110,16 +118,25 @@
     </el-row>
 
     <!-- 三阶段处理流程动画：随请求开始/结束显示隐藏，纯前端动画，不代表真实进度 -->
-    <GrowthProcessAnimation v-if="isProcessing" />
+    <GrowthProcessAnimation
+      v-if="isProcessing"
+      :is-video="inputMode === 'growthVideo'"
+      :stage="growthVideoStage"
+      :completed-frame-count="growthVideoCompletedFrameCount"
+      :planned-frame-count="growthVideoPlannedFrameCount"
+      :cancelling="growthVideoIsCancelling"
+      :show-cancel="['queued', 'processing'].includes(growthVideoTaskStatus ?? '')"
+      @cancel="handleCancelVideo"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
   import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
-  import { ElMessage } from 'element-plus'
+  import { ElMessage, ElMessageBox } from 'element-plus'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
-  import { detectGrowth, evaluateGrowth } from '@/api/growth-monitoring/detect'
+  import { detectGrowth, evaluateGrowth, evaluateGrowthVideo } from '@/api/growth-monitoring/detect'
   import {
     DEFAULT_GROWTH_POND_ID,
     useGrowthRecognitionStore
@@ -190,16 +207,28 @@
 
   const {
     growthVideoTaskStatus,
+    growthVideoStage,
     growthVideoTaskId,
     growthVideoFrames,
     selectedGrowthFrameId,
     growthVideoAggregateStats,
     growthVideoAggregateSummary,
+    growthVideoAssessment,
     growthVideoMeta,
     growthVideoProgress,
+    growthVideoPlannedFrameCount,
+    growthVideoCompletedFrameCount,
+    growthVideoEvaluableFrameCount,
+    growthVideoDetectionOccurrenceCount,
+    growthVideoMeasurableOccurrenceCount,
+    growthVideoIsPartial,
     growthVideoErrorCode,
+    growthVideoIsCancelling,
+    restoredAssessmentParams,
     selectedGrowthFrame,
     uploadVideo,
+    cancelVideoTask,
+    releaseVideoTask,
     clearVideoTask,
     markVideoTaskFailed,
     selectGrowthFrame,
@@ -257,25 +286,28 @@
   )
 
   const activeStats = computed(() =>
-    inputMode.value === 'growthVideo'
-      ? (selectedGrowthFrame.value?.stats ?? EMPTY_STATS)
-      : stats.value
+    inputMode.value === 'growthVideo' ? growthVideoAggregateStats.value : stats.value
   )
 
   const activeSummary = computed(() =>
-    inputMode.value === 'growthVideo'
-      ? (selectedGrowthFrame.value?.summary ?? EMPTY_SUMMARY)
-      : summary.value
+    inputMode.value === 'growthVideo' ? growthVideoAggregateSummary.value : summary.value
   )
 
-  // 视频路径本期不做月度评价，因此不向群体卡片提供 assessment。
   const activeAssessment = computed(() =>
-    inputMode.value === 'growthVideo' ? null : assessment.value
+    inputMode.value === 'growthVideo' ? growthVideoAssessment.value : assessment.value
   )
 
-  const showFeedingEntry = computed(
-    () => inputMode.value === 'image' && taskStatus.value === 'success' && detections.value.length > 0
-  )
+  const showFeedingEntry = computed(() => {
+    if (inputMode.value === 'image') {
+      return taskStatus.value === 'success' && detections.value.length > 0
+    }
+    return (
+      growthVideoTaskStatus.value === 'success' &&
+      growthVideoAssessment.value?.sampleSufficient === true &&
+      growthVideoAssessment.value.cohortStatus !== 'unassessed' &&
+      growthVideoAssessment.value.cohortStatus !== 'insufficient'
+    )
+  })
 
   const goToFeeding = () => router.push({ name: 'Feeding' })
 
@@ -289,7 +321,7 @@
     if (!isValidStockingLength(stockingAvgLengthCm.value)) return ''
 
     const monthText = `投苗后第 ${cultureMonth.value} 个月`
-    const evaluated = assessment.value
+    const evaluated = activeAssessment.value
 
     if (
       !evaluated ||
@@ -411,6 +443,8 @@
         return '图片过大，请压缩后重试。'
       case 'IMAGE_DECODE_FAILED':
         return '图片解析失败，请更换图片。'
+      case 'GROWTH_INFERENCE_BUSY':
+        return '当前已有生长识别任务正在处理，请稍后重试。'
       case 'MODEL_INFERENCE_FAILED':
         return '模型推理失败，请稍后重试。'
       case 'INTERNAL_ERROR':
@@ -430,14 +464,22 @@
         return '视频过大，请压缩后重试。'
       case 'VIDEO_DECODE_FAILED':
         return '视频解析失败，请更换视频。'
+      case 'VIDEO_TOO_SHORT':
+        return '视频时长过短，请上传至少 3 秒的视频。'
       case 'NO_VALID_FRAMES':
         return '未提取到有效关键帧，请尝试更清晰的视频。'
       case 'PROCESS_TIMEOUT':
-        return '视频处理超时，请缩短视频或稍后重试。'
+        return '视频处理达到时间限制，已保留已完成关键帧。'
+      case 'PARTIAL_FRAME_FAILURE':
+        return '部分关键帧处理失败，已保留其他结果。'
+      case 'GROWTH_INFERENCE_BUSY':
+        return '当前已有生长识别任务正在处理，请稍后重试。'
       case 'MODEL_INFERENCE_FAILED':
         return '模型推理失败，请稍后重试。'
       case 'INTERNAL_ERROR':
         return '系统异常，请稍后重试。'
+      case 'USER_CANCELLED':
+        return '本次视频识别已取消。'
       default:
         return ''
     }
@@ -515,14 +557,17 @@
   const writeVideoRecognitionSummary = () => {
     if (
       growthVideoTaskStatus.value !== 'success' ||
-      growthVideoAggregateStats.value.detectedCount <= 0
+      growthVideoAggregateStats.value.detectedCount <= 0 ||
+      !growthVideoAssessment.value?.sampleSufficient ||
+      growthVideoAssessment.value.cohortStatus === 'unassessed' ||
+      growthVideoAssessment.value.cohortStatus === 'insufficient'
     ) {
       return
     }
 
     // 第一阶段生长识别页没有池塘选择，先写入默认池塘，避免跨页摘要缺少业务归属。
     const pondId = DEFAULT_GROWTH_POND_ID
-    const allDetections = growthVideoFrames.value.flatMap((frame) => frame.detections)
+    const evaluated = growthVideoAssessment.value
 
     growthRecognitionStore.setLatestSummary({
       pondId,
@@ -532,13 +577,33 @@
       detectedCount: growthVideoAggregateStats.value.detectedCount,
       measurableCount: growthVideoAggregateStats.value.measurableCount,
       unmeasurableCount: growthVideoAggregateStats.value.unmeasurableCount,
-      small: growthVideoAggregateStats.value.small,
-      normal: growthVideoAggregateStats.value.normal,
-      large: growthVideoAggregateStats.value.large,
+      plannedFrameCount: growthVideoPlannedFrameCount.value,
+      completedFrameCount: growthVideoCompletedFrameCount.value,
+      evaluableFrameCount: growthVideoEvaluableFrameCount.value,
+      detectionOccurrenceCount: growthVideoDetectionOccurrenceCount.value,
+      measurableOccurrenceCount: growthVideoMeasurableOccurrenceCount.value,
+      small: 0,
+      normal: 0,
+      large: 0,
       avgBodyLengthCm: growthVideoAggregateSummary.value.avgBodyLengthCm,
       avgWeightG: growthVideoAggregateSummary.value.avgWeightG,
-      avgConfidence: getAverageConfidence(allDetections),
-      isDemoData: false
+      avgConfidence: undefined,
+      isDemoData: false,
+      cultureMonth: evaluated.cultureMonth,
+      stockingAvgLengthCm: evaluated.stockingAvgLengthCm,
+      referenceLengthCm: evaluated.referenceLengthCm,
+      smallThresholdCm: evaluated.smallThresholdCm,
+      largeThresholdCm: evaluated.largeThresholdCm,
+      trimmedMeanLengthCm: evaluated.trimmedMeanLengthCm,
+      allMeasurableAvgLengthCm: evaluated.allMeasurableAvgLengthCm,
+      cohortStatus: evaluated.cohortStatus,
+      advice: evaluated.advice,
+      perStatus: {
+        small: 0,
+        normal: 0,
+        large: 0,
+        unassessed: 0
+      }
     })
   }
 
@@ -601,6 +666,14 @@
     }
   }
 
+  /** 只用于刷新恢复页面输入；后端参数始终使用 buildAssessmentParams 的空值语义。 */
+  const buildVideoTaskSnapshot = () => ({
+    cultureMonth: cultureMonth.value,
+    stockingAvgLengthCm: isValidStockingLength(stockingAvgLengthCm.value)
+      ? stockingAvgLengthCm.value
+      : null
+  })
+
   const rememberSuccessfulAssessmentParams = () => {
     lastSuccessfulAssessmentParams = {
       cultureMonth: cultureMonth.value,
@@ -609,7 +682,15 @@
     growthRecognitionStore.setRecentParams(lastSuccessfulAssessmentParams)
   }
 
+  const invalidateReevaluation = () => {
+    reevaluateAbortController?.abort()
+    reevaluateAbortController = null
+    reevaluateRequestSeq += 1
+    isReevaluating.value = false
+  }
+
   const handleImageUpload = async (imgData: string) => {
+    invalidateReevaluation()
     clearVideoTask()
     inputMode.value = 'image'
     taskStatus.value = 'uploading'
@@ -652,6 +733,7 @@
           'INVALID_IMAGE',
           'IMAGE_TOO_LARGE',
           'IMAGE_DECODE_FAILED',
+          'GROWTH_INFERENCE_BUSY',
           'MODEL_INFERENCE_FAILED',
           'INTERNAL_ERROR'
         ] as GrowthDetectErrorCode[]
@@ -664,11 +746,12 @@
   }
 
   const handleVideoUpload = async (file: File) => {
+    invalidateReevaluation()
     resetImageState()
     inputMode.value = 'growthVideo'
 
     try {
-      await uploadVideo(file)
+      await uploadVideo(file, buildAssessmentParams(), buildVideoTaskSnapshot())
       ElMessage.success('视频已上传，正在识别关键帧')
     } catch (error: any) {
       const rawMessage = String(error?.message || '')
@@ -677,8 +760,11 @@
           'INVALID_VIDEO',
           'VIDEO_TOO_LARGE',
           'VIDEO_DECODE_FAILED',
+          'VIDEO_TOO_SHORT',
           'NO_VALID_FRAMES',
           'PROCESS_TIMEOUT',
+          'PARTIAL_FRAME_FAILURE',
+          'GROWTH_INFERENCE_BUSY',
           'MODEL_INFERENCE_FAILED',
           'INTERNAL_ERROR'
         ] as GrowthVideoDetectErrorCode[]
@@ -686,6 +772,24 @@
 
       markVideoTaskFailed(matchedCode ?? 'INTERNAL_ERROR')
       ElMessage.error(mapVideoErrorMessage(matchedCode ?? 'INTERNAL_ERROR'))
+    }
+  }
+
+  const handleCancelVideo = async () => {
+    try {
+      await ElMessageBox.confirm(
+        '确认取消当前视频识别吗？当前正在处理的关键帧会完成，已完成结果会保留。',
+        '取消视频识别',
+        { type: 'warning', confirmButtonText: '确认取消', cancelButtonText: '继续识别' }
+      )
+    } catch {
+      return
+    }
+
+    try {
+      await cancelVideoTask()
+    } catch {
+      ElMessage.warning('取消请求未完成，请稍后重试')
     }
   }
 
@@ -704,10 +808,15 @@
 
   // 只清图片与识别结果；已记忆的养殖参数按方案 §5.2 保留，方便连续识别同一批鱼。
   const handleClear = () => {
-    reevaluateAbortController?.abort()
-    reevaluateAbortController = null
-    isReevaluating.value = false
-    resetAllState()
+    invalidateReevaluation()
+    if (
+      growthVideoTaskId.value &&
+      ['success', 'failed', 'cancelled'].includes(growthVideoTaskStatus.value ?? '')
+    ) {
+      void releaseVideoTask().catch(() => undefined)
+    } else {
+      resetAllState()
+    }
     ElMessage.info('已清空识别结果')
   }
 
@@ -719,7 +828,93 @@
    * 重评失败保留上一次成功的结论与参数，也不覆盖 store 里的成功摘要。
    */
   const reevaluateAssessment = async () => {
-    if (inputMode.value === 'growthVideo') return
+    if (inputMode.value === 'growthVideo') {
+      if (growthVideoTaskStatus.value !== 'success' || !growthVideoFrames.value.length) return
+
+      const params = buildAssessmentParams()
+      if (isKnownCultureMonth(cultureMonth.value) && params.stockingAvgLengthCm === null) return
+
+      reevaluateAbortController?.abort()
+      const controller = new AbortController()
+      reevaluateAbortController = controller
+      const requestSeq = ++reevaluateRequestSeq
+      isReevaluating.value = true
+
+      try {
+        const response = await evaluateGrowthVideo(
+          {
+            cultureMonth: params.cultureMonth,
+            stockingAvgLengthCm: params.stockingAvgLengthCm,
+            frames: growthVideoFrames.value.map((frame) => ({
+              frameId: frame.frameId,
+              fishMeasurements: frame.detections.map((item) => ({
+                id: item.id,
+                isMeasurable: item.isMeasurable,
+                bodyLengthCm: item.bodyLengthCm
+              }))
+            }))
+          },
+          { signal: controller.signal }
+        )
+        if (requestSeq !== reevaluateRequestSeq) return
+
+        const resultByFrameId = new Map(response.frames.map((item) => [item.frameId, item]))
+        const nextFrames = growthVideoFrames.value.map((frame) => {
+          const evaluated = resultByFrameId.get(frame.frameId)
+          if (!evaluated) return frame
+          const statusById = new Map(evaluated.detections.map((item) => [item.id, item]))
+          return {
+            ...frame,
+            detections: frame.detections.map((item) => {
+              const status = statusById.get(item.id)
+              return status
+                ? { ...item, status: status.status, statusText: status.statusText }
+                : item
+            }),
+            stats: evaluated.stats,
+            summary: evaluated.summary,
+            assessment: evaluated.assessment,
+            frameStatus: evaluated.frameStatus
+          }
+        })
+        growthVideoFrames.value = nextFrames
+        growthVideoAggregateStats.value = nextFrames.reduce<GrowthStats>(
+          (total, frame) => ({
+            small: total.small + frame.stats.small,
+            normal: total.normal + frame.stats.normal,
+            large: total.large + frame.stats.large,
+            unassessed: total.unassessed + frame.stats.unassessed,
+            detectedCount: total.detectedCount + frame.stats.detectedCount,
+            measurableCount: total.measurableCount + frame.stats.measurableCount,
+            unmeasurableCount: total.unmeasurableCount + frame.stats.unmeasurableCount
+          }),
+          { ...EMPTY_STATS }
+        )
+        growthVideoEvaluableFrameCount.value = nextFrames.filter(
+          (frame) => frame.frameStatus === 'evaluable'
+        ).length
+        growthVideoAssessment.value = response.assessment
+        growthVideoAggregateSummary.value = response.summary
+        rememberSuccessfulAssessmentParams()
+        writeVideoRecognitionSummary()
+      } catch {
+        if (requestSeq === reevaluateRequestSeq) {
+          restoringAssessmentParams = true
+          cultureMonth.value = lastSuccessfulAssessmentParams.cultureMonth
+          stockingAvgLengthCm.value = lastSuccessfulAssessmentParams.stockingAvgLengthCm
+          await nextTick()
+          restoringAssessmentParams = false
+          ElMessage.warning('生长评价更新失败，仍展示上一次评价结果')
+        }
+      } finally {
+        if (requestSeq === reevaluateRequestSeq) {
+          isReevaluating.value = false
+          reevaluateAbortController = null
+        }
+      }
+      return
+    }
+
     if (taskStatus.value !== 'success' || !detections.value.length) return
 
     const params = buildAssessmentParams()
@@ -778,10 +973,7 @@
   }
 
   /** 重评成功后覆盖摘要中的评价字段，保持 24 小时有效期的起点仍是首次识别时间 */
-  const writeReevaluatedSummary = (
-    evaluated: GrowthAssessment | null,
-    nextStats: GrowthStats
-  ) => {
+  const writeReevaluatedSummary = (evaluated: GrowthAssessment | null, nextStats: GrowthStats) => {
     const existing = growthRecognitionStore.getLatestSummary(DEFAULT_GROWTH_POND_ID)
     if (!existing) return
 
@@ -819,6 +1011,17 @@
     reevaluateAssessment()
   })
 
+  watch(restoredAssessmentParams, (params) => {
+    if (!params) return
+    inputMode.value = 'growthVideo'
+    restoringAssessmentParams = true
+    cultureMonth.value = params.cultureMonth as CultureMonthSelection
+    stockingAvgLengthCm.value = params.stockingAvgLengthCm ?? null
+    nextTick(() => {
+      restoringAssessmentParams = false
+    })
+  })
+
   watch(isProcessing, (value) => {
     if (value) {
       loadingService.showLoading()
@@ -829,12 +1032,16 @@
   })
 
   watch(growthVideoTaskStatus, (value, previous) => {
-    if (!previous || previous === value) return
+    if (previous === value) return
 
     if (value === 'success') {
       writeVideoRecognitionSummary()
-      ElMessage.success('视频关键帧识别完成')
+      ElMessage.success(
+        growthVideoIsPartial.value ? '视频部分关键帧识别完成' : '视频关键帧识别完成'
+      )
     }
+
+    if (value === 'cancelled') ElMessage.info('视频识别已取消，已完成关键帧仍可查看')
 
     if (value === 'failed') {
       ElMessage.error(activeErrorMessage.value || '视频识别失败，请稍后重试')

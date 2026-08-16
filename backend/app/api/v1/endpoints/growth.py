@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, cast
 
 import cv2
-from fastapi import APIRouter, BackgroundTasks, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -22,6 +22,8 @@ from app.schemas.growth import (
     GrowthDetectionItem,
     GrowthEvaluateRequest,
     GrowthEvaluateResponse,
+    GrowthEvaluateVideoRequest,
+    GrowthEvaluateVideoResponse,
     GrowthEvaluatedFishItem,
     GrowthImageMeta,
     GrowthStats,
@@ -30,6 +32,7 @@ from app.schemas.growth import (
     GrowthVideoDetectCreateResponse,
     GrowthVideoDetectResultResponse,
     GrowthVideoFrameItem,
+    GrowthVideoFrameEvaluationResponse,
     GrowthVideoMeta,
 )
 from app.services.growth_standard import (
@@ -38,13 +41,13 @@ from app.services.growth_standard import (
     FishMeasurement,
     GrowthEvaluation,
     GrowthStandardError,
-    LegacyVideoRule,
     ReferenceRange,
+    VideoGrowthEvaluation,
     calculate_reference_range,
     classify_growth_length,
     estimate_weight,
     evaluate_growth_measurements,
-    load_legacy_video_rule,
+    evaluate_video_measurements,
 )
 
 router = APIRouter()
@@ -68,11 +71,7 @@ GROUPER_WEIGHT_COEF_B = 2.937
 SUCCESS_CODE = 200
 ERROR_CODE = 500
 CENTER_WEIGHT = 0.01
-VIDEO_SAMPLE_INTERVAL_SECONDS = 1
-VIDEO_MAX_FRAMES = 12
 VIDEO_MAX_BYTES = 50 * 1024 * 1024
-VIDEO_PROCESS_TIMEOUT_SECONDS = 60
-VIDEO_TASK_TTL_SECONDS = 60 * 60
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".avi", ".mkv"}
 ALLOWED_VIDEO_CONTENT_TYPES = {
     "video/mp4",
@@ -91,6 +90,8 @@ _growth_manifest = None
 _growth_manifest_lock = threading.Lock()
 _video_task_lock = threading.Lock()
 _video_tasks: Dict[str, GrowthVideoDetectResultResponse] = {}
+_video_cancel_requested: Dict[str, bool] = {}
+_growth_inference_lock = threading.Lock()
 
 
 class DetectionRequest(BaseModel):
@@ -216,27 +217,11 @@ def _map_status(
     """把单条可测鱼的估算全长映射为月度生长状态与中文文案。
 
     reference_range 由养殖标准算出（当月综合参考全长及上下限）；为 None 表示未提供
-    养殖月数/投苗体长或评价配置不可用，此时返回"未评估"——图片路径绝不回退到旧的
-    固定 15/25 cm 分档（方案 §9.4）。判断本身使用未四舍五入的原始值。
+    养殖月数/投苗体长或评价配置不可用，此时返回"未评估"。判断本身使用未四舍五入的
+    原始值。
     """
     status = classify_growth_length(body_length_cm, reference_range)
     return status, STATUS_TEXTS[status]
-
-
-def _map_status_legacy_video(
-    body_length_cm: float,
-    rule: LegacyVideoRule,
-) -> Tuple[str, str]:
-    """⚠️ 临时兼容：视频逐帧分档沿用配置拆分前的固定 15/25 cm 阈值。
-
-    视频本期不做月度评价，为保证行为不变而显式读取 legacy_video_rule；图片路径
-    禁止调用本函数。视频完成月度改造后应删除本函数及对应 JSON 段（方案 §11）。
-    """
-    if body_length_cm < rule.small_threshold_cm:
-        return "small", "偏小"
-    if body_length_cm <= rule.large_threshold_cm:
-        return "normal", "正常"
-    return "large", "偏大"
 
 
 def _is_measurable_detection(detection: Dict[str, object]) -> bool:
@@ -299,14 +284,12 @@ def _build_detection_items(
     image_meta: Dict[str, int],
     *,
     reference_range: Optional[ReferenceRange] = None,
-    legacy_video_rule: Optional[LegacyVideoRule] = None,
 ) -> List[GrowthDetectionItem]:
     """把模型原始检测转成前端检测项，并给可测鱼附加生长状态。
 
-    分档来源二选一，互斥：图片路径传 reference_range（养殖标准算出的当月参考范围，
-    缺参数时为 None → 可测鱼记为"未评估"）；视频路径传 legacy_video_rule
-    （⚠️ 临时兼容的固定 15/25 cm 阈值）。不可测鱼一律为"不可测"、体长与体重记 0，
-    不参与任何平均值。本函数只做换算与映射，不运行模型。
+    图片和视频都使用共享的 reference_range；缺参数时可测鱼记为"未评估"。
+    不可测鱼一律为"不可测"、体长与体重记 0，不参与任何平均值。本函数只做
+    换算与映射，不运行模型。
     """
     center_x = image_meta["width"] / 2
     center_y = image_meta["height"] / 2
@@ -323,12 +306,7 @@ def _build_detection_items(
         is_measurable = _is_measurable_detection(detection)
         if is_measurable:
             body_length_cm = _safe_cm(detection.get("length", 0), cm_per_pixel) or 0.0
-            if legacy_video_rule is not None:
-                status, status_text = _map_status_legacy_video(
-                    body_length_cm, legacy_video_rule
-                )
-            else:
-                status, status_text = _map_status(body_length_cm, reference_range)
+            status, status_text = _map_status(body_length_cm, reference_range)
             weight_g = _estimate_weight(body_length_cm)
             label_text = f"{status_text} | {body_length_cm:.1f}cm"
             measurability_label = "可测"
@@ -508,14 +486,12 @@ def _build_detect_response(
     error_code: Optional[str] = None,
     *,
     context: Optional[AssessmentContext] = None,
-    legacy_video_rule: Optional[LegacyVideoRule] = None,
 ) -> GrowthDetectResponse:
     """组装图片识别响应：测量结果 + 可选月度生长评价。
 
-    context 是图片路径的养殖参数（养殖月数、投苗时平均全长）；参数不全时可测鱼为
-    "未评估"，但体长、体重和平均值照常返回。养殖标准加载或校验失败时同样保留全部
-    测量结果，assessment 置 None、可测鱼置"未评估"，**不回退到视频旧的 15/25 分档**
-    （方案 §9.4）。legacy_video_rule 仅供视频逐帧调用（⚠️ 临时兼容）。
+    context 是养殖参数（养殖月数、投苗时平均全长）；参数不全时可测鱼为"未评估"，
+    但体长、体重和平均值照常返回。养殖标准加载或校验失败时同样保留全部测量结果，
+    assessment 置 None、可测鱼置"未评估"，不使用任何固定阈值回退。
     本函数不运行模型，只消费已有的推理结果。
     """
     image_payload = detection_result["image"]
@@ -526,16 +502,11 @@ def _build_detect_response(
         "height": int(image_payload["height"]),
     }
     image = GrowthImageMeta(**image_meta_dict)
-    reference_range = (
-        None
-        if legacy_video_rule is not None or context is None
-        else _safe_reference_range(context)
-    )
+    reference_range = None if context is None else _safe_reference_range(context)
     detections = _build_detection_items(
         raw_detections,
         image_meta_dict,
         reference_range=reference_range,
-        legacy_video_rule=legacy_video_rule,
     )
 
     if not detections:
@@ -550,7 +521,7 @@ def _build_detect_response(
         )
 
     assessment: Optional[GrowthAssessment] = None
-    if legacy_video_rule is None and context is not None:
+    if context is not None:
         try:
             assessment = _to_assessment(
                 evaluate_growth_measurements(_to_fish_measurements(detections), context)
@@ -570,34 +541,23 @@ def _build_detect_response(
     )
 
 
-def _safe_legacy_video_rule() -> Optional[LegacyVideoRule]:
-    """⚠️ 临时兼容：读取视频专用的固定 15/25 cm 分档规则。
-
-    仅视频路径调用；养殖标准不可用时返回 None，视频帧退回"未评估"而不是内置阈值。
-    视频完成月度评价改造后删除本函数（方案 §11）。
-    """
-    try:
-        return load_legacy_video_rule()
-    except GrowthStandardError as exc:
-        print(f"[Growth] 视频临时分档规则不可用，本帧降级为未评估：{exc}")
-        return None
-
-
 def _build_frame_item(
     frame_id: str,
-    timestamp_sec: int,
+    timestamp_sec: float,
     detection_result: Dict[str, object],
-    legacy_video_rule: Optional[LegacyVideoRule] = None,
+    context: AssessmentContext,
 ) -> GrowthVideoFrameItem:
-    """组装视频关键帧结果。
-
-    ⚠️ 临时兼容：视频本期不做月度评价，逐帧分档显式使用 legacy_video_rule
-    （固定 15/25 cm），不产出 assessment，行为与配置拆分前保持一致。
-    """
+    """组装一个关键帧结果，并复用图片评价函数得到帧级状态。"""
     frame_response = _build_detect_response(
         detection_result,
-        legacy_video_rule=legacy_video_rule or _safe_legacy_video_rule(),
+        context=context,
     )
+    if not frame_response.detections:
+        frame_status = "no_valid_detection"
+    elif frame_response.assessment and frame_response.assessment.trimmedMeanLengthCm is not None:
+        frame_status = "evaluable"
+    else:
+        frame_status = "insufficient_sample"
     return GrowthVideoFrameItem(
         frameId=frame_id,
         timestampSec=timestamp_sec,
@@ -606,21 +566,87 @@ def _build_frame_item(
         selectedDetectionId=frame_response.selectedDetectionId,
         stats=frame_response.stats,
         summary=frame_response.summary,
+        assessment=frame_response.assessment,
+        frameStatus=frame_status,
     )
 
 
-def _sample_timestamps(duration_sec: float) -> List[int]:
-    if duration_sec <= 0:
-        return [0]
-    sample_count = min(VIDEO_MAX_FRAMES, max(1, math.ceil(duration_sec)))
-    return [index * VIDEO_SAMPLE_INTERVAL_SECONDS for index in range(sample_count)]
+def _sample_timestamps(duration_sec: float) -> List[float]:
+    """按完整视频时长生成 3–8 个等分区间中点（单位：秒）。"""
+    if duration_sec < settings.VIDEO_MIN_DURATION_SECONDS:
+        return []
+    sample_count = min(
+        settings.VIDEO_MAX_FRAMES,
+        max(settings.VIDEO_MIN_FRAMES, math.ceil(duration_sec / settings.VIDEO_TARGET_INTERVAL_SECONDS)),
+    )
+    segment_width = duration_sec / sample_count
+    timestamps = [
+        min(duration_sec - 0.001, (index + 0.5) * segment_width)
+        for index in range(sample_count)
+    ]
+    return list(dict.fromkeys(round(max(0.0, timestamp), 3) for timestamp in timestamps))
 
 
-def _encode_frame_to_base64(frame) -> str:
-    success, encoded = cv2.imencode(".jpg", frame)
+def _prioritized_indices(count: int) -> List[int]:
+    """返回覆盖视频前、中、后的分散处理顺序，最终展示仍按时间排序。"""
+    if count <= 0:
+        return []
+    preferred = [0, count - 1, count // 2, count // 4, (count * 3) // 4]
+    return list(dict.fromkeys(preferred + list(range(count))))
+
+
+def _encode_frame_to_base64(frame, *, for_display: bool = False) -> str:
+    """编码关键帧展示副本；推理路径可选择保留原始分辨率。"""
+    output = frame
+    if for_display:
+        height, width = frame.shape[:2]
+        max_edge = max(height, width)
+        if max_edge > settings.VIDEO_DISPLAY_MAX_EDGE:
+            scale = settings.VIDEO_DISPLAY_MAX_EDGE / max_edge
+            output = cv2.resize(frame, (round(width * scale), round(height * scale)))
+    success, encoded = cv2.imencode(
+        ".jpg",
+        output,
+        [cv2.IMWRITE_JPEG_QUALITY, settings.VIDEO_DISPLAY_JPEG_QUALITY],
+    )
     if not success:
         raise ValueError("VIDEO_DECODE_FAILED")
     return base64.b64encode(encoded.tobytes()).decode("utf-8")
+
+
+def _detect_frame_payload(
+    frame,
+    *,
+    stream_id: str,
+    frame_index: int,
+    timestamp_sec: float,
+) -> Dict[str, object]:
+    """把原始 OpenCV 帧直接送入两阶段管线，兼容 legacy 路径再编码。"""
+    if settings.GROWTH_PIPELINE != "two_stage":
+        return _detect_payload(
+            _encode_frame_to_base64(frame),
+            stream_id=stream_id,
+            frame_index=frame_index,
+            timestamp_sec=timestamp_sec,
+            temporal_enabled=False,
+        )
+
+    image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    height, width = image_rgb.shape[:2]
+    pipeline = get_pipeline()
+    output = pipeline.analyze_frame(
+        image_rgb,
+        {"width": width, "height": height},
+        stream_id=stream_id,
+        frame_index=frame_index,
+        timestamp_sec=timestamp_sec,
+        temporal_enabled_override=False,
+    )
+    return {
+        "image": {"src": "", "width": width, "height": height},
+        "detections": pipeline.to_legacy_detections(output),
+        "debug": output.debug,
+    }
 
 
 def _build_video_result(
@@ -633,29 +659,125 @@ def _build_video_result(
     selected_frame_id: Optional[str] = None,
     error_code: Optional[str] = None,
     started_at: Optional[float] = None,
+    created_at: Optional[float] = None,
+    finished_at: Optional[float] = None,
+    stage: str = "queued",
+    culture_month: Optional[int] = None,
+    stocking_avg_length_cm: Optional[float] = None,
+    planned_frame_count: int = 0,
+    is_partial: bool = False,
+    warning_code: Optional[str] = None,
 ) -> GrowthVideoDetectResultResponse:
     safe_frames = frames or []
+    safe_frames = sorted(safe_frames, key=lambda frame: frame.timestampSec)
     flattened_detections = [
         detection for frame in safe_frames for detection in frame.detections
     ]
+    context = AssessmentContext(
+        culture_month=culture_month,
+        stocking_avg_length_cm=stocking_avg_length_cm,
+    )
+    video_evaluation: Optional[VideoGrowthEvaluation] = None
+    if task_status != "cancelled":
+        try:
+            video_evaluation = evaluate_video_measurements(
+                [
+                    _to_fish_measurements(frame.detections)
+                    for frame in safe_frames
+                ],
+                context,
+            )
+        except GrowthStandardError as exc:
+            print(f"[Growth] 视频评价配置不可用，保留测量结果并降级为未评估：{exc}")
+
+    video_assessment = _to_video_assessment(video_evaluation)
+    video_length = video_evaluation.video_length_cm if video_evaluation else None
+    video_summary = GrowthSummary()
+    if task_status != "cancelled":
+        video_summary = (
+            GrowthSummary(
+                avgBodyLengthCm=_round_optional(video_length) or 0,
+                avgWeightG=round(_estimate_weight(video_length or 0), 1),
+            )
+            if video_length is not None
+            else _build_summary(flattened_detections)
+        )
+    evaluable_count = (
+        video_evaluation.evaluable_frame_count
+        if video_evaluation
+        else sum(frame.frameStatus == "evaluable" for frame in safe_frames)
+    )
     return GrowthVideoDetectResultResponse(
         taskId=task_id,
         taskStatus=task_status,
+        stage=stage,
         progress=progress,
         video=video,
+        cultureMonth=culture_month,
+        stockingAvgLengthCm=stocking_avg_length_cm,
         selectedFrameId=selected_frame_id,
         frames=safe_frames,
         aggregateStats=_build_stats(flattened_detections),
-        aggregateSummary=_build_summary(flattened_detections),
+        aggregateSummary=video_summary,
+        assessment=video_assessment,
+        plannedFrameCount=planned_frame_count,
+        completedFrameCount=len(safe_frames),
+        evaluableFrameCount=evaluable_count,
+        detectionOccurrenceCount=len(flattened_detections),
+        measurableOccurrenceCount=sum(1 for item in flattened_detections if item.isMeasurable),
+        isPartial=is_partial,
+        warningCode=warning_code,
         errorCode=error_code,
         startedAt=started_at,
+        createdAt=created_at,
+        finishedAt=finished_at,
+    )
+
+
+def _to_video_assessment(
+    evaluation: Optional[VideoGrowthEvaluation],
+) -> Optional[GrowthAssessment]:
+    """把视频级中位数评价映射为页面复用的群体评价模型。"""
+    if evaluation is None:
+        return None
+    reference = evaluation.reference_range
+    return GrowthAssessment(
+        cultureMonth=reference.culture_month if reference else None,
+        stockingAvgLengthCm=(
+            _round_optional(reference.stocking_avg_length_cm) if reference else None
+        ),
+        referenceLengthCm=(
+            _round_optional(reference.reference_length_cm) if reference else None
+        ),
+        smallThresholdCm=_round_optional(reference.small_lower_cm) if reference else None,
+        largeThresholdCm=_round_optional(reference.large_upper_cm) if reference else None,
+        trimmedMeanLengthCm=_round_optional(evaluation.video_length_cm),
+        allMeasurableAvgLengthCm=_round_optional(evaluation.all_measurable_avg_length_cm),
+        cohortStatus=evaluation.cohort_status,
+        sampleSufficient=evaluation.sample_sufficient,
+        advice=evaluation.advice,
     )
 
 
 def _set_video_task(task_id: str, payload: GrowthVideoDetectResultResponse) -> None:
     with _video_task_lock:
         _cleanup_expired_video_tasks_locked(time.time())
+        if (
+            payload.taskStatus == "success"
+            and _video_cancel_requested.get(task_id, False)
+        ):
+            payload = payload.model_copy(
+                update={
+                    "taskStatus": "cancelled",
+                    "assessment": None,
+                    "aggregateSummary": GrowthSummary(),
+                    "warningCode": "USER_CANCELLED",
+                }
+            )
         _video_tasks[task_id] = payload
+        if payload.taskStatus in {"success", "failed"}:
+            _video_cancel_requested.pop(task_id, None)
+        _trim_terminal_video_tasks_locked()
 
 
 def _get_video_task(task_id: str) -> Optional[GrowthVideoDetectResultResponse]:
@@ -677,10 +799,43 @@ def _cleanup_expired_video_tasks_locked(now: float) -> None:
     expired_task_ids = [
         task_id
         for task_id, task in _video_tasks.items()
-        if task.startedAt is not None and now - task.startedAt > VIDEO_TASK_TTL_SECONDS
+        if task.finishedAt is not None
+        and now - task.finishedAt > settings.VIDEO_TASK_TTL_SECONDS
     ]
     for task_id in expired_task_ids:
         del _video_tasks[task_id]
+        _video_cancel_requested.pop(task_id, None)
+
+
+def _trim_terminal_video_tasks_locked() -> None:
+    terminal = [
+        (task.finishedAt or 0.0, task_id)
+        for task_id, task in _video_tasks.items()
+        if task.taskStatus in {"success", "failed", "cancelled"}
+    ]
+    terminal.sort()
+    for _, task_id in terminal[: -settings.VIDEO_MAX_TERMINAL_TASKS]:
+        del _video_tasks[task_id]
+        _video_cancel_requested.pop(task_id, None)
+
+
+def _is_video_cancel_requested(task_id: str) -> bool:
+    with _video_task_lock:
+        return _video_cancel_requested.get(task_id, False)
+
+
+def _select_default_video_frame(frames: List[GrowthVideoFrameItem]) -> Optional[GrowthVideoFrameItem]:
+    """按可评价优先、可测数最多、时间最早的规则选择默认关键帧。"""
+    if not frames:
+        return None
+    evaluable = [frame for frame in frames if frame.frameStatus == "evaluable"]
+    if evaluable:
+        return max(evaluable, key=lambda frame: (frame.stats.measurableCount, -frame.timestampSec))
+    with_measurable = [frame for frame in frames if frame.stats.measurableCount > 0]
+    if with_measurable:
+        return max(with_measurable, key=lambda frame: (frame.stats.measurableCount, -frame.timestampSec))
+    with_detection = [frame for frame in frames if frame.stats.detectedCount > 0]
+    return max(with_detection, key=lambda frame: (frame.stats.detectedCount, -frame.timestampSec)) if with_detection else frames[0]
 
 
 def _cleanup_video_file(temp_path: str) -> None:
@@ -692,13 +847,62 @@ def _cleanup_video_file(temp_path: str) -> None:
 
 
 def _process_video_task(task_id: str, temp_path: str, filename: str) -> None:
+    """串行处理视频任务，保留已完成帧并把阶段/预算映射到查询响应。"""
     capture = None
-    started_at = time.time()
+    inference_acquired = False
+    started_at: Optional[float] = None
+    created_at = (_get_video_task(task_id).createdAt if _get_video_task(task_id) else time.time())
     try:
-        # 两阶段管线：每个视频任务独立 stream_id，重置时序状态防止串线
+        while not inference_acquired:
+            if _is_video_cancel_requested(task_id):
+                current = _get_video_task(task_id)
+                if current:
+                    _set_video_task(
+                        task_id,
+                        current.model_copy(
+                            update={
+                                "taskStatus": "cancelled",
+                                "progress": 100,
+                                "warningCode": "USER_CANCELLED",
+                                "finishedAt": time.time(),
+                            }
+                        ),
+                    )
+                return
+            inference_acquired = _growth_inference_lock.acquire(timeout=0.2)
+
+        current = _get_video_task(task_id)
+        if current is None or current.taskStatus == "cancelled":
+            return
+        if _is_video_cancel_requested(task_id):
+            _set_video_task(
+                task_id,
+                current.model_copy(
+                    update={
+                        "taskStatus": "cancelled",
+                        "progress": 100,
+                        "warningCode": "USER_CANCELLED",
+                        "finishedAt": time.time(),
+                    }
+                ),
+            )
+            return
+
+        started_at = time.time()
+        context = AssessmentContext(
+            culture_month=current.cultureMonth if current else None,
+            stocking_avg_length_cm=current.stockingAvgLengthCm if current else None,
+        )
+        _update_video_task(
+            task_id,
+            taskStatus="processing",
+            stage="preparing",
+            progress=2,
+            startedAt=started_at,
+        )
         if settings.GROWTH_PIPELINE == "two_stage":
             get_pipeline().reset_temporal_state(task_id)
-        _update_video_task(task_id, taskStatus="processing", progress=5, startedAt=started_at)
+        frame_budget_started_at = time.time()
 
         capture = cv2.VideoCapture(temp_path)
         if not capture.isOpened():
@@ -706,66 +910,157 @@ def _process_video_task(task_id: str, temp_path: str, filename: str) -> None:
 
         fps = float(capture.get(cv2.CAP_PROP_FPS) or 0)
         total_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-        if fps <= 0 and total_frames <= 0:
+        if fps <= 0 or total_frames <= 0:
             raise ValueError("VIDEO_DECODE_FAILED")
 
-        duration_sec = round(total_frames / fps, 1) if fps > 0 and total_frames > 0 else 0.0
-        video_meta = GrowthVideoMeta(filename=filename, durationSec=duration_sec)
-        _update_video_task(task_id, video=video_meta)
-
+        duration_sec = total_frames / fps
+        if duration_sec < settings.VIDEO_MIN_DURATION_SECONDS:
+            raise ValueError("VIDEO_TOO_SHORT")
+        video_meta = GrowthVideoMeta(filename=filename, durationSec=round(duration_sec, 2))
         timestamps = _sample_timestamps(duration_sec)
+        if not timestamps:
+            raise ValueError("VIDEO_TOO_SHORT")
+        planned_count = len(timestamps)
+        _update_video_task(
+            task_id,
+            video=video_meta,
+            stage="analyzing",
+            plannedFrameCount=planned_count,
+            progress=5,
+        )
+
         frames: List[GrowthVideoFrameItem] = []
+        partial = False
+        warning_code: Optional[str] = None
+        for processed_index, timestamp_index in enumerate(
+            _prioritized_indices(planned_count), start=1
+        ):
+            if _is_video_cancel_requested(task_id):
+                partial = True
+                warning_code = "USER_CANCELLED"
+                break
 
-        for index, timestamp_sec in enumerate(timestamps, start=1):
-            if time.time() - started_at > VIDEO_PROCESS_TIMEOUT_SECONDS:
-                raise ValueError("PROCESS_TIMEOUT")
+            elapsed = time.time() - frame_budget_started_at
+            if elapsed >= settings.VIDEO_PROCESS_SOFT_LIMIT_SECONDS:
+                partial = True
+                warning_code = "PROCESS_TIMEOUT"
+                break
 
+            timestamp_sec = timestamps[timestamp_index]
+            _update_video_task(
+                task_id,
+                stage="analyzing",
+                progress=min(95, max(5, int((processed_index - 1) / planned_count * 100))),
+            )
             capture.set(cv2.CAP_PROP_POS_MSEC, timestamp_sec * 1000)
             success, frame = capture.read()
-
-            if not success and fps > 0:
-                target_index = min(total_frames - 1, int(timestamp_sec * fps))
-                if target_index >= 0:
-                    capture.set(cv2.CAP_PROP_POS_FRAMES, target_index)
-                    success, frame = capture.read()
-
             if not success:
+                print(f"[Growth][Video {task_id}] 关键帧解码失败 timestamp={timestamp_sec:.3f}")
                 continue
 
-            frame_base64 = _encode_frame_to_base64(frame)
-            frame_detection_result = _detect_payload(
-                frame_base64,
-                stream_id=task_id,
-                frame_index=timestamp_sec,
-                timestamp_sec=float(timestamp_sec),
-                temporal_enabled=settings.GROWTH_VIDEO_TEMPORAL_ENABLED,
-            )
-            frames.append(
-                _build_frame_item(
-                    frame_id=f"frame-{len(frames) + 1}",
+            try:
+                frame_detection_result = _detect_frame_payload(
+                    frame,
+                    stream_id=task_id,
+                    frame_index=timestamp_index,
+                    timestamp_sec=timestamp_sec,
+                )
+                display_base64 = _encode_frame_to_base64(frame, for_display=True)
+                image_payload = frame_detection_result.get("image")
+                if isinstance(image_payload, dict):
+                    image_payload["src"] = f"data:image/jpeg;base64,{display_base64}"
+                frame_item = _build_frame_item(
+                    frame_id=f"frame-{timestamp_index + 1}",
                     timestamp_sec=timestamp_sec,
                     detection_result=frame_detection_result,
+                    context=context,
                 )
+                frames.append(frame_item)
+            except Exception as exc:
+                print(
+                    f"[Growth][Video {task_id}] 关键帧分析失败 "
+                    f"timestamp={timestamp_sec:.3f}: {type(exc).__name__}: {exc}"
+                )
+            else:
+                _update_video_task(
+                    task_id,
+                    completedFrameCount=len(frames),
+                    evaluableFrameCount=sum(
+                        frame.frameStatus == "evaluable" for frame in frames
+                    ),
+                    detectionOccurrenceCount=sum(
+                        frame.stats.detectedCount for frame in frames
+                    ),
+                    measurableOccurrenceCount=sum(
+                        frame.stats.measurableCount for frame in frames
+                    ),
+                    progress=min(
+                        95, max(10, int(processed_index / planned_count * 100))
+                    ),
+                )
+
+            # 单帧推理是同步调用，不能在不隔离模型进程的前提下安全强杀；
+            # 因此最大时限在每次帧尝试返回后统一判定，且绝不再启动下一帧。
+            if (
+                time.time() - frame_budget_started_at
+                >= settings.VIDEO_PROCESS_MAX_SECONDS
+            ):
+                partial = True
+                warning_code = "PROCESS_TIMEOUT"
+                break
+
+        if not frames and warning_code == "USER_CANCELLED":
+            _set_video_task(
+                task_id,
+                _build_video_result(
+                    task_id,
+                    "cancelled",
+                    progress=100,
+                    video=video_meta,
+                    frames=[],
+                    selected_frame_id=None,
+                    error_code=None,
+                    started_at=started_at,
+                    created_at=created_at,
+                    finished_at=time.time(),
+                    stage="finalizing",
+                    culture_month=context.culture_month,
+                    stocking_avg_length_cm=context.stocking_avg_length_cm,
+                    planned_frame_count=planned_count,
+                    is_partial=False,
+                    warning_code=warning_code,
+                ),
             )
-
-            progress = min(95, max(10, int(index / len(timestamps) * 100)))
-            _update_video_task(task_id, progress=progress)
-
+            return
         if not frames:
             raise ValueError("NO_VALID_FRAMES")
 
-        selected_frame = next((frame for frame in frames if frame.detections), frames[0])
+        frames.sort(key=lambda frame: frame.timestampSec)
+        selected_frame = _select_default_video_frame(frames)
+        is_cancelled = warning_code == "USER_CANCELLED"
+        is_partial = partial or len(frames) < planned_count
+        if len(frames) < planned_count and warning_code is None:
+            warning_code = "PARTIAL_FRAME_FAILURE"
+        _update_video_task(task_id, stage="finalizing", progress=98)
         _set_video_task(
             task_id,
             _build_video_result(
                 task_id,
-                "success",
+                "cancelled" if is_cancelled else "success",
                 progress=100,
                 video=video_meta,
                 frames=frames,
-                selected_frame_id=selected_frame.frameId,
+                selected_frame_id=selected_frame.frameId if selected_frame else None,
                 error_code=None,
                 started_at=started_at,
+                created_at=created_at,
+                finished_at=time.time(),
+                stage="finalizing",
+                culture_month=context.culture_month,
+                stocking_avg_length_cm=context.stocking_avg_length_cm,
+                planned_frame_count=planned_count,
+                is_partial=is_partial,
+                warning_code=warning_code,
             ),
         )
     except ValueError as exc:
@@ -777,13 +1072,21 @@ def _process_video_task(task_id: str, temp_path: str, filename: str) -> None:
                 "failed",
                 progress=100,
                 video=current.video if current else None,
-                frames=[],
-                selected_frame_id=None,
+                frames=current.frames if current else [],
+                selected_frame_id=current.selectedFrameId if current else None,
                 error_code=str(exc) or "VIDEO_DECODE_FAILED",
                 started_at=started_at,
+                created_at=created_at,
+                finished_at=time.time(),
+                stage="finalizing",
+                culture_month=current.cultureMonth if current else None,
+                stocking_avg_length_cm=current.stockingAvgLengthCm if current else None,
+                planned_frame_count=current.plannedFrameCount if current else 0,
+                warning_code=str(exc) if str(exc) == "PROCESS_TIMEOUT" else None,
             ),
         )
-    except Exception:
+    except Exception as exc:
+        print(f"[Growth][Video {task_id}] 任务失败: {type(exc).__name__}: {exc}")
         current = _get_video_task(task_id)
         _set_video_task(
             task_id,
@@ -792,15 +1095,25 @@ def _process_video_task(task_id: str, temp_path: str, filename: str) -> None:
                 "failed",
                 progress=100,
                 video=current.video if current else None,
-                frames=[],
-                selected_frame_id=None,
+                frames=current.frames if current else [],
+                selected_frame_id=current.selectedFrameId if current else None,
                 error_code="INTERNAL_ERROR",
                 started_at=started_at,
+                created_at=created_at,
+                finished_at=time.time(),
+                stage="finalizing",
+                culture_month=current.cultureMonth if current else None,
+                stocking_avg_length_cm=current.stockingAvgLengthCm if current else None,
+                planned_frame_count=current.plannedFrameCount if current else 0,
             ),
         )
     finally:
         if capture is not None:
             capture.release()
+        if inference_acquired:
+            _growth_inference_lock.release()
+        with _video_task_lock:
+            _video_cancel_requested.pop(task_id, None)
         _cleanup_video_file(temp_path)
 
 
@@ -826,6 +1139,14 @@ def _invalid_video_create_response(error_code: str):
 
 @router.post("/detect", response_model=BaseResponse[GrowthDetectResponse])
 def detect_fish(request: DetectionRequest):
+    if not _growth_inference_lock.acquire(blocking=False):
+        return BaseResponse[GrowthDetectResponse](
+            code=ERROR_CODE,
+            msg="检测忙碌: GROWTH_INFERENCE_BUSY",
+            data=_empty_detect_response(
+                task_status="failed", error_code="GROWTH_INFERENCE_BUSY"
+            ),
+        )
     try:
         detection_result = _detect_payload(request.image)
         # 图片路径把养殖参数传给统一评价入口；不传时 assessment 为 None、可测鱼"未评估"
@@ -867,6 +1188,8 @@ def detect_fish(request: DetectionRequest):
             msg="检测失败: INTERNAL_ERROR",
             data=_empty_detect_response(task_status="failed", error_code="INTERNAL_ERROR"),
         )
+    finally:
+        _growth_inference_lock.release()
 
 
 @router.post("/evaluate", response_model=BaseResponse[GrowthEvaluateResponse])
@@ -938,10 +1261,100 @@ def evaluate_growth(request: GrowthEvaluateRequest):
     )
 
 
+@router.post("/evaluate/video", response_model=BaseResponse[GrowthEvaluateVideoResponse])
+def evaluate_growth_video(request: GrowthEvaluateVideoRequest):
+    """轻量重评视频所有关键帧，不读取媒体、不运行模型。"""
+    context = AssessmentContext(
+        culture_month=request.cultureMonth,
+        stocking_avg_length_cm=request.stockingAvgLengthCm,
+    )
+    frame_measurements = [
+        [
+            FishMeasurement(
+                id=item.id,
+                is_measurable=item.isMeasurable,
+                body_length_cm=item.bodyLengthCm,
+            )
+            for item in frame.fishMeasurements
+        ]
+        for frame in request.frames
+    ]
+    try:
+        evaluation = evaluate_video_measurements(frame_measurements, context)
+    except GrowthStandardError as exc:
+        print(f"[Growth] 视频轻量重评失败（保留前端上一次成功结果）：{exc}")
+        return BaseResponse[GrowthEvaluateVideoResponse](
+            code=ERROR_CODE,
+            msg="生长评价配置暂时不可用",
+            data=GrowthEvaluateVideoResponse(errorCode="EVALUATION_CONFIG_UNAVAILABLE"),
+        )
+
+    frame_results: List[GrowthVideoFrameEvaluationResponse] = []
+    for frame_input, frame_evaluation in zip(
+        request.frames, evaluation.frame_evaluations
+    ):
+        counts = frame_evaluation.status_counts
+        stats = GrowthStats(
+            small=counts.get("small", 0),
+            normal=counts.get("normal", 0),
+            large=counts.get("large", 0),
+            unassessed=counts.get("unassessed", 0),
+            detectedCount=len(frame_evaluation.fish),
+            measurableCount=frame_evaluation.measurable_count,
+            unmeasurableCount=frame_evaluation.unmeasurable_count,
+        )
+        frame_results.append(
+            GrowthVideoFrameEvaluationResponse(
+                frameId=frame_input.frameId,
+                detections=[
+                    GrowthEvaluatedFishItem(
+                        id=item.id,
+                        status=cast(GrowthStatus, item.status),
+                        statusText=item.status_text,
+                    )
+                    for item in frame_evaluation.fish
+                ],
+                stats=stats,
+                summary=GrowthSummary(
+                    avgBodyLengthCm=round(
+                        frame_evaluation.all_measurable_avg_length_cm or 0, 1
+                    ),
+                    avgWeightG=0,
+                ),
+                assessment=_to_assessment(frame_evaluation),
+                frameStatus=(
+                    "evaluable"
+                    if frame_evaluation.trimmed_mean_length_cm is not None
+                    else (
+                        "insufficient_sample"
+                        if stats.detectedCount > 0
+                        else "no_valid_detection"
+                    )
+                ),
+            )
+        )
+
+    return BaseResponse[GrowthEvaluateVideoResponse](
+        code=SUCCESS_CODE,
+        msg="视频评价已更新",
+        data=GrowthEvaluateVideoResponse(
+            frames=frame_results,
+            assessment=_to_video_assessment(evaluation),
+            summary=GrowthSummary(
+                avgBodyLengthCm=round(evaluation.video_length_cm or 0, 1),
+                avgWeightG=round(_estimate_weight(evaluation.video_length_cm or 0), 1),
+            ),
+            errorCode=None,
+        ),
+    )
+
+
 @router.post("/detect/video", response_model=BaseResponse[GrowthVideoDetectCreateResponse])
 async def create_growth_video_task(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    cultureMonth: Optional[int] = Form(None),
+    stockingAvgLengthCm: Optional[float] = Form(None),
 ):
     filename = file.filename or "growth-video.mp4"
     suffix = Path(filename).suffix.lower()
@@ -966,7 +1379,10 @@ async def create_growth_video_task(
         temp_file.close()
 
     task_id = uuid.uuid4().hex
+    created_at = time.time()
     initial_video = GrowthVideoMeta(filename=filename, durationSec=0)
+    with _video_task_lock:
+        _video_cancel_requested[task_id] = False
     _set_video_task(
         task_id,
         _build_video_result(
@@ -977,7 +1393,9 @@ async def create_growth_video_task(
             frames=[],
             selected_frame_id=None,
             error_code=None,
-            started_at=time.time(),
+            created_at=created_at,
+            culture_month=cultureMonth,
+            stocking_avg_length_cm=stockingAvgLengthCm,
         ),
     )
     background_tasks.add_task(_process_video_task, task_id, temp_path, filename)
@@ -1012,10 +1430,79 @@ def get_growth_video_task(task_id: str):
         "processing": "视频关键帧识别中",
         "success": "视频识别完成",
         "failed": "视频识别失败",
+        "cancelled": "视频识别已取消",
     }[task.taskStatus]
     return BaseResponse[GrowthVideoDetectResultResponse](
         code=SUCCESS_CODE,
         msg=status_message,
+        data=task,
+    )
+
+
+@router.post(
+    "/detect/video/{task_id}/cancel",
+    response_model=BaseResponse[GrowthVideoDetectResultResponse],
+)
+def cancel_growth_video_task(task_id: str):
+    """请求协作式取消：当前帧完成后不再启动下一帧。"""
+    task = _get_video_task(task_id)
+    if task is None:
+        return BaseResponse[GrowthVideoDetectResultResponse](
+            code=ERROR_CODE,
+            msg="视频任务不存在: INTERNAL_ERROR",
+            data=_build_video_result(task_id, "failed", error_code="INTERNAL_ERROR"),
+        )
+    if task.taskStatus in {"success", "failed", "cancelled"}:
+        return BaseResponse[GrowthVideoDetectResultResponse](
+            code=SUCCESS_CODE,
+            msg="视频任务已结束",
+            data=task,
+        )
+    with _video_task_lock:
+        _video_cancel_requested[task_id] = True
+    if task.taskStatus == "queued":
+        cancelled = task.model_copy(
+            update={
+                "taskStatus": "cancelled",
+                "progress": 100,
+                "warningCode": "USER_CANCELLED",
+                "finishedAt": time.time(),
+            }
+        )
+        _set_video_task(task_id, cancelled)
+    return BaseResponse[GrowthVideoDetectResultResponse](
+        code=SUCCESS_CODE,
+        msg="已请求取消视频识别",
+        data=_get_video_task(task_id) or task,
+    )
+
+
+@router.delete(
+    "/detect/video/{task_id}",
+    response_model=BaseResponse[GrowthVideoDetectResultResponse],
+)
+def delete_growth_video_task(task_id: str):
+    """只释放终态任务的内存结果，活动任务必须先取消。"""
+    with _video_task_lock:
+        task = _video_tasks.get(task_id)
+        if task is None:
+            return BaseResponse[GrowthVideoDetectResultResponse](
+                code=ERROR_CODE,
+                msg="视频任务不存在: INTERNAL_ERROR",
+                data=_build_video_result(task_id, "failed", error_code="INTERNAL_ERROR"),
+            )
+        if task.taskStatus not in {"success", "failed", "cancelled"}:
+            return BaseResponse[GrowthVideoDetectResultResponse](
+                code=ERROR_CODE,
+                msg="活动视频任务需先取消",
+                data=task,
+            )
+        del _video_tasks[task_id]
+        _video_cancel_requested.pop(task_id, None)
+        print(f"[Growth] 清理视频任务 {task_id}：用户主动释放终态结果")
+    return BaseResponse[GrowthVideoDetectResultResponse](
+        code=SUCCESS_CODE,
+        msg="视频任务已释放",
         data=task,
     )
 

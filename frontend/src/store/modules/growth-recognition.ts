@@ -27,6 +27,12 @@ export interface LatestGrowthRecognitionSummary {
   detectedCount: number
   measurableCount: number
   unmeasurableCount: number
+  /** 视频任务的关键帧口径；图片摘要不填写。 */
+  plannedFrameCount?: number
+  completedFrameCount?: number
+  evaluableFrameCount?: number
+  detectionOccurrenceCount?: number
+  measurableOccurrenceCount?: number
   measurableRatio: number
   avgBodyLengthCm: number
   avgWeightG: number
@@ -124,6 +130,26 @@ export const useGrowthRecognitionStore = defineStore(
           detectedCount,
           measurableCount,
           unmeasurableCount: normalizeCount(input.unmeasurableCount),
+          plannedFrameCount:
+            input.plannedFrameCount === undefined
+              ? undefined
+              : normalizeCount(input.plannedFrameCount),
+          completedFrameCount:
+            input.completedFrameCount === undefined
+              ? undefined
+              : normalizeCount(input.completedFrameCount),
+          evaluableFrameCount:
+            input.evaluableFrameCount === undefined
+              ? undefined
+              : normalizeCount(input.evaluableFrameCount),
+          detectionOccurrenceCount:
+            input.detectionOccurrenceCount === undefined
+              ? undefined
+              : normalizeCount(input.detectionOccurrenceCount),
+          measurableOccurrenceCount:
+            input.measurableOccurrenceCount === undefined
+              ? undefined
+              : normalizeCount(input.measurableOccurrenceCount),
           small: normalizeCount(input.small),
           normal: normalizeCount(input.normal),
           large: normalizeCount(input.large),

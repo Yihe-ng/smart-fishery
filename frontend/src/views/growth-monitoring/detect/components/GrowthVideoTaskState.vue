@@ -8,6 +8,10 @@
 
       <div v-if="taskStatus === 'queued' || taskStatus === 'processing'" class="state-progress">
         <el-progress :percentage="progress" :stroke-width="10" />
+        <el-button v-if="!isCancelling" type="danger" text size="small" @click="emit('cancel')">
+          取消识别
+        </el-button>
+        <span v-else class="cancel-copy">正在取消</span>
       </div>
     </div>
   </el-card>
@@ -15,24 +19,47 @@
 
 <script setup lang="ts">
   import { computed } from 'vue'
-  import type { GrowthStats, GrowthVideoTaskStatus } from '@/types/growth-monitoring'
+  import type {
+    GrowthStats,
+    GrowthVideoTaskStage,
+    GrowthVideoTaskStatus
+  } from '@/types/growth-monitoring'
+
+  defineOptions({ name: 'GrowthVideoTaskState' })
 
   const props = withDefaults(
     defineProps<{
       taskStatus: GrowthVideoTaskStatus | null
+      stage: GrowthVideoTaskStage
       progress: number
       filename?: string
       frameCount?: number
+      plannedFrameCount?: number
+      completedFrameCount?: number
+      evaluableFrameCount?: number
+      detectionOccurrenceCount?: number
       aggregateStats?: GrowthStats | null
       errorMessage?: string
+      isPartial?: boolean
+      isCancelling?: boolean
     }>(),
     {
       filename: '',
       frameCount: 0,
+      plannedFrameCount: 0,
+      completedFrameCount: 0,
+      evaluableFrameCount: 0,
+      detectionOccurrenceCount: 0,
       aggregateStats: null,
-      errorMessage: ''
+      errorMessage: '',
+      isPartial: false,
+      isCancelling: false
     }
   )
+
+  const emit = defineEmits<{
+    cancel: []
+  }>()
 
   const visible = computed(() => Boolean(props.taskStatus))
 
@@ -41,11 +68,15 @@
       case 'queued':
         return '视频任务已创建'
       case 'processing':
-        return '正在抽取关键帧并识别石斑鱼'
+        return props.stage === 'finalizing'
+          ? '正在整理已完成的关键帧结果'
+          : '正在抽取关键帧并识别石斑鱼'
       case 'failed':
         return '视频识别失败'
+      case 'cancelled':
+        return '视频识别已取消'
       case 'success':
-        return '视频关键帧识别完成'
+        return props.isPartial ? '视频识别部分完成' : '视频关键帧识别完成'
       default:
         return ''
     }
@@ -58,11 +89,15 @@
           ? `已接收 ${props.filename}，正在排队处理。`
           : '视频已接收，正在排队处理。'
       case 'processing':
-        return `当前进度 ${props.progress}% ，系统会按时间顺序提取关键帧。`
+        return props.stage === 'preparing'
+          ? '正在准备模型与视频关键帧。'
+          : `正在处理关键帧 ${props.completedFrameCount}/${props.plannedFrameCount}，其中 ${props.evaluableFrameCount} 个可评价。`
       case 'failed':
         return props.errorMessage || '视频解析失败，请更换视频后重试。'
+      case 'cancelled':
+        return `已保留 ${props.completedFrameCount} 个已完成关键帧，本次不生成视频级结论。`
       case 'success':
-        return `已提取 ${props.frameCount} 张关键帧，累计识别 ${props.aggregateStats?.detectedCount ?? 0} 条鱼。`
+        return `已分析 ${props.completedFrameCount}/${props.plannedFrameCount} 个关键帧，其中 ${props.evaluableFrameCount} 个可评价，累计获得 ${props.detectionOccurrenceCount} 次鱼体检测。`
       default:
         return ''
     }
@@ -101,6 +136,13 @@
   .state-progress {
     width: min(240px, 40%);
     min-width: 180px;
+  }
+
+  .cancel-copy {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--el-color-danger);
   }
 
   @media (width <= 768px) {

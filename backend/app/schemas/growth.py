@@ -9,7 +9,9 @@ GrowthTaskStatus = Literal["success", "failed"]
 GrowthStatus = Literal["small", "normal", "large", "unassessed", "unmeasurable"]
 # 群体状态：insufficient=有效可测样本不足；unassessed=未提供养殖参数，仅完成测量。
 GrowthCohortStatus = Literal["small", "normal", "large", "insufficient", "unassessed"]
-GrowthVideoTaskStatus = Literal["queued", "processing", "success", "failed"]
+GrowthVideoTaskStatus = Literal["queued", "processing", "success", "failed", "cancelled"]
+GrowthVideoTaskStage = Literal["queued", "preparing", "analyzing", "finalizing"]
+GrowthVideoFrameStatus = Literal["evaluable", "insufficient_sample", "no_valid_detection"]
 
 
 class GrowthImageMeta(BaseModel):
@@ -149,12 +151,45 @@ class GrowthVideoMeta(BaseModel):
 
 class GrowthVideoFrameItem(BaseModel):
     frameId: str
-    timestampSec: int
+    timestampSec: float
     image: GrowthImageMeta
     detections: List[GrowthDetectionItem] = Field(default_factory=list)
     selectedDetectionId: Optional[str] = None
     stats: GrowthStats = Field(default_factory=GrowthStats)
     summary: GrowthSummary = Field(default_factory=GrowthSummary)
+    assessment: Optional[GrowthAssessment] = None
+    frameStatus: GrowthVideoFrameStatus = "no_valid_detection"
+
+
+class GrowthVideoFrameMeasurementInput(BaseModel):
+    """视频轻量重评的单帧输入：只传帧编号和已有测量结果。"""
+
+    frameId: str
+    fishMeasurements: List[FishMeasurementInput] = Field(default_factory=list)
+
+
+class GrowthEvaluateVideoRequest(BaseModel):
+    """修改视频评价参数时的轻量请求，不携带图片、掩码或模型概率。"""
+
+    cultureMonth: Optional[int] = None
+    stockingAvgLengthCm: Optional[float] = None
+    frames: List[GrowthVideoFrameMeasurementInput] = Field(default_factory=list)
+
+
+class GrowthVideoFrameEvaluationResponse(BaseModel):
+    frameId: str
+    detections: List[GrowthEvaluatedFishItem] = Field(default_factory=list)
+    stats: GrowthStats = Field(default_factory=GrowthStats)
+    summary: GrowthSummary = Field(default_factory=GrowthSummary)
+    assessment: Optional[GrowthAssessment] = None
+    frameStatus: GrowthVideoFrameStatus = "no_valid_detection"
+
+
+class GrowthEvaluateVideoResponse(BaseModel):
+    frames: List[GrowthVideoFrameEvaluationResponse] = Field(default_factory=list)
+    assessment: Optional[GrowthAssessment] = None
+    summary: GrowthSummary = Field(default_factory=GrowthSummary)
+    errorCode: Optional[str] = None
 
 
 class GrowthVideoDetectCreateResponse(BaseModel):
@@ -165,11 +200,24 @@ class GrowthVideoDetectCreateResponse(BaseModel):
 class GrowthVideoDetectResultResponse(BaseModel):
     taskId: str
     taskStatus: GrowthVideoTaskStatus
+    stage: GrowthVideoTaskStage = "queued"
     progress: int = 0
     video: Optional[GrowthVideoMeta] = None
+    cultureMonth: Optional[int] = None
+    stockingAvgLengthCm: Optional[float] = None
     selectedFrameId: Optional[str] = None
     frames: List[GrowthVideoFrameItem] = Field(default_factory=list)
     aggregateStats: GrowthStats = Field(default_factory=GrowthStats)
     aggregateSummary: GrowthSummary = Field(default_factory=GrowthSummary)
+    assessment: Optional[GrowthAssessment] = None
+    plannedFrameCount: int = 0
+    completedFrameCount: int = 0
+    evaluableFrameCount: int = 0
+    detectionOccurrenceCount: int = 0
+    measurableOccurrenceCount: int = 0
+    isPartial: bool = False
+    warningCode: Optional[str] = None
     errorCode: Optional[str] = None
     startedAt: Optional[float] = None
+    createdAt: Optional[float] = None
+    finishedAt: Optional[float] = None

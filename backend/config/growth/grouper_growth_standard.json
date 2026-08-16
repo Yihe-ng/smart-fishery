@@ -4,6 +4,9 @@
     "min_measurable_count": 3,
     "drop_shortest_count": 1
   },
+  "video_cohort_rule": {
+    "min_evaluable_frames": 3
+  },
   "weight_estimation": {
     "coefficient_a": 0.0285,
     "exponent_b": 2.937
@@ -74,10 +77,5 @@
       "small_ratio": 0.85,
       "large_ratio": 1.15
     }
-  },
-  "legacy_video_rule": {
-    "temporary": true,
-    "small_threshold_cm": 15.0,
-    "large_threshold_cm": 25.0
   }
 }

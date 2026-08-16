@@ -26,7 +26,7 @@
 
         <div class="growth-metrics">
           <div class="growth-metric">
-            <span>群体评价平均全长</span>
+            <span>{{ growthMetricLabel }}</span>
             <strong>{{ formatLengthCm(growthSummary.trimmedMeanLengthCm) }} cm</strong>
           </div>
           <div class="growth-metric">
@@ -60,7 +60,7 @@
 
       <section v-else class="empty-state">
         <ArtSvgIcon icon="ri:scales-3-line" size="24" />
-        <p>暂无生长识别结果，先完成一次图片生长识别才能生成生长与投喂建议。</p>
+        <p>暂无生长识别结果，先完成一次图片或视频生长识别才能生成生长与投喂建议。</p>
         <ElButton type="primary" size="small" @click="goGrowthRecognition">前往生长识别</ElButton>
       </section>
 
@@ -158,6 +158,9 @@
   const cohortText = computed(() => GROWTH_COHORT_STATUS_TEXT[cohortStatus.value])
   const cohortTagType = computed(() => getGrowthCohortTagType(cohortStatus.value))
   const growthBlockClass = computed(() => ({ expired: growthExpired.value }))
+  const growthMetricLabel = computed(() =>
+    growthSummary.value?.sourceType === 'video' ? '视频群体评价全长' : '群体评价平均全长'
+  )
 
   const recognizedAtText = computed(() => {
     if (!growthSummary.value?.recognizedAt) return '--'
@@ -207,9 +210,19 @@
       items.push(`本月综合参考全长 ${formatLengthCm(summary.referenceLengthCm)} cm`)
     }
 
-    items.push(
-      `识别总数 ${summary.detectedCount} 条，可测 ${summary.measurableCount} 条，不可测 ${summary.unmeasurableCount} 条`
-    )
+    if (summary.sourceType === 'video') {
+      const completed = summary.completedFrameCount ?? 0
+      const planned = summary.plannedFrameCount ?? completed
+      const evaluable = summary.evaluableFrameCount ?? 0
+      items.push(`基于已完成 ${completed}/${planned} 个关键帧，其中 ${evaluable} 个可评价`)
+      items.push(
+        `累计鱼体检测 ${summary.detectionOccurrenceCount ?? summary.detectedCount} 次，可测 ${summary.measurableOccurrenceCount ?? summary.measurableCount} 次，不可测 ${summary.unmeasurableCount} 次`
+      )
+    } else {
+      items.push(
+        `识别总数 ${summary.detectedCount} 条，可测 ${summary.measurableCount} 条，不可测 ${summary.unmeasurableCount} 条`
+      )
+    }
 
     if (summary.allMeasurableAvgLengthCm != null) {
       items.push(`全部可测鱼平均全长 ${formatLengthCm(summary.allMeasurableAvgLengthCm)} cm`)

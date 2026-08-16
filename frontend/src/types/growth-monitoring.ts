@@ -1,5 +1,7 @@
 export type GrowthTaskStatus = 'idle' | 'uploading' | 'processing' | 'success' | 'failed'
-export type GrowthVideoTaskStatus = 'queued' | 'processing' | 'success' | 'failed'
+export type GrowthVideoTaskStatus = 'queued' | 'processing' | 'success' | 'failed' | 'cancelled'
+export type GrowthVideoTaskStage = 'queued' | 'preparing' | 'analyzing' | 'finalizing'
+export type GrowthVideoFrameStatus = 'evaluable' | 'insufficient_sample' | 'no_valid_detection'
 
 /**
  * 单鱼生长状态。
@@ -20,6 +22,7 @@ export type GrowthDetectErrorCode =
   | 'INVALID_IMAGE'
   | 'IMAGE_TOO_LARGE'
   | 'IMAGE_DECODE_FAILED'
+  | 'GROWTH_INFERENCE_BUSY'
   | 'NO_FISH_DETECTED'
   | 'MODEL_INFERENCE_FAILED'
   | 'INTERNAL_ERROR'
@@ -28,10 +31,19 @@ export type GrowthVideoDetectErrorCode =
   | 'INVALID_VIDEO'
   | 'VIDEO_TOO_LARGE'
   | 'VIDEO_DECODE_FAILED'
+  | 'VIDEO_TOO_SHORT'
   | 'NO_VALID_FRAMES'
   | 'PROCESS_TIMEOUT'
+  | 'PARTIAL_FRAME_FAILURE'
+  | 'USER_CANCELLED'
+  | 'GROWTH_INFERENCE_BUSY'
   | 'MODEL_INFERENCE_FAILED'
   | 'INTERNAL_ERROR'
+
+export interface GrowthAssessmentParams {
+  cultureMonth?: number | null
+  stockingAvgLengthCm?: number | null
+}
 
 export interface GrowthStats {
   small: number
@@ -156,6 +168,35 @@ export interface GrowthVideoFrameItem {
   selectedDetectionId: string | null
   stats: GrowthStats
   summary: GrowthSummary
+  assessment?: GrowthAssessment | null
+  frameStatus: GrowthVideoFrameStatus
+}
+
+export interface GrowthVideoFrameMeasurementInput {
+  frameId: string
+  fishMeasurements: GrowthFishMeasurementInput[]
+}
+
+export interface GrowthEvaluateVideoRequest {
+  cultureMonth: number | null
+  stockingAvgLengthCm: number | null
+  frames: GrowthVideoFrameMeasurementInput[]
+}
+
+export interface GrowthVideoFrameEvaluationResponse {
+  frameId: string
+  detections: GrowthEvaluatedFishItem[]
+  stats: GrowthStats
+  summary: GrowthSummary
+  assessment: GrowthAssessment | null
+  frameStatus: GrowthVideoFrameStatus
+}
+
+export interface GrowthEvaluateVideoResponse {
+  frames: GrowthVideoFrameEvaluationResponse[]
+  assessment: GrowthAssessment | null
+  summary: GrowthSummary
+  errorCode: string | null
 }
 
 export interface GrowthVideoDetectCreateResponse {
@@ -166,11 +207,24 @@ export interface GrowthVideoDetectCreateResponse {
 export interface GrowthVideoDetectResultResponse {
   taskId: string
   taskStatus: GrowthVideoTaskStatus
+  stage: GrowthVideoTaskStage
   progress: number
   video: GrowthVideoMeta | null
+  cultureMonth: number | null
+  stockingAvgLengthCm: number | null
   selectedFrameId: string | null
   frames: GrowthVideoFrameItem[]
   aggregateStats: GrowthStats
   aggregateSummary: GrowthSummary
+  assessment: GrowthAssessment | null
+  plannedFrameCount: number
+  completedFrameCount: number
+  evaluableFrameCount: number
+  detectionOccurrenceCount: number
+  measurableOccurrenceCount: number
+  isPartial: boolean
+  warningCode: string | null
   errorCode: GrowthVideoDetectErrorCode | null
+  createdAt?: number | null
+  finishedAt?: number | null
 }
