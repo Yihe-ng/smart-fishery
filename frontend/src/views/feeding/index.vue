@@ -70,17 +70,9 @@
 
       <!-- 右侧：45% -->
       <el-col :span="11" class="right-column">
-        <div class="growth-reference-section">
-          <GrowthRecognitionSummaryCard :pond-id="pondId" compact />
-        </div>
-
-        <!-- AI投喂建议 - 移至最上方 -->
+        <!-- 生长与投喂建议 - 置顶主位；独立的“最近生长识别参考”卡片已合并进本卡片（方案 §8.1） -->
         <div class="suggestion-section">
-          <AISuggestionPanel
-            :pond-id="pondId"
-            :current-index="currentIndex"
-            @adopt-suggestion="handleAdoptSuggestion"
-          />
+          <AISuggestionPanel :pond-id="pondId" :current-index="currentIndex" />
         </div>
 
         <!-- 投喂执行日志 - 中间位置 -->
@@ -140,7 +132,6 @@
   import VideoPlayer from '@/views/dashboard/fishery-console/components/VideoPlayer.vue'
   import AISuggestionPanel from './components/AISuggestionPanel.vue'
   import WeatherCard from './components/WeatherCard.vue'
-  import GrowthRecognitionSummaryCard from '@/components/business/GrowthRecognitionSummaryCard.vue'
   import { useDemoFrameSnapshot } from '@/composables/use-demo-frame-snapshot'
   import { getVideoList } from '@/api/video'
   import type { FeedingConfig, FeedingLog } from '@/types/feeding'
@@ -195,13 +186,6 @@
       console.error('Failed to send feeding command:', error)
       ElMessage.error('投喂指令发送失败')
     }
-  }
-
-  // 处理采纳建议
-  const handleAdoptSuggestion = (suggestedAmount: number) => {
-    // 将建议投喂量应用到配置中
-    // 这里可以根据建议调整饲料系数或记录建议值
-    ElMessage.success(`已采纳AI建议：建议投喂量 ${suggestedAmount}g`)
   }
 
   const fetchVideoList = async () => {
@@ -384,16 +368,7 @@
     height: 100%;
     min-height: 0;
 
-    .growth-reference-section {
-      flex: 0 0 clamp(310px, 30vh, 340px);
-      min-height: 0;
-
-      :deep(.growth-summary-card) {
-        height: 100%;
-      }
-    }
-
-    // AI投喂建议 - 最上方，向下拉长
+    // 生长与投喂建议 - 最上方，向下拉长
     .suggestion-section {
       flex: 1;
       min-height: 230px;
@@ -499,7 +474,6 @@
     }
 
     .right-column {
-      .growth-reference-section,
       .suggestion-section,
       .logs-card {
         flex: initial;

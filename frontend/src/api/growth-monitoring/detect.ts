@@ -1,9 +1,17 @@
 import api from '@/utils/http'
 import type {
   GrowthDetectResponse,
+  GrowthEvaluateRequest,
+  GrowthEvaluateResponse,
   GrowthVideoDetectCreateResponse,
   GrowthVideoDetectResultResponse
 } from '@/types/growth-monitoring'
+
+/** 图片识别可选的月度评价参数；不传时后端只测量体长，可测鱼状态为“未评估” */
+export interface GrowthAssessmentParams {
+  cultureMonth?: number | null
+  stockingAvgLengthCm?: number | null
+}
 
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -14,7 +22,15 @@ function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
-export async function detectGrowth(img: string | Blob): Promise<GrowthDetectResponse> {
+/**
+ * 提交图片进行生长识别，可选携带养殖月数与投苗平均全长以触发月度生长评价。
+ * assessment 参数缺省时后端仅返回体长测量结果，可测鱼状态为“未评估”。
+ * 该请求会在后端运行分割与分类模型，耗时较长且不自动重试。
+ */
+export async function detectGrowth(
+  img: string | Blob,
+  assessment?: GrowthAssessmentParams
+): Promise<GrowthDetectResponse> {
   let base64Data: string
 
   if (img instanceof Blob) {
@@ -26,9 +42,31 @@ export async function detectGrowth(img: string | Blob): Promise<GrowthDetectResp
 
   return api.post<GrowthDetectResponse>({
     url: '/api/growth/detect',
-    params: { image: base64Data },
-    // 图片识别包含分割、分类和几何测长，按方案单独放宽到 60 秒；其他请求仍为 15 秒。
-    timeout: 60_000
+    data: {
+      image: base64Data,
+      cultureMonth: assessment?.cultureMonth ?? null,
+      stockingAvgLengthCm: assessment?.stockingAvgLengthCm ?? null
+    },
+    // 图片识别包含分割、分类和几何测长，按方案 §13 放宽到 90 秒；其他请求仍为 15 秒。
+    timeout: 90_000
+  })
+}
+
+/**
+ * 轻量重评：仅用已有的单鱼测量结果与新的月份参数重算生长状态。
+ * 后端不会重新加载模型、不读取图片、不重复测长，因此超时按方案 §13 设为 10 秒且不重试。
+ * 失败时调用方需保留上一次成功的参数与结论，不能用失败结果覆盖当前展示。
+ */
+export async function evaluateGrowth(
+  payload: GrowthEvaluateRequest,
+  options?: { signal?: AbortSignal; showErrorMessage?: boolean }
+): Promise<GrowthEvaluateResponse> {
+  return api.post<GrowthEvaluateResponse>({
+    url: '/api/growth/evaluate',
+    data: payload,
+    timeout: 10_000,
+    signal: options?.signal,
+    showErrorMessage: options?.showErrorMessage ?? false
   })
 }
 

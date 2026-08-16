@@ -15,12 +15,14 @@
         :key="item.id"
         type="button"
         class="list-item"
-        :class="{ active: item.id === selectedId }"
+        :class="{ active: item.id === selectedId, 'status-hidden': !SHOW_GROWTH_STATUS_UI }"
         @click="emit('select', item.id)"
       >
         <span class="item-index">第 {{ item.index }} 条鱼</span>
-        <span class="item-status">{{ item.statusText }}</span>
-        <span class="item-length">{{ item.isMeasurable ? `${item.bodyLengthCm}cm` : '-' }}</span>
+        <span v-if="SHOW_GROWTH_STATUS_UI" class="item-status">{{ item.statusText }}</span>
+        <span class="item-length">
+          {{ item.isMeasurable ? `${item.bodyLengthCm.toFixed(1)}cm` : '-' }}
+        </span>
       </button>
     </div>
   </el-card>
@@ -29,6 +31,7 @@
 <script setup lang="ts">
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import type { GrowthDetectionItem } from '@/types/growth-monitoring'
+  import { SHOW_GROWTH_STATUS_UI } from '../constants/statusColors'
 
   defineProps<{
     detections: GrowthDetectionItem[]
@@ -110,6 +113,10 @@
     .list-item.active {
       background: rgb(64 158 255 / 8%);
       border-color: rgb(64 158 255 / 40%);
+    }
+
+    .list-item.status-hidden {
+      grid-template-columns: 1.2fr 0.7fr;
     }
 
     .item-index {

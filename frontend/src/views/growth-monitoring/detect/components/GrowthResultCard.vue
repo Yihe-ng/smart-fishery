@@ -10,11 +10,13 @@
     <template v-if="result">
       <el-descriptions :column="1" border>
         <el-descriptions-item label="编号">第 {{ result.index }} 条鱼</el-descriptions-item>
-        <el-descriptions-item label="生长状态">
+        <el-descriptions-item v-if="SHOW_GROWTH_STATUS_UI" label="生长状态">
           <el-tag :type="statusType">{{ result.statusText }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="估算体长">
-          <span class="metric-value">{{ result.isMeasurable ? result.bodyLengthCm : '-' }}</span>
+          <span class="metric-value">
+            {{ result.isMeasurable ? result.bodyLengthCm.toFixed(1) : '-' }}
+          </span>
           <span v-if="result.isMeasurable" class="metric-unit">cm</span>
         </el-descriptions-item>
         <el-descriptions-item label="估算重量">
@@ -32,6 +34,7 @@
   import { computed } from 'vue'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import type { GrowthDetectionItem } from '@/types/growth-monitoring'
+  import { SHOW_GROWTH_STATUS_UI, getGrowthStatusTagType } from '../constants/statusColors'
 
   const props = withDefaults(
     defineProps<{
@@ -43,20 +46,7 @@
     }
   )
 
-  const statusType = computed(() => {
-    switch (props.result?.status) {
-      case 'small':
-        return 'warning'
-      case 'normal':
-        return 'success'
-      case 'large':
-        return 'primary'
-      case 'unmeasurable':
-        return 'info'
-      default:
-        return 'info'
-    }
-  })
+  const statusType = computed(() => getGrowthStatusTagType(props.result?.status))
 </script>
 
 <style scoped lang="scss">

@@ -4,24 +4,77 @@
       <div class="panel-header">
         <div class="title-wrap">
           <ArtSvgIcon icon="ri:deepseek-fill" class="title-icon" />
-          <span class="title">AI 投喂建议</span>
+          <span class="title">生长与投喂建议</span>
         </div>
         <ElTag size="small" :type="panelTagType">{{ panelTagText }}</ElTag>
       </div>
     </template>
 
     <div class="panel-body" v-loading="loading">
+      <!-- 生长结论区：第一优先级，位于全部投喂建议之上（方案 §8.1） -->
+      <section v-if="growthSummary" class="growth-block" :class="growthBlockClass">
+        <div class="growth-head">
+          <div>
+            <h4>{{ cohortText }}</h4>
+            <p class="growth-meta">
+              最近一次成功识别：{{ recognizedAtText }}
+              <template v-if="growthExpired">｜已过期，仅供参考</template>
+            </p>
+          </div>
+          <ElTag :type="cohortTagType" effect="light">{{ cohortLabel }}</ElTag>
+        </div>
+
+        <div class="growth-metrics">
+          <div class="growth-metric">
+            <span>群体评价平均全长</span>
+            <strong>{{ formatLengthCm(growthSummary.trimmedMeanLengthCm) }} cm</strong>
+          </div>
+          <div class="growth-metric">
+            <span>本月参考范围</span>
+            <strong>{{ referenceRangeText }}</strong>
+          </div>
+          <div class="growth-metric">
+            <span>偏离比例</span>
+            <strong>{{ deviationText }}</strong>
+          </div>
+        </div>
+
+        <ul class="rationale-list">
+          <li v-for="reason in growthRationale" :key="reason">{{ reason }}</li>
+        </ul>
+
+        <p v-if="growthExpired" class="growth-advice muted">
+          识别结果已超过 24 小时，暂不生成新的投喂方向，请重新进行生长识别。
+        </p>
+        <p v-else-if="growthSummary.advice" class="growth-advice">
+          {{ growthSummary.advice }}
+        </p>
+
+        <div class="growth-actions">
+          <ElButton type="primary" size="small" @click="goGrowthRecognition">
+            重新进行生长识别
+          </ElButton>
+          <ElButton size="small" @click="continueGrowthAnalysis">继续分析</ElButton>
+        </div>
+      </section>
+
+      <section v-else class="empty-state">
+        <ArtSvgIcon icon="ri:scales-3-line" size="24" />
+        <p>暂无生长识别结果，先完成一次图片生长识别才能生成生长与投喂建议。</p>
+        <ElButton type="primary" size="small" @click="goGrowthRecognition">前往生长识别</ElButton>
+      </section>
+
       <div class="panel-meta">
         <span>状态：{{ modeLabel }}</span>
         <span v-if="latestUpdatedAt">更新时间：{{ latestUpdatedAt }}</span>
       </div>
 
-      <div v-if="cards.length === 0" class="empty-state">
-        <ArtSvgIcon icon="ri:message-3-line" size="24" />
-        <p>当前暂无投喂建议，请稍后刷新。</p>
-      </div>
-
-      <article v-for="card in cards" :key="card.id" class="suggestion-card" :class="card.severity">
+      <article
+        v-for="card in visibleCards"
+        :key="card.id"
+        class="suggestion-card"
+        :class="card.severity"
+      >
         <div class="suggestion-head">
           <div>
             <h4>{{ card.title }}</h4>
@@ -36,19 +89,6 @@
           <li v-for="reason in card.rationale" :key="reason">{{ reason }}</li>
         </ul>
 
-        <!-- 建议投喂量显示和采纳按钮 -->
-        <div v-if="card.suggestedAmount" class="suggested-amount">
-          <div class="amount-display">
-            <span class="amount-label">建议投喂量</span>
-            <span class="amount-value">{{ card.suggestedAmount }}g</span>
-            <span class="amount-hint">结合水质、设备、存塘和规则数据辅助判断</span>
-          </div>
-          <ElButton type="primary" size="small" class="adopt-btn" @click="adoptSuggestion(card)">
-            <ArtSvgIcon icon="ri:check-line" class="btn-icon" />
-            采纳建议
-          </ElButton>
-        </div>
-
         <div class="card-footer">
           <div class="metrics">
             <span>{{ card.updatedAt }}</span>
@@ -56,15 +96,6 @@
           <div class="actions">
             <ElButton type="primary" size="small" @click="continueInAssistant(card)">
               继续分析
-            </ElButton>
-            <ElButton
-              v-if="card.confirmRequired"
-              text
-              type="warning"
-              size="small"
-              @click="previewAction()"
-            >
-              动作预览
             </ElButton>
           </div>
         </div>
@@ -74,30 +105,120 @@
 </template>
 
 <script setup lang="ts">
+  import { useRouter } from 'vue-router'
   import { fetchFeedingSuggestions } from '@/api/agent'
   import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import { AI_MODE_LABEL } from '@/config/ai'
   import { useAIStore } from '@/store/modules/ai'
+  import {
+    DEFAULT_GROWTH_POND_ID,
+    useGrowthRecognitionStore
+  } from '@/store/modules/growth-recognition'
   import type { AISeverity, AISuggestionCard } from '@/types'
+  import {
+    GROWTH_COHORT_STATUS_LABEL,
+    GROWTH_COHORT_STATUS_TEXT,
+    getGrowthCohortTagType
+  } from '@/views/growth-monitoring/detect/constants/statusColors'
+  import { formatLengthCm } from '@/views/growth-monitoring/detect/constants/assessmentParams'
 
   const props = defineProps<{
     pondId?: string
     currentIndex?: number
   }>()
 
-  const emit = defineEmits<{
-    /** 采纳建议事件，传递建议投喂量 */
-    (e: 'adopt-suggestion', amount: number): void
-  }>()
-
+  const router = useRouter()
   const aiStore = useAIStore()
+  const growthRecognitionStore = useGrowthRecognitionStore()
   const loading = ref(false)
   const cards = ref<AISuggestionCard[]>([])
   const panelState = ref({ hasNewRisk: false, hasNewSuggestion: false })
 
-  const latestUpdatedAt = computed(() => cards.value[0]?.updatedAt ?? '')
+  /**
+   * “当前风险摘要”卡片暂停展示（方案 §8.3）。
+   * 该卡片当前依赖 Mock 水质、默认 1000 尾和平均 300 g 的规则，不足以作为生长结论的依据，
+   * 因此只在前端过滤渲染；后端 suggestion_service 的生成代码保持不动，后续接入真实数据后可直接恢复。
+   */
+  const HIDDEN_CARD_IDS = [
+    'feeding-risk-summary',
+    'feeding-recommendation',
+    'feeding-recommendation-unavailable'
+  ]
+
+  const visibleCards = computed(() => cards.value.filter((card) => !HIDDEN_CARD_IDS.includes(card.id)))
+
+  const activePondId = computed(() => props.pondId || DEFAULT_GROWTH_POND_ID)
+  const growthSummary = computed(() => growthRecognitionStore.getLatestSummary(activePondId.value))
+  const growthExpired = computed(() => growthRecognitionStore.isSummaryExpired(growthSummary.value))
+
+  const cohortStatus = computed(() => growthSummary.value?.cohortStatus ?? 'unassessed')
+  const cohortLabel = computed(() => GROWTH_COHORT_STATUS_LABEL[cohortStatus.value])
+  const cohortText = computed(() => GROWTH_COHORT_STATUS_TEXT[cohortStatus.value])
+  const cohortTagType = computed(() => getGrowthCohortTagType(cohortStatus.value))
+  const growthBlockClass = computed(() => ({ expired: growthExpired.value }))
+
+  const recognizedAtText = computed(() => {
+    if (!growthSummary.value?.recognizedAt) return '--'
+    return new Date(growthSummary.value.recognizedAt).toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  })
+
+  const referenceRangeText = computed(() => {
+    const summary = growthSummary.value
+    if (!summary || summary.smallThresholdCm == null || summary.largeThresholdCm == null) {
+      return '--'
+    }
+    return `${formatLengthCm(summary.smallThresholdCm)}–${formatLengthCm(summary.largeThresholdCm)} cm`
+  })
+
+  // 偏离比例 = （群体评价平均全长 - 综合参考全长）/ 综合参考全长，保留一位小数并带正负号。
+  const deviationText = computed(() => {
+    const summary = growthSummary.value
+    if (!summary?.trimmedMeanLengthCm || !summary.referenceLengthCm) return '--'
+
+    const ratio =
+      ((summary.trimmedMeanLengthCm - summary.referenceLengthCm) / summary.referenceLengthCm) * 100
+    const sign = ratio > 0 ? '+' : ''
+    return `${sign}${ratio.toFixed(1)}%`
+  })
+
+  /** 判断依据：只陈述已有的测量事实与参考口径，不假设投喂、水质、密度和健康数据 */
+  const growthRationale = computed(() => {
+    const summary = growthSummary.value
+    if (!summary) return []
+
+    const items: string[] = []
+
+    if (summary.cultureMonth && summary.stockingAvgLengthCm != null) {
+      items.push(
+        `投苗后第 ${summary.cultureMonth} 个月，投苗时平均全长 ${formatLengthCm(summary.stockingAvgLengthCm)} cm`
+      )
+    } else {
+      items.push('本次识别未提供养殖月数，仅完成体长测量')
+    }
+
+    if (summary.referenceLengthCm != null) {
+      items.push(`本月综合参考全长 ${formatLengthCm(summary.referenceLengthCm)} cm`)
+    }
+
+    items.push(
+      `识别总数 ${summary.detectedCount} 条，可测 ${summary.measurableCount} 条，不可测 ${summary.unmeasurableCount} 条`
+    )
+
+    if (summary.allMeasurableAvgLengthCm != null) {
+      items.push(`全部可测鱼平均全长 ${formatLengthCm(summary.allMeasurableAvgLengthCm)} cm`)
+    }
+
+    return items
+  })
+
+  const latestUpdatedAt = computed(() => visibleCards.value[0]?.updatedAt ?? '')
   const modeLabel = computed(() => {
-    const mode = cards.value[0]?.sourceMode ?? 'mock'
+    const mode = visibleCards.value[0]?.sourceMode ?? cards.value[0]?.sourceMode ?? 'mock'
     return AI_MODE_LABEL[mode]
   })
 
@@ -141,11 +262,8 @@
     }
   }
 
-  // 采纳建议
-  const adoptSuggestion = (card: AISuggestionCard) => {
-    if (card.suggestedAmount && card.suggestedAmount > 0) {
-      emit('adopt-suggestion', card.suggestedAmount)
-    }
+  const goGrowthRecognition = () => {
+    router.push('/fishery/growth')
   }
 
   const continueInAssistant = async (card: AISuggestionCard) => {
@@ -163,7 +281,7 @@
     )
   }
 
-  const previewAction = async () => {
+  const continueGrowthAnalysis = async () => {
     await aiStore.openAssistant(
       {
         pageId: 'feeding',
@@ -172,10 +290,10 @@
         currentIndex: props.currentIndex
       },
       {
-        activeTab: 'automation'
+        activeTab: 'chat',
+        initialPrompt: `请结合本页的群体生长结论"${cohortText.value}"继续分析后续管理方向。`
       }
     )
-    await aiStore.requestManualFeedingPreview(600)
   }
 
   watch(
@@ -203,7 +321,8 @@
   .card-footer,
   .actions,
   .metrics,
-  .suggestion-head {
+  .suggestion-head,
+  .growth-head {
     display: flex;
     gap: 10px;
     align-items: center;
@@ -247,9 +366,91 @@
     align-items: center;
     justify-content: center;
     min-height: 180px;
+    padding: 16px;
+    text-align: center;
     color: var(--el-text-color-secondary);
     border: 1px dashed var(--art-card-border);
     border-radius: 14px;
+
+    p {
+      max-width: 320px;
+      margin: 0;
+      line-height: 1.6;
+    }
+  }
+
+  .growth-block {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    background: color-mix(in srgb, var(--el-color-primary) 6%, var(--default-box-color));
+    border: 1px solid color-mix(in srgb, var(--el-color-primary) 20%, transparent);
+    border-radius: 16px;
+  }
+
+  .growth-block.expired {
+    background: color-mix(in srgb, var(--el-color-warning) 7%, var(--default-box-color));
+    border-color: rgb(245 158 11 / 35%);
+  }
+
+  .growth-head {
+    align-items: flex-start;
+  }
+
+  .growth-head h4 {
+    margin: 0 0 6px;
+    font-size: 15px;
+  }
+
+  .growth-meta {
+    margin: 0;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
+  .growth-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .growth-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px;
+    background: var(--art-hover-color);
+    border-radius: 8px;
+
+    span {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+    }
+
+    strong {
+      font-size: 15px;
+      font-variant-numeric: tabular-nums;
+      color: var(--el-text-color-primary);
+    }
+  }
+
+  .growth-advice {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--el-text-color-regular);
+  }
+
+  .growth-advice.muted {
+    color: var(--el-text-color-secondary);
+  }
+
+  .growth-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .suggestion-card {
@@ -295,48 +496,6 @@
     color: var(--el-text-color-secondary);
   }
 
-  // 建议投喂量和采纳按钮
-  .suggested-amount {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    background: var(--el-color-primary-light-9);
-    border: 1px solid var(--el-color-primary-light-7);
-    border-radius: 8px;
-
-    .amount-display {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-
-      .amount-label {
-        font-size: 11px;
-        color: var(--el-text-color-secondary);
-      }
-
-      .amount-value {
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--el-color-primary);
-      }
-
-      .amount-hint {
-        font-size: 11px;
-        line-height: 1.4;
-        color: var(--el-text-color-secondary);
-      }
-    }
-
-    .adopt-btn {
-      .btn-icon {
-        margin-right: 4px;
-        font-size: 14px;
-      }
-    }
-  }
-
   .card-footer {
     align-items: flex-end;
     margin-top: 4px;
@@ -351,5 +510,11 @@
 
   .actions {
     flex-shrink: 0;
+  }
+
+  @media (width <= 768px) {
+    .growth-metrics {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
